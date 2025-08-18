@@ -1,0 +1,43 @@
+ci:
+  autoupdate_schedule: quarterly
+
+# Stem Python-versie af op je project
+default_language_version:
+  python: python3
+
+repos:
+  # Basis hygiëne
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # Ruff eerst (met fixes), zodat Black/Docformatter daarna consistent kunnen formatteren
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.8
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+      # Gebruik ruff-format NIET als je Black gebruikt
+      # - id: ruff-format
+
+  # Docstrings formatteren (mild afgesteld om niet met Black te vechten)
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.7
+    hooks:
+      - id: docformatter
+        args: [--in-place]
+
+  # Laat Black als laatste lopen
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+
+  # --- Optioneel: ALS je isort wilt i.p.v. Ruff-imports ---
+  # - repo: https://github.com/pycqa/isort
+  #   rev: 5.13.2
+  #   hooks:
+  #     - id: isort
