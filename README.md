@@ -6,10 +6,30 @@ TimbrosaField is a powerful and user-friendly tool for analyzing, visualizing, a
 
 ## Features
 
-- **Support for WAV files:** Load and analyze mono and stereo audio files.
-- **Waveform visualization:** Dynamic downsampling for smooth and fast rendering.
-- **Metadata and tags:** Manage extensive metadata and custom tags for each recording.
-- **Configuration storage:** Settings and tag data are saved in a JSON configuration file.
+### Core Audio Processing
+- **Multi-format audio support:** Load and analyze WAV files (mono and stereo)
+- **Advanced waveform visualization:** Dynamic downsampling for smooth, real-time rendering
+- **Professional audio analysis:** Built-in spectrum analysis and audio metrics
+- **Cue point management:** Mark and annotate specific segments within recordings
+
+### Metadata & Tagging System
+- **Comprehensive metadata management:** Store extensive information for each recording
+- **Custom tagging system:** Create and apply custom tags with auto-completion
+- **Template system:** Quick-apply predefined tag templates (Ctrl+1-4)
+- **Batch tag editing:** Edit multiple files simultaneously
+- **Tag persistence:** Metadata stored directly in audio files
+
+### Workflow Integration
+- **Ableton Live export:** Generate optimized Ableton Live project templates
+- **File organization:** Advanced file management with directory browsing
+- **Configuration management:** Persistent settings and user preferences
+- **Analytics dashboard:** Visual insights into your recording collection
+
+### User Interface
+- **Intuitive PyQt5 interface:** Clean, professional desktop application
+- **Extensive keyboard shortcuts:** Streamlined workflow with 20+ shortcuts
+- **Zoom and navigation controls:** Precise waveform examination
+- **Audio playback controls:** Built-in player with seek and volume controls
 
 ---
 
