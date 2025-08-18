@@ -58,7 +58,8 @@ python main.py
 - Save your configuration so your tags and settings are retained upon reopening.
 
 ---
-
+![TimbrosaField Screenshot](./screenshots/main-interface.png)
+---
 ## Project structure
 
 ```
@@ -103,8 +104,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 ```
 
 ---
-
-
 ## Background
 
 Recently, I bought a Tascam Portacapture X6 and was curious how I could integrate these recordings into my Ableton projects. Unfortunately, Ableton does not read tags from WAV files, and manually renaming files with tags took too much time. While waiting for my cheese plate, I started analyzing the WAV files — and before I knew it, this project was born.
