@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         Creates comprehensive command mappings for all major application functions:
         - File operations (open, import, export, etc.)
         - Edit operations (tags, templates, configuration.)
-        - View controls (zoom, panels, display modes)
+        - View controls (zoom, panels, display modes.)
         - Audio playback controls
         - Analysis tools and help dialogs
 
