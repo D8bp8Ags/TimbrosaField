@@ -1411,17 +1411,45 @@ class ApplicationStylist:
         dark_colors = ApplicationStylist.COLORS.copy()
         dark_colors.update(
             {
-                "background": "#1e293b",
-                "surface": "#334155",
-                "surface_elevated": "#475569",
-                "text_primary": "#f8fafc",
-                "text_secondary": "#cbd5e1",
-                "text_muted": "#94a3b8",
-                "border": "#475569",
-                "divider": "#64748b",
+                # Primary colors - brighter for dark theme
+                "primary": "#3b82f6",
+                "primary_hover": "#60a5fa",
+                "primary_pressed": "#2563eb",
+
+                # Secondary colors for dark
+                "secondary": "#94a3b8",
+                "secondary_hover": "#cbd5e1",
+                "secondary_pressed": "#e2e8f0",
+
+                # Dark backgrounds
+                "background": "#0f0f23",  # Very dark navy
+                "surface": "#1a1b3a",  # Dark surface
+                "surface_elevated": "#252659",  # Elevated surface
+
+                # Dark borders and dividers
+                "border": "#374151",  # Subtle border
+                "divider": "#4b5563",  # Visible divider
+
+                # Dark text hierarchy
+                "text_primary": "#f9fafb",  # Almost white
+                "text_secondary": "#d1d5db",  # Light gray
+                "text_muted": "#9ca3af",  # Muted gray
+                "text_disabled": "#6b7280",  # Disabled gray
+
+                # Status colors - adjusted for dark
+                "success": "#10b981",
+                "warning": "#f59e0b",
+                "error": "#ef4444",
+                "info": "#06b6d4",
+
+                # Interactive states
+                "hover_overlay": "rgba(59, 130, 246, 0.15)",
+                "active_overlay": "rgba(59, 130, 246, 0.25)",
+                "focus_ring": "rgba(96, 165, 250, 0.4)",
             }
         )
-
+        ApplicationStylist.COLORS.update(dark_colors)
+        ApplicationStylist.apply_complete_styling(app)
         # Apply dark theme stylesheet
         print("🌙 Dark theme applied")
 
