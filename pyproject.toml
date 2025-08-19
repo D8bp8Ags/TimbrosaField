@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+# Pas aan naar jouw minimale Pythonversie
+target-version = ["py311"]
+# Houd bestaande quotes aan om churn met docformatter te voorkomen
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 88
+# Pas aan naar jouw minimale Pythonversie
+target-version = "py311"
+
+[tool.ruff.lint]
+# "I" = import sorteren door Ruff (vervangt isort)
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "D"]
+# Compatibel met Black
+# ignore = ["E203", "W503"]
+ignore = ["E501","PLR2004","BLE001", "SIM102", "SIM108", "SIM118"]
+# Sta autofixes toe; pre-commit zal met --fix draaien
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.docformatter]
+# Houd docstring-wrapping in lijn met Black
+wrap-summaries = 88
+wrap-descriptions = 88
+pre-summary-newline = false
+make-summary-multi-line = false
+close-quotes-on-newline = true
+
+# --- Optioneel: ALS je liever isort gebruikt i.p.v. Ruff voor imports ---
+# [tool.isort]
+# profile = "black"
+# line_length = 88
+# combine_as_imports = true
+# force_grid_wrap = 0
+# multi_line_output = 3
+# include_trailing_comma = true
