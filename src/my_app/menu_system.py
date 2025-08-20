@@ -1,11 +1,24 @@
-"""
-Menu System Module for Field Recorder Analyzer - UPDATED.
+"""Menu System Module for TimbrosaField Audio Analysis Application.
 
-This module extracts all menu functionality from MainWindow with proper delegation to
-specialized managers. Updated for Phase 4 with FileManager delegation and proper logging
-throughout.
+This module provides a comprehensive menu system architecture that separates menu
+logic from the main window through specialized menu handlers. Each handler manages
+a specific functional area (File, Edit, View, Audio, Analysis, Help) and routes
+operations through the main window's command interface system.
 
-Phase 2-4 of MainWindow refactoring - removes ~400 lines from main.py
+The module follows a clean separation of concerns pattern:
+- MenuBarManager: Central coordinator for all menu systems
+- MenuHandlerBase: Common functionality mixin for all handlers
+- Specialized Handlers: Domain-specific menu management (FileMenuHandler, etc.)
+
+All menu operations are routed through command interfaces for:
+- Consistent error handling and logging
+- Progress indication for long-running operations
+- Centralized shortcut management
+- Clean separation between UI and business logic
+
+Typical usage:
+    manager = MenuBarManager(main_window)
+    manager.setup_all_menus()
 """
 
 import logging
@@ -28,21 +41,72 @@ logger = logging.getLogger(__name__)
 
 ## TEST
 class MenuHandlerBase:
+    """Base class providing common functionality for menu handlers.
+    
+    This mixin class provides shared methods that can be used by all menu handler
+    classes to maintain consistency and reduce code duplication across the menu system.
+    """
+    
     def _apply_shortcut(self, action, command_group, command_name):
-        """Apply shortcut from GlobalShortcutManager to action."""
+        """Apply keyboard shortcut from GlobalShortcutManager to a QAction.
+        
+        Retrieves the keyboard shortcut associated with a specific command from
+        the global shortcut manager and applies it to the given QAction.
+        
+        Args:
+            action (QAction): The menu action to assign the shortcut to.
+            command_group (str): Name of the command group (e.g., "file_commands").
+            command_name (str): Specific command name within the group.
+            
+        Note:
+            If no shortcut is found for the command, the action remains without
+            a keyboard shortcut. This allows for flexible shortcut assignment
+            without breaking menu functionality.
+        """
         shortcut = self.main_window.shortcut_manager.get_shortcut_for_command(command_group, command_name)
         if shortcut:
             action.setShortcut(QKeySequence(shortcut))
 
 class MenuBarManager:
-    """Main coordinator for all menu systems.
+    """Central coordinator for the application's complete menu system.
 
-    This class sets up the menu bar and coordinates between different menu handlers
-    while keeping MainWindow clean.
+    This class orchestrates the creation and management of all menu bars and their
+    handlers, providing a clean separation between the main window and menu logic.
+    It initializes specialized menu handlers for different functional areas and
+    coordinates their setup and state synchronization.
+    
+    The manager maintains references to:
+    - FileMenuHandler: File operations (open, save, export, recent directories)
+    - EditMenuHandler: Editing operations (tags, templates, configuration)
+    - ViewMenuHandler: Display and visualization controls
+    - AudioMenuHandler: Audio playback and control functions
+    - AnalysisMenuHandler: Analysis tools and dashboards
+    - HelpMenuHandler: Help system and documentation
+    
+    Attributes:
+        main_window: Reference to the main application window.
+        file_handler: Handler for file menu operations.
+        edit_handler: Handler for edit menu operations.
+        view_handler: Handler for view menu operations.
+        audio_handler: Handler for audio menu operations.
+        analysis_handler: Handler for analysis menu operations.
+        help_handler: Handler for help menu operations.
     """
 
     def __init__(self, main_window):
-        """Initialize menu bar manager with reference to main window."""
+        """Initialize the MenuBarManager with specialized menu handlers.
+        
+        Creates instances of all menu handlers and establishes the connection
+        to the main window for command execution and state management.
+        
+        Args:
+            main_window: The main application window that provides command
+                        interfaces and serves as the parent for menu actions.
+                        
+        Note:
+            All menu handlers are initialized immediately but the actual menu
+            setup is deferred until setup_all_menus() is called.
+        """
         self.main_window = main_window
         #        self.wav_viewer = main_window.wav_viewer
 
@@ -57,7 +121,25 @@ class MenuBarManager:
         logger.info("MenuBarManager initialized with all handlers")
 
     def setup_all_menus(self):
-        """Setup complete menu bar with all menus."""
+        """Configure and display the complete application menu bar.
+        
+        Creates all menu categories and their associated actions by delegating
+        to the appropriate specialized handlers. After setup, synchronizes all
+        menu states with current application settings.
+        
+        The menu setup order is:
+        1. File menu (open, save, export, recent directories)
+        2. Edit menu (tags, templates, configuration)
+        3. View menu (display modes, themes, panels)
+        4. Audio menu (playback controls, volume)
+        5. Analysis menu (dashboards, analytics)
+        6. Help menu (documentation, shortcuts, about)
+        
+        Note:
+            Clears any existing menu bar content before setup to ensure
+            clean state. All menu states are synchronized with current
+            application settings after creation.
+        """
         menubar = self.main_window.menuBar()
 
         # Clear existing menus if any
@@ -76,7 +158,22 @@ class MenuBarManager:
         logger.info("Complete menu bar setup finished")
 
     def sync_all_menu_states(self):
-        """Sync all menu states with application settings."""
+        """Synchronize all menu item states with current application settings.
+        
+        Updates checkable menu items to reflect the current application state
+        by reading settings from the settings manager and updating menu handlers
+        accordingly. This ensures menu items accurately show current modes and preferences.
+        
+        Synchronized states include:
+        - Theme selection (light, dark, macOS dark)
+        - View mode (mono, stereo, overlay)
+        - Mouse label presets (minimal, performance, professional)
+        - Panel visibility states
+        
+        Note:
+            Called automatically after menu setup and should be called whenever
+            application settings change to keep menus in sync.
+        """
         settings = self.main_window.settings_manager
 
         # Theme
@@ -96,7 +193,19 @@ class MenuBarManager:
         # self.set_metadata_toggle_checked(show_metadata)
 
     def set_theme_checked(self, theme):
-        """Set theme menu checked state."""
+        """Update theme menu items to reflect the currently active theme.
+        
+        Searches through theme action group and sets the appropriate action
+        as checked based on the theme name. Uses object names for reliable matching.
+        
+        Args:
+            theme (str): Name of the active theme ("light", "dark", or "macos_dark").
+                        Must match the objectName of the corresponding theme action.
+                        
+        Note:
+            Only one theme action can be checked at a time due to the QActionGroup
+            mutual exclusivity. Invalid theme names are silently ignored.
+        """
         if hasattr(self.view_handler, 'theme_group'):
             for action in self.view_handler.theme_group.actions():
                 # Match op object name in plaats van text
@@ -104,7 +213,21 @@ class MenuBarManager:
                 action.setChecked(should_check)
 
     def set_view_mode_checked(self, mode):
-        """Set view mode checked state."""
+        """Update view mode menu items to reflect the current display mode.
+        
+        Searches through view mode actions and checks the appropriate item
+        based on the current waveform display mode.
+        
+        Args:
+            mode (str): Current view mode identifier:
+                       - "mono": Single channel view
+                       - "per_kanaal": Stereo/per-channel view
+                       - "overlay": Overlay view mode
+                       
+        Note:
+            Uses text matching to identify the correct action since view mode
+            actions don't use object names. Only one mode can be active at a time.
+        """
         if hasattr(self.view_handler, 'view_group'):
             for action in self.view_handler.view_group.actions():
                 if mode == "mono" and "Mono" in action.text():
@@ -115,7 +238,22 @@ class MenuBarManager:
                     action.setChecked(True)
 
     def set_mouse_preset_checked(self, preset):
-        """Set mouse preset checked state."""
+        """Update mouse label preset menu items to reflect the active preset.
+        
+        Sets the appropriate mouse label preset action as checked based on
+        the current preset configuration.
+        
+        Args:
+            preset (str): Name of the active mouse label preset:
+                         - "minimal": Minimal information display
+                         - "performance": Balanced info and performance
+                         - "professional": Complete professional info
+                         - "professional_advanced": All features enabled
+                         
+        Note:
+            Uses object name matching for reliable preset identification.
+            Only one preset can be active at a time due to QActionGroup exclusivity.
+        """
 
         if hasattr(self.view_handler, 'mouse_preset_group'):
             # for action in self.view_handler.mouse_preset_group.actions():
@@ -124,16 +262,52 @@ class MenuBarManager:
                 action.setChecked(action.objectName() == preset)
 
 # class FileMenuHandler:
-class FileMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
-
-    """Handles all File menu operations - CLEAN via command interface."""
+class FileMenuHandler(MenuHandlerBase):
+    """Specialized handler for all file-related menu operations.
+    
+    This class manages the File menu and all its associated actions, routing
+    commands through the main window's file_commands interface. It handles
+    directory operations, import/export functionality, recent directories,
+    and application exit.
+    
+    Key responsibilities:
+    - Directory opening and reloading
+    - Batch file import operations
+    - Export to Ableton Live and CSV formats
+    - Recent directories management and display
+    - Application exit with proper cleanup
+    
+    All operations are executed through the command interface for consistent
+    error handling and progress indication.
+    """
 
     def __init__(self, main_window):
+        """Initialize the FileMenuHandler with main window reference.
+        
+        Args:
+            main_window: Main application window that provides the file_commands
+                        interface for executing file operations.
+        """
         self.main_window = main_window
         logger.debug("FileMenuHandler initialized")
 
     def setup_file_menu(self, menubar):
-        """Setup File menu with all actions."""
+        """Create and configure the complete File menu with all actions.
+        
+        Sets up the File menu with organized sections:
+        - Directory operations (open, reload)
+        - Import/Export submenu (batch import, Ableton export, CSV export)
+        - Recent directories dynamic submenu
+        - Application exit
+        
+        Args:
+            menubar (QMenuBar): The main menu bar to add the File menu to.
+            
+        Note:
+            All actions are connected to the command interface for consistent
+            behavior. Shortcuts are applied automatically from the global
+            shortcut manager. Recent directories are populated dynamically.
+        """
         file_menu = menubar.addMenu("&File")
 
         # Open directory
@@ -204,7 +378,25 @@ class FileMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
         logger.debug("File menu setup completed")
 
     def _execute_file_command(self, command_name, *args):
-        """Execute file command with optional parameters."""
+        """Execute a file operation command through the command interface.
+        
+        Looks up and executes the specified command from the main window's
+        file_commands dictionary. Provides automatic recent directories menu
+        updates for relevant operations.
+        
+        Args:
+            command_name (str): Name of the command to execute from file_commands.
+            *args: Optional arguments to pass to the command function.
+            
+        Returns:
+            The return value of the executed command, or False if the command
+            fails or is not available.
+            
+        Note:
+            Automatically updates the recent directories menu after directory
+            operations (open_directory, reload_directory, open_recent_directory)
+            if the operation succeeds.
+        """
         try:
             command_func = self.main_window.file_commands.get(command_name)
             if command_func:
@@ -229,7 +421,23 @@ class FileMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
             return False
 
     def update_recent_directories_menu(self):
-        """Update recent directories menu via command interface."""
+        """Refresh the recent directories submenu with current directory history.
+        
+        Clears the existing recent directories menu and repopulates it with
+        the current list of recently accessed directories. Non-existent
+        directories are automatically removed from the list.
+        
+        The menu shows up to 10 most recent directories with:
+        - Numbered entries (1-10) showing directory basename
+        - Full path in status tip for reference
+        - Automatic cleanup of non-existent directories
+        - Disabled placeholder when no recent directories exist
+        
+        Note:
+            Called automatically after directory operations and can be called
+            manually to refresh the menu state. Uses the command interface
+            to maintain consistency with the rest of the application.
+        """
         self.recent_menu.clear()
 
         try:
@@ -266,16 +474,49 @@ class FileMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
 
 
 #class EditMenuHandler:
-class EditMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
-
-    """Handles all Edit menu operations - CLEAN via command interface."""
+class EditMenuHandler(MenuHandlerBase):
+    """Specialized handler for all editing and configuration menu operations.
+    
+    This class manages the Edit menu and routes all editing commands through
+    the main window's edit_commands interface. It provides access to user
+    configuration, tag operations, batch editing, and template management.
+    
+    Key responsibilities:
+    - User configuration management
+    - Tag clearing and resetting operations
+    - Batch tag editor access
+    - Template manager integration
+    - Default value restoration
+    
+    All operations maintain consistency through the centralized command interface.
+    """
 
     def __init__(self, main_window):
+        """Initialize the EditMenuHandler with main window reference.
+        
+        Args:
+            main_window: Main application window that provides the edit_commands
+                        interface for executing editing operations.
+        """
         self.main_window = main_window
         logger.debug("EditMenuHandler initialized")
 
     def setup_edit_menu(self, menubar):
-        """Setup Edit menu with all actions."""
+        """Create and configure the complete Edit menu with all actions.
+        
+        Sets up the Edit menu with organized sections:
+        - User configuration access
+        - Tag operations (clear, reset to defaults)
+        - Batch editing tools
+        - Template management
+        
+        Args:
+            menubar (QMenuBar): The main menu bar to add the Edit menu to.
+            
+        Note:
+            All actions are connected through the command interface and have
+            appropriate keyboard shortcuts applied from the global shortcut manager.
+        """
         edit_menu = menubar.addMenu("&Edit")
 
         # User config
@@ -328,7 +569,23 @@ class EditMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
         logger.debug("Edit menu setup completed")
 
     def _execute_edit_command(self, command_name):
-        """Execute edit command via command interface."""
+        """Execute an editing operation command through the command interface.
+        
+        Looks up and executes the specified command from the main window's
+        edit_commands dictionary with proper error handling.
+        
+        Args:
+            command_name (str): Name of the command to execute from edit_commands.
+            
+        Returns:
+            The return value of the executed command, or False if the command
+            fails or is not available.
+            
+        Note:
+            All edit commands are expected to be simple callables without
+            parameters. Complex operations should be handled within the
+            command implementations themselves.
+        """
         try:
             command_func = self.main_window.edit_commands.get(command_name)
             if command_func:
@@ -342,8 +599,28 @@ class EditMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
 
 
 class ViewMenuHandler(MenuHandlerBase):
-    #class ViewMenuHandler:
-    """Handles all View menu operations - CLEAN VERSION via command interface only."""
+    """Specialized handler for all view and display menu operations.
+    
+    This class manages the comprehensive View menu system, providing access to
+    display modes, zoom controls, panel toggles, mouse label configurations,
+    and theme selection. All operations are routed through the command interface
+    for consistent behavior.
+    
+    Key responsibilities:
+    - Waveform display mode selection (mono, stereo, overlay)
+    - Zoom controls (in, out, fit to window)
+    - Panel visibility toggles (metadata, analysis)
+    - Mouse label preset management
+    - Application theme selection
+    
+    The handler maintains QActionGroups for mutually exclusive options and
+    provides state synchronization with application settings.
+    
+    Attributes:
+        view_group: QActionGroup for waveform display modes.
+        mouse_preset_group: QActionGroup for mouse label presets.
+        theme_group: QActionGroup for theme selection.
+    """
 
     def __init__(self, main_window):
         self.main_window = main_window
@@ -576,7 +853,20 @@ class ViewMenuHandler(MenuHandlerBase):
 
 
 class AudioMenuHandler(MenuHandlerBase):
-    """Handles all Audio menu operations - CLEAN via command interface."""
+    """Specialized handler for all audio playback menu operations.
+    
+    This class manages the Audio menu and provides access to all audio
+    playback and control functions through the main window's audio_commands
+    interface. It handles playback control, volume adjustment, and mute functionality.
+    
+    Key responsibilities:
+    - Playback controls (play, pause, stop)
+    - Volume controls (up, down, mute)
+    - Audio navigation and seeking
+    
+    All audio operations are routed through the command interface for
+    consistent behavior and proper error handling.
+    """
 
     def __init__(self, main_window):
         self.main_window = main_window
@@ -644,7 +934,20 @@ class AudioMenuHandler(MenuHandlerBase):
 
 
 class AnalysisMenuHandler(MenuHandlerBase):
-    """Handles all Analysis menu operations - CLEAN via command interface."""
+    """Specialized handler for all analysis and reporting menu operations.
+    
+    This class manages the Analysis menu and provides access to analytical
+    tools and dashboards through the main window's analysis_commands interface.
+    It handles analytics dashboards, cue point analysis, and other analytical features.
+    
+    Key responsibilities:
+    - Analytics dashboard access
+    - Cue point analysis and overview
+    - Statistical reporting tools
+    
+    All analysis operations are routed through the command interface for
+    consistent behavior and progress indication.
+    """
 
     def __init__(self, main_window):
         self.main_window = main_window
@@ -688,14 +991,40 @@ class AnalysisMenuHandler(MenuHandlerBase):
 
 
 class HelpMenuHandler(MenuHandlerBase):
-    """Handles all Help menu operations - STREAMLINED VERSION."""
+    """Specialized handler for help system and documentation menu operations.
+    
+    This class manages a streamlined Help menu that provides access to user
+    documentation, keyboard shortcuts reference, and application information.
+    The design consolidates help functions for better user experience.
+    
+    Key responsibilities:
+    - Consolidated help and quick start guide
+    - Keyboard shortcuts reference
+    - Application about dialog
+    
+    All help operations are routed through the command interface with
+    appropriate fallback error handling for missing help functions.
+    """
 
     def __init__(self, main_window):
         self.main_window = main_window
         logger.debug("HelpMenuHandler initialized")
 
     def setup_help_menu(self, menubar):
-        """Setup STREAMLINED Help menu with consolidated actions."""
+        """Create and configure a streamlined Help menu with essential help functions.
+        
+        Sets up a consolidated Help menu with:
+        - Help & Quick Start: Combined documentation and tutorial access
+        - Keyboard Shortcuts: Reference for all application shortcuts
+        - About: Application information and credits
+        
+        Args:
+            menubar (QMenuBar): The main menu bar to add the Help menu to.
+            
+        Note:
+            This streamlined approach consolidates multiple help functions into
+            a single comprehensive help dialog for better user experience.
+        """
         help_menu = menubar.addMenu("&Help")
 
         # CONSOLIDATED: Help & Quick Start (replaces 3 separate dialogs)
@@ -726,7 +1055,22 @@ class HelpMenuHandler(MenuHandlerBase):
         logger.debug("Streamlined Help menu setup completed")
 
     def _execute_help_command(self, command_name):
-        """Execute help command via command interface."""
+        """Execute a help operation command through the command interface.
+        
+        Looks up and executes the specified command from the main window's
+        help_commands dictionary with proper error handling and user feedback.
+        
+        Args:
+            command_name (str): Name of the command to execute from help_commands.
+            
+        Returns:
+            The return value of the executed command, or False if the command
+            fails or is not available.
+            
+        Note:
+            Help commands may launch dialogs or display documentation. Errors
+            are reported both to the log and to the user via status messages.
+        """
         try:
             command_func = self.main_window.help_commands.get(command_name)
             if command_func:
