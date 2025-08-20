@@ -13,6 +13,7 @@ import os
 
 # from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QAction, QActionGroup
+from PyQt5.QtGui import QKeySequence
 
 # Configure logging
 logging.basicConfig(
@@ -25,6 +26,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+## TEST
+class MenuHandlerBase:
+    def _apply_shortcut(self, action, command_group, command_name):
+        """Apply shortcut from GlobalShortcutManager to action."""
+        shortcut = self.main_window.shortcut_manager.get_shortcut_for_command(command_group, command_name)
+        if shortcut:
+            action.setShortcut(QKeySequence(shortcut))
 
 class MenuBarManager:
     """Main coordinator for all menu systems.
@@ -63,11 +71,61 @@ class MenuBarManager:
         self.analysis_handler.setup_analysis_menu(menubar)
         self.help_handler.setup_help_menu(menubar)
 
+        self.sync_all_menu_states()
+
         logger.info("Complete menu bar setup finished")
 
+    def sync_all_menu_states(self):
+        """Sync all menu states with application settings."""
+        settings = self.main_window.settings_manager
 
-# done
-class FileMenuHandler:
+        # Theme
+        theme = settings.get_theme("light")
+        self.set_theme_checked(theme)
+
+        # View mode
+        view_mode = settings.get_view_mode("per_kanaal")
+        self.set_view_mode_checked(view_mode)
+
+        # Mouse preset
+        mouse_preset = settings.get_mouse_labels_preset("performance")
+        self.set_mouse_preset_checked(mouse_preset)
+
+        # # Metadata visibility
+        # show_metadata = settings.get_show_metadata(True)
+        # self.set_metadata_toggle_checked(show_metadata)
+
+    def set_theme_checked(self, theme):
+        """Set theme menu checked state."""
+        if hasattr(self.view_handler, 'theme_group'):
+            for action in self.view_handler.theme_group.actions():
+                # Match op object name in plaats van text
+                should_check = action.objectName() == f"{theme}_theme"
+                action.setChecked(should_check)
+
+    def set_view_mode_checked(self, mode):
+        """Set view mode checked state."""
+        if hasattr(self.view_handler, 'view_group'):
+            for action in self.view_handler.view_group.actions():
+                if mode == "mono" and "Mono" in action.text():
+                    action.setChecked(True)
+                elif mode == "per_kanaal" and "Stereo" in action.text():
+                    action.setChecked(True)
+                elif mode == "overlay" and "Overlay" in action.text():
+                    action.setChecked(True)
+
+    def set_mouse_preset_checked(self, preset):
+        """Set mouse preset checked state."""
+
+        if hasattr(self.view_handler, 'mouse_preset_group'):
+            # for action in self.view_handler.mouse_preset_group.actions():
+            #     action.setChecked(preset.lower() in action.text().lower())
+            for action in self.view_handler.mouse_preset_group.actions():
+                action.setChecked(action.objectName() == preset)
+
+# class FileMenuHandler:
+class FileMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
+
     """Handles all File menu operations - CLEAN via command interface."""
 
     def __init__(self, main_window):
@@ -81,6 +139,7 @@ class FileMenuHandler:
         # Open directory
         open_dir_action = QAction("&Open Directory...", self.main_window)
         # open_dir_action.setShortcut(QKeySequence('Ctrl+O'))
+        self._apply_shortcut(open_dir_action, 'file_commands', 'open_directory')  # ✨ ADD THIS
         open_dir_action.setStatusTip("Open a different WAV directory")
         open_dir_action.triggered.connect(
             lambda: self._execute_file_command("open_directory")
@@ -90,6 +149,7 @@ class FileMenuHandler:
         # Reload
         reload_action = QAction("&Reload Directory", self.main_window)
         # reload_action.setShortcut(QKeySequence('F5'))
+        self._apply_shortcut(reload_action, 'file_commands', 'reload_directory')  # ✨ ADD THIS
         reload_action.triggered.connect(
             lambda: self._execute_file_command("reload_directory")
         )
@@ -101,6 +161,7 @@ class FileMenuHandler:
         import_export_menu = file_menu.addMenu("📥📤 &Import/Export")
 
         batch_import_action = QAction("Batch Import WAV Files...", self.main_window)
+        self._apply_shortcut(batch_import_action, 'file_commands', 'batch_import_files')
         batch_import_action.triggered.connect(
             lambda: self._execute_file_command("batch_import_files")
         )
@@ -108,6 +169,7 @@ class FileMenuHandler:
 
         export_ableton_action = QAction("🎛️ Export to Ableton Live...", self.main_window)
         # export_ableton_action.setShortcut(QKeySequence('Ctrl+E'))
+        self._apply_shortcut(export_ableton_action, 'file_commands', 'export_to_ableton')  # ✨ ADD THIS
         export_ableton_action.triggered.connect(
             lambda: self._execute_file_command("export_to_ableton")
         )
@@ -116,6 +178,7 @@ class FileMenuHandler:
         export_metadata_action = QAction(
             "📋 Export Metadata to CSV...", self.main_window
         )
+        self._apply_shortcut(export_metadata_action, 'file_commands', 'export_metadata_csv')
         export_metadata_action.triggered.connect(
             lambda: self._execute_file_command("export_metadata_csv")
         )
@@ -132,6 +195,7 @@ class FileMenuHandler:
         # Exit
         exit_action = QAction("E&xit", self.main_window)
         # exit_action.setShortcut(QKeySequence('Ctrl+Q'))
+        self._apply_shortcut(exit_action, 'file_commands', 'exit_application')  # ✨ ADD THIS
         exit_action.triggered.connect(
             lambda: self._execute_file_command("exit_application")
         )
@@ -201,7 +265,9 @@ class FileMenuHandler:
             self.recent_menu.addAction(error_action)
 
 
-class EditMenuHandler:
+#class EditMenuHandler:
+class EditMenuHandler(MenuHandlerBase):  # ✨ ADD MIXIN
+
     """Handles all Edit menu operations - CLEAN via command interface."""
 
     def __init__(self, main_window):
@@ -215,6 +281,7 @@ class EditMenuHandler:
         # User config
         config_action = QAction("⚙️ &User Config...", self.main_window)
         # config_action.setShortcut(QKeySequence('Ctrl+,'))
+        self._apply_shortcut(config_action, 'edit_commands', 'open_user_config_manager')  # ✨ ADD THIS
         config_action.triggered.connect(
             lambda: self._execute_edit_command("open_user_config_manager")
         )
@@ -225,6 +292,7 @@ class EditMenuHandler:
         # Tag operations
         clear_tags_action = QAction("🧹 &Clear Current Tags", self.main_window)
         # clear_tags_action.setShortcut(QKeySequence('Ctrl+Shift+C'))
+        self._apply_shortcut(clear_tags_action, 'edit_commands', 'clear_tags')  # ✨ ADD THIS
         clear_tags_action.triggered.connect(
             lambda: self._execute_edit_command("clear_tags")
         )
@@ -232,6 +300,7 @@ class EditMenuHandler:
 
         reset_defaults_action = QAction("🔄 &Reset to Defaults", self.main_window)
         # reset_defaults_action.setShortcut(QKeySequence('Ctrl+R'))
+        self._apply_shortcut(reset_defaults_action, 'edit_commands', 'reset_defaults')
         reset_defaults_action.triggered.connect(
             lambda: self._execute_edit_command("reset_defaults")
         )
@@ -239,6 +308,7 @@ class EditMenuHandler:
 
         batch_tag_action = QAction("🏷️ &Batch Tag Editor...", self.main_window)
         # batch_tag_action.setShortcut(QKeySequence('Ctrl+B'))
+        self._apply_shortcut(batch_tag_action, 'edit_commands', 'open_batch_tagger')  # ✨ ADD THIS
         batch_tag_action.triggered.connect(
             lambda: self._execute_edit_command("open_batch_tagger")
         )
@@ -249,6 +319,7 @@ class EditMenuHandler:
         # Template management
         template_action = QAction("📋 &Template Manager...", self.main_window)
         # template_action.setShortcut(QKeySequence('F9'))
+        self._apply_shortcut(template_action, 'edit_commands', 'open_template_manager')  # ✨ ADD THIS
         template_action.triggered.connect(
             lambda: self._execute_edit_command("open_template_manager")
         )
@@ -270,7 +341,8 @@ class EditMenuHandler:
             return False
 
 
-class ViewMenuHandler:
+class ViewMenuHandler(MenuHandlerBase):
+    #class ViewMenuHandler:
     """Handles all View menu operations - CLEAN VERSION via command interface only."""
 
     def __init__(self, main_window):
@@ -293,6 +365,8 @@ class ViewMenuHandler:
         view_menu.addSeparator()
 
         self._setup_mouse_labels_menu(view_menu)
+
+        self._setup_theme_menu(view_menu)
 
         logger.debug("View menu setup completed")
 
@@ -333,11 +407,13 @@ class ViewMenuHandler:
         """Setup zoom control actions."""
         zoom_in_action = QAction("🔍 Zoom &In", self.main_window)
         # zoom_in_action.setShortcut(QKeySequence('Ctrl+='))
+        self._apply_shortcut(zoom_in_action, 'view_commands', 'zoom_in')
         zoom_in_action.triggered.connect(lambda: self._execute_view_command("zoom_in"))
         view_menu.addAction(zoom_in_action)
 
         zoom_out_action = QAction("🔍 Zoom &Out", self.main_window)
         # zoom_out_action.setShortcut(QKeySequence('Ctrl+-'))
+        self._apply_shortcut(zoom_out_action, 'view_commands', 'zoom_out')
         zoom_out_action.triggered.connect(
             lambda: self._execute_view_command("zoom_out")
         )
@@ -345,6 +421,7 @@ class ViewMenuHandler:
 
         zoom_fit_action = QAction("⊞ &Fit to Window", self.main_window)
         # zoom_fit_action.setShortcut(QKeySequence('Ctrl+0'))
+        self._apply_shortcut(zoom_fit_action, 'view_commands', 'zoom_fit')
         zoom_fit_action.triggered.connect(
             lambda: self._execute_view_command("zoom_fit")
         )
@@ -355,6 +432,7 @@ class ViewMenuHandler:
         toggle_metadata_action = QAction("Show/Hide &Metadata Tables", self.main_window)
         toggle_metadata_action.setCheckable(True)
         toggle_metadata_action.setChecked(True)
+        self._apply_shortcut(toggle_metadata_action, 'view_commands', 'toggle_metadata')
         toggle_metadata_action.triggered.connect(
             lambda checked: self._execute_view_command("toggle_metadata", checked)
         )
@@ -369,39 +447,56 @@ class ViewMenuHandler:
         mouse_labels_menu.addSeparator()
 
         # Setup individual toggles
-        self._setup_mouse_toggle_actions(mouse_labels_menu)
+        # self._setup_mouse_toggle_actions(mouse_labels_menu)
 
     def _setup_mouse_preset_actions(self, mouse_labels_menu):
         """Setup mouse label preset actions."""
         minimal_action = QAction("⚡ &Minimal (Fast)", self.main_window)
+        minimal_action.setObjectName("minimal")
         minimal_action.setStatusTip("Show only essential info for better performance")
+        minimal_action.setCheckable(True)
         minimal_action.triggered.connect(
             lambda: self._execute_view_command("set_mouse_labels_minimal")
         )
         mouse_labels_menu.addAction(minimal_action)
 
         performance_action = QAction("⚙️ &Performance (Balanced)", self.main_window)
+        performance_action.setObjectName("performance")
         performance_action.setStatusTip("Optimized balance of info and performance")
+        performance_action.setCheckable(True)
         performance_action.setChecked(True)  # Default
         performance_action.triggered.connect(
             lambda: self._execute_view_command("set_mouse_labels_performance")
         )
         mouse_labels_menu.addAction(performance_action)
 
-        professional_action = QAction("🎛️ &Professional (Full)", self.main_window)
+        professional_action = QAction("🎛️ &Professional", self.main_window)
+        professional_action.setObjectName("professional")
         professional_action.setStatusTip("Complete professional audio information")
+        professional_action.setCheckable(True)
         professional_action.triggered.connect(
             lambda: self._execute_view_command("set_mouse_labels_professional")
         )
         mouse_labels_menu.addAction(professional_action)
+
+        professional_advanced_action = QAction("🎛️ &Professional+ (All Features)", self.main_window)
+        professional_advanced_action.setObjectName("professional_advanced")
+        professional_advanced_action.setStatusTip("All features including frequency analysis")
+        professional_advanced_action.setCheckable(True)
+        professional_advanced_action.triggered.connect(
+            lambda: self._execute_view_command("set_mouse_labels_professional_advanced")
+        )
+        mouse_labels_menu.addAction(professional_advanced_action)
+
 
         # Group the preset actions for mutual exclusivity
         self.mouse_preset_group = QActionGroup(self.main_window)
         self.mouse_preset_group.addAction(minimal_action)
         self.mouse_preset_group.addAction(performance_action)
         self.mouse_preset_group.addAction(professional_action)
+        self.mouse_preset_group.addAction(professional_advanced_action)
 
-    def _setup_mouse_toggle_actions(self, mouse_labels_menu):
+    def _setup_mouse_toggle_actions_old(self, mouse_labels_menu):
         """Setup individual mouse label toggle actions."""
         frequency_action = QAction("🎼 &Frequency Analysis", self.main_window)
         frequency_action.setCheckable(True)
@@ -425,6 +520,44 @@ class ViewMenuHandler:
         self.frequency_action = frequency_action
         self.timecode_action = timecode_action
 
+    def _setup_theme_menu(self, view_menu):
+        """Setup theme selection submenu."""
+        theme_menu = view_menu.addMenu("🎨 &Theme")
+
+        # Light theme
+        light_action = QAction("☀️ &Light Theme", self.main_window)
+        light_action.setObjectName("light_theme")
+        light_action.setCheckable(True)
+        light_action.setChecked(True)  # Default
+        light_action.triggered.connect(
+            lambda: self._execute_view_command("apply_light_theme")
+        )
+        theme_menu.addAction(light_action)
+
+        # Dark theme
+        dark_action = QAction("🌙 &Dark Theme", self.main_window)
+        dark_action.setObjectName("dark_theme")
+        dark_action.setCheckable(True)
+        dark_action.triggered.connect(
+            lambda: self._execute_view_command("apply_dark_theme")
+        )
+        theme_menu.addAction(dark_action)
+
+        # macOS dark theme
+        macos_action = QAction("🍎 &macOS Dark", self.main_window)
+        macos_action.setObjectName("macos_dark_theme")
+        macos_action.setCheckable(True)
+        macos_action.triggered.connect(
+            lambda: self._execute_view_command("apply_macos_dark_theme")
+        )
+        theme_menu.addAction(macos_action)
+
+        # Group voor mutual exclusivity
+        self.theme_group = QActionGroup(self.main_window)
+        self.theme_group.addAction(light_action)
+        self.theme_group.addAction(dark_action)
+        self.theme_group.addAction(macos_action)
+
     def _execute_view_command(self, command_name, *args):
         """Execute view command via command interface with error handling."""
         try:
@@ -442,7 +575,7 @@ class ViewMenuHandler:
             return False
 
 
-class AudioMenuHandler:
+class AudioMenuHandler(MenuHandlerBase):
     """Handles all Audio menu operations - CLEAN via command interface."""
 
     def __init__(self, main_window):
@@ -455,6 +588,7 @@ class AudioMenuHandler:
 
         # Playback controls
         play_pause_action = QAction("⏯️ &Play/Pause", self.main_window)
+        self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')  # ✨ ADD THIS
         play_pause_action.triggered.connect(
             lambda: self._execute_audio_command("play_pause")
         )
@@ -462,6 +596,7 @@ class AudioMenuHandler:
 
         stop_action = QAction("⏹️ &Stop", self.main_window)
         # stop_action.setShortcut(QKeySequence(Qt.Key_Escape))
+        self._apply_shortcut(stop_action, 'audio_commands', 'stop')
         stop_action.triggered.connect(lambda: self._execute_audio_command("stop"))
         audio_menu.addAction(stop_action)
 
@@ -470,6 +605,7 @@ class AudioMenuHandler:
         # Volume controls
         volume_up_action = QAction("🔊 Volume +", self.main_window)
         # volume_up_action.setShortcut(QKeySequence(Qt.Key_PageUp))
+        self._apply_shortcut(volume_up_action, 'audio_commands', 'volume_up')  # ✨ ADD THIS
         volume_up_action.triggered.connect(
             lambda: self._execute_audio_command("volume_up")
         )
@@ -477,6 +613,7 @@ class AudioMenuHandler:
 
         volume_down_action = QAction("🔉 Volume -", self.main_window)
         # volume_down_action.setShortcut(QKeySequence(Qt.Key_PageDown))
+        self._apply_shortcut(volume_down_action, 'audio_commands', 'volume_down')  # ✨ ADD THIS
         volume_down_action.triggered.connect(
             lambda: self._execute_audio_command("volume_down")
         )
@@ -484,6 +621,7 @@ class AudioMenuHandler:
 
         mute_action = QAction("🔇 &Mute", self.main_window)
         # mute_action.setShortcut(QKeySequence(Qt.Key_M))
+        self._apply_shortcut(mute_action, 'audio_commands', 'toggle_mute')  # ✨ ADD THIS
         mute_action.triggered.connect(
             lambda: self._execute_audio_command("toggle_mute")
         )
@@ -505,7 +643,7 @@ class AudioMenuHandler:
             return False
 
 
-class AnalysisMenuHandler:
+class AnalysisMenuHandler(MenuHandlerBase):
     """Handles all Analysis menu operations - CLEAN via command interface."""
 
     def __init__(self, main_window):
@@ -519,6 +657,7 @@ class AnalysisMenuHandler:
         # Analytics dashboard
         analytics_action = QAction("📊 &Analytics Dashboard...", self.main_window)
         # analytics_action.setShortcut(QKeySequence('Ctrl+A'))
+        self._apply_shortcut(analytics_action, 'analysis_commands', 'show_analytics')  # ✨ ADD THIS
         analytics_action.triggered.connect(
             lambda: self._execute_analysis_command("show_analytics")
         )
@@ -526,6 +665,7 @@ class AnalysisMenuHandler:
 
         # Cue points analysis
         cue_analysis_action = QAction("📍 &Cue Points Overview...", self.main_window)
+        self._apply_shortcut(cue_analysis_action, 'analysis_commands', 'show_cue_analysis')
         cue_analysis_action.triggered.connect(
             lambda: self._execute_analysis_command("show_cue_analysis")
         )
@@ -547,7 +687,7 @@ class AnalysisMenuHandler:
             return False
 
 
-class HelpMenuHandler:
+class HelpMenuHandler(MenuHandlerBase):
     """Handles all Help menu operations - STREAMLINED VERSION."""
 
     def __init__(self, main_window):
@@ -560,6 +700,7 @@ class HelpMenuHandler:
 
         # CONSOLIDATED: Help & Quick Start (replaces 3 separate dialogs)
         help_quickstart_action = QAction("🚀 &Help & Quick Start", self.main_window)
+        self._apply_shortcut(help_quickstart_action, 'help_commands', 'show_help_and_quickstart')
         help_quickstart_action.triggered.connect(
             lambda: self._execute_help_command("show_help_and_quickstart")
         )
@@ -568,6 +709,7 @@ class HelpMenuHandler:
         # Keyboard shortcuts (stays separate - useful as reference during work)
         shortcuts_action = QAction("⌨️ &Keyboard Shortcuts", self.main_window)
         # shortcuts_action.setShortcut(QKeySequence(Qt.Key_F1))
+        self._apply_shortcut(shortcuts_action, 'help_commands', 'show_keyboard_shortcuts')  # ✨ ADD THIS
         shortcuts_action.triggered.connect(
             lambda: self._execute_help_command("show_keyboard_shortcuts")
         )
@@ -577,6 +719,7 @@ class HelpMenuHandler:
 
         # About (simplified)
         about_action = QAction("ℹ️ &About", self.main_window)
+        self._apply_shortcut(about_action, 'help_commands', 'show_about')
         about_action.triggered.connect(lambda: self._execute_help_command("show_about"))
         help_menu.addAction(about_action)
 
