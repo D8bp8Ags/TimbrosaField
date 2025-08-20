@@ -165,7 +165,7 @@ class ExportManager:
         """
         return {
             "wav_files_count": len(self.main_window.file_manager.get_all_wav_files()),
-            "has_analytics": self.analytics_launcher.is_analytics_available(),
+            "has_analytics": True,
             "has_ableton_export": self.ableton_exporter.is_ableton_export_available(),
             "export_directory": self.main_window.user_config_manager.user_config.get(
                 "paths", {}
@@ -950,17 +950,17 @@ class AnalyticsLauncher:
 
         try:
             # Check if analytics is available
-            if not self.is_analytics_available():
-                self.main_window.show_status_message(
-                    "Analytics dashboard not available", 3000
-                )
-                logger.error("Analytics dashboard import failed")
-                QMessageBox.warning(
-                    self.main_window,
-                    "Analytics Niet Beschikbaar",
-                    "Analytics dashboard is niet beschikbaar.\n\nControleer of analytics_dashboard.py bestaat.",
-                )
-                return False
+            # if not self.is_analytics_available():
+            #     self.main_window.show_status_message(
+            #         "Analytics dashboard not available", 3000
+            #     )
+            #     logger.error("Analytics dashboard import failed")
+            #     QMessageBox.warning(
+            #         self.main_window,
+            #         "Analytics Niet Beschikbaar",
+            #         "Analytics dashboard is niet beschikbaar.\n\nControleer of analytics_dashboard.py bestaat.",
+            #     )
+            #     return False
 
             # Get WAV files via FileManager
             wav_files = self.main_window.file_manager.get_all_wav_files()
@@ -1028,7 +1028,7 @@ class AnalyticsLauncher:
         wav_files = self.main_window.file_manager.get_all_wav_files()
 
         return {
-            "available": self.is_analytics_available(),
+            # "available": self.is_analytics_available(),
             "wav_files_count": len(wav_files),
             "has_tagged_files": self._count_tagged_files(wav_files),
             "categories_detected": self._detect_categories(wav_files),
@@ -1181,9 +1181,9 @@ class ExportManagerInterface:
         """Show analytics dashboard."""
         return self.export_manager.show_analytics_dashboard()
 
-    def is_analytics_available(self) -> bool:
-        """Check if analytics is available."""
-        return self.export_manager.analytics_launcher.is_analytics_available()
+    # def is_analytics_available(self) -> bool:
+    #     """Check if analytics is available."""
+    #     return self.export_manager.analytics_launcher.is_analytics_available()
 
     # === UTILITY METHODS ===
 
