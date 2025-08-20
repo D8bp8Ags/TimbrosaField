@@ -86,7 +86,7 @@ This project is licensed under the **GNU GENERAL PUBLIC LICENSE v3.0**.
 GNU GENERAL PUBLIC LICENSE
 Version 3, 29 June 2007
 
-Copyright (C) <year> <author name>
+Copyright (C) 2025 D8bp8Ags
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
