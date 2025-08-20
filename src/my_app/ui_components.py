@@ -407,6 +407,20 @@ class ApplicationStylist:
         "hover_overlay": "rgba(37, 99, 235, 0.1)",
         "active_overlay": "rgba(37, 99, 235, 0.2)",
         "focus_ring": "rgba(37, 99, 235, 0.3)",
+
+        "input_background": "#ffffff",
+        "selection_text": "#ffffff",
+        "card_background": "#ffffff",
+        "overlay_background": "rgba(255, 255, 255, 0.9)",
+        "error_background": "#fef2f2",
+        "error_border": "#fecaca",
+        "success_background": "#f0fdf4",
+        "success_border": "#bbf7d0",
+        "danger_hover": "#b91c1c",
+        "tooltip_background": "#0f172a",
+        "tooltip_text": "#ffffff",
+        "plot_background": "#ffffff",
+
     }
 
     @staticmethod
@@ -447,7 +461,7 @@ class ApplicationStylist:
         )
 
         # Base colors (input fields)
-        palette.setColor(QPalette.Base, QColor("#ffffff"))
+        palette.setColor(QPalette.Base, QColor(ApplicationStylist.COLORS["input_background"]))
         palette.setColor(
             QPalette.AlternateBase, QColor(ApplicationStylist.COLORS["surface"])
         )
@@ -456,7 +470,7 @@ class ApplicationStylist:
         palette.setColor(
             QPalette.Text, QColor(ApplicationStylist.COLORS["text_primary"])
         )
-        palette.setColor(QPalette.BrightText, QColor("#ffffff"))
+        palette.setColor(QPalette.BrightText, QColor(ApplicationStylist.COLORS["selection_text"]))
 
         # Button colors
         palette.setColor(QPalette.Button, QColor(ApplicationStylist.COLORS["surface"]))
@@ -486,7 +500,7 @@ class ApplicationStylist:
             background-color: {ApplicationStylist.COLORS['background']};
             color: {ApplicationStylist.COLORS['text_primary']};
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         /* === TYPOGRAPHY === */
@@ -536,7 +550,7 @@ class ApplicationStylist:
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                 stop:0 {ApplicationStylist.COLORS['primary']},
                 stop:1 {ApplicationStylist.COLORS['primary_hover']});
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
             border: none;
             border-radius: 8px;
             padding: 6px 6px;
@@ -581,16 +595,16 @@ class ApplicationStylist:
         /* Danger Button Style */
         QPushButton[class="danger"] {{
             background: {ApplicationStylist.COLORS['error']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         QPushButton[class="danger"]:hover {{
-            background: #b91c1c;
+            background: {ApplicationStylist.COLORS['danger_hover']};
         }}
 
         /* === INPUT FIELDS === */
         QLineEdit {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 2px 16px;
@@ -601,7 +615,7 @@ class ApplicationStylist:
 
         QLineEdit:focus {{
             border-color: {ApplicationStylist.COLORS['primary']};
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             outline: none;
         }}
 
@@ -617,7 +631,7 @@ class ApplicationStylist:
 
         /* === TEXT AREAS === */
         QTextEdit, QPlainTextEdit {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 12px;
@@ -633,7 +647,7 @@ class ApplicationStylist:
 
         /* === COMBO BOXES === */
         QComboBox {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 2px 16px;
@@ -664,24 +678,24 @@ class ApplicationStylist:
         }}
 
         QComboBox QAbstractItemView {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
             padding: 4px;
         }}
 
         /* === TABLES === */
         QTableWidget {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             alternate-background-color: {ApplicationStylist.COLORS['surface']};
             gridline-color: {ApplicationStylist.COLORS['divider']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             font-size: 10pt;
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         QTableWidget::item {{
@@ -691,7 +705,7 @@ class ApplicationStylist:
 
         QTableWidget::item:selected {{
             background-color: {ApplicationStylist.COLORS['primary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         QHeaderView::section {{
@@ -713,12 +727,12 @@ class ApplicationStylist:
 
         /* === LISTS === */
         QListWidget {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             font-size: 11pt;
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
             outline: none;
         }}
 
@@ -735,17 +749,17 @@ class ApplicationStylist:
 
         QListWidget::item:selected {{
             background-color: {ApplicationStylist.COLORS['primary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         /* === TREE WIDGETS === */
         QTreeWidget {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             font-size: 11pt;
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
             outline: none;
         }}
 
@@ -760,7 +774,7 @@ class ApplicationStylist:
 
         QTreeWidget::item:selected {{
             background-color: {ApplicationStylist.COLORS['primary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         /* === SCROLL BARS === */
@@ -812,7 +826,7 @@ class ApplicationStylist:
         QTabWidget::pane {{
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             margin-top: -2px;
         }}
 
@@ -862,7 +876,7 @@ class ApplicationStylist:
 
         QMenuBar::item:selected {{
             background-color: {ApplicationStylist.COLORS['primary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         QMenuBar::item:pressed {{
@@ -871,7 +885,7 @@ class ApplicationStylist:
 
         /* === MENUS === */
         QMenu {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 8px;
@@ -887,7 +901,7 @@ class ApplicationStylist:
 
         QMenu::item:selected {{
             background-color: {ApplicationStylist.COLORS['primary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
         }}
 
         QMenu::separator {{
@@ -945,7 +959,7 @@ class ApplicationStylist:
 
         /* === DIALOG STYLING === */
         QDialog {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 12px;
         }}
@@ -996,7 +1010,7 @@ class ApplicationStylist:
             height: 18px;
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 4px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
         }}
 
         QCheckBox::indicator:hover {{
@@ -1021,7 +1035,7 @@ class ApplicationStylist:
             height: 8px;
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 6px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
         }}
 
         QRadioButton::indicator:hover {{
@@ -1035,7 +1049,7 @@ class ApplicationStylist:
 
         /* === SPIN BOX STYLING === */
         QSpinBox, QDoubleSpinBox {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 8px 12px;
@@ -1106,7 +1120,7 @@ class ApplicationStylist:
         /* === MODERN AUDIO PLAYER STYLING === */
         QWidget[objectName="audio_player_widget"] {{
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 white, stop:1 {ApplicationStylist.COLORS['surface']});
+                stop:0 {ApplicationStylist.COLORS['card_background']}, stop:1 {ApplicationStylist.COLORS['surface']});
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 12px;
             margin: 8px;
@@ -1115,7 +1129,7 @@ class ApplicationStylist:
 
         QWidget[objectName="audio_player_widget"] QPushButton {{
             background: {ApplicationStylist.COLORS['secondary']};
-            color: white;
+            color: {ApplicationStylist.COLORS['selection_text']};
             border: none;
             border-radius: 6px;
             padding: 8px;
@@ -1164,7 +1178,7 @@ class ApplicationStylist:
 
         /* === TAG COMPLETER STYLING === */
         QWidget[objectName="tag_completer"] {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 12px;
             padding: 8px;
@@ -1174,21 +1188,21 @@ class ApplicationStylist:
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 12px 16px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             font-size: 11pt;
         }}
 
         QWidget[objectName="tag_completer"] QLineEdit:focus {{
             border-color: {ApplicationStylist.COLORS['primary']};
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
         }}
 
         QWidget[objectName="tag_completer"] QListWidget {{
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             selection-background-color: {ApplicationStylist.COLORS['primary']};
-            selection-color: white;
+            selection-color: {ApplicationStylist.COLORS['selection_text']};
             margin-top: 4px;
         }}
 
@@ -1206,7 +1220,7 @@ class ApplicationStylist:
         /* === NOTIFICATION STYLING === */
         QWidget[class="notification"] {{
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 white, stop:1 {ApplicationStylist.COLORS['surface']});
+                stop:0 {ApplicationStylist.COLORS['card_background']}, stop:1 {ApplicationStylist.COLORS['surface']});
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-left: 4px solid {ApplicationStylist.COLORS['primary']};
             border-radius: 8px;
@@ -1232,7 +1246,7 @@ class ApplicationStylist:
 
         /* === CARD STYLING === */
         QWidget[class="card"] {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 12px;
             padding: 20px;
@@ -1244,7 +1258,7 @@ class ApplicationStylist:
         }}
 
         QWidget[class="card-elevated"] {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 1px solid {ApplicationStylist.COLORS['divider']};
             border-radius: 12px;
             padding: 20px;
@@ -1253,8 +1267,8 @@ class ApplicationStylist:
 
         /* === TOOLTIP STYLING === */
         QToolTip {{
-            background-color: {ApplicationStylist.COLORS['text_primary']};
-            color: white;
+            background-color: {ApplicationStylist.COLORS['tooltip_background']};
+            color: {ApplicationStylist.COLORS['tooltip_text']};
             border: none;
             border-radius: 6px;
             padding: 8px 12px;
@@ -1278,7 +1292,7 @@ class ApplicationStylist:
             subcontrol-origin: margin;
             left: 12px;
             padding: 0 8px 0 8px;
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             color: {ApplicationStylist.COLORS['primary']};
         }}
 
@@ -1304,7 +1318,7 @@ class ApplicationStylist:
 
         /* === DOCK WIDGET STYLING === */
         QDockWidget {{
-            background-color: white;
+            background-color: {ApplicationStylist.COLORS['input_background']};
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             titlebar-close-icon: none;
@@ -1324,7 +1338,7 @@ class ApplicationStylist:
 
         /* === LOADING/SPINNER STYLING === */
         QWidget[class="loading-overlay"] {{
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: {ApplicationStylist.COLORS['overlay_background']};
             border-radius: 8px;
         }}
 
@@ -1337,8 +1351,8 @@ class ApplicationStylist:
 
         /* === ERROR STATE STYLING === */
         QWidget[class="error-state"] {{
-            background-color: #fef2f2;
-            border: 2px solid #fecaca;
+            background-color: {ApplicationStylist.COLORS['error_background']};
+            border: 2px solid {ApplicationStylist.COLORS['error_border']};
             border-radius: 8px;
             padding: 16px;
         }}
@@ -1350,8 +1364,8 @@ class ApplicationStylist:
 
         /* === SUCCESS STATE STYLING === */
         QWidget[class="success-state"] {{
-            background-color: #f0fdf4;
-            border: 2px solid #bbf7d0;
+            background-color: {ApplicationStylist.COLORS['success_background']};
+            border: 2px solid {ApplicationStylist.COLORS['success_border']};
             border-radius: 8px;
             padding: 16px;
         }}
@@ -1405,9 +1419,17 @@ class ApplicationStylist:
         return ApplicationStylist.COLORS.copy()
 
     @staticmethod
+    def apply_light_theme(app):
+        light_colors = ApplicationStylist.COLORS.copy()
+        ApplicationStylist.COLORS.update(light_colors)
+
+        ApplicationStylist.apply_complete_styling(app)
+        # Apply dark theme stylesheet
+        print("☀️ Light theme applied")
+
+    @staticmethod
     def apply_dark_theme(app):
         """Apply dark theme variant (future enhancement)."""
-        # TODO: Implement dark theme colors
         dark_colors = ApplicationStylist.COLORS.copy()
         dark_colors.update(
             {
@@ -1446,12 +1468,85 @@ class ApplicationStylist:
                 "hover_overlay": "rgba(59, 130, 246, 0.15)",
                 "active_overlay": "rgba(59, 130, 246, 0.25)",
                 "focus_ring": "rgba(96, 165, 250, 0.4)",
+
+                "input_background": "#1a1b3a",
+                "selection_text": "#f9fafb",
+                "card_background": "#1a1b3a",
+                "overlay_background": "rgba(26, 27, 58, 0.9)",
+                "error_background": "#2d1b1b",
+                "error_border": "#4a2525",
+                "success_background": "#1b2d20",
+                "success_border": "#254a2a",
+                "danger_hover": "#dc2626",
+                "tooltip_background": "#f9fafb",
+                "tooltip_text": "#0f172a",
+                "plot_background": "#1a1b3a",
             }
         )
         ApplicationStylist.COLORS.update(dark_colors)
         ApplicationStylist.apply_complete_styling(app)
         # Apply dark theme stylesheet
         print("🌙 Dark theme applied")
+
+    @staticmethod
+    def apply_macos_dark_theme(app):
+        """Apply macOS-style dark theme."""
+        macos_dark_colors = ApplicationStylist.COLORS.copy()
+        macos_dark_colors.update({
+            # Primary colors - macOS blue
+            "primary": "#007AFF",  # macOS system blue
+            "primary_hover": "#0051D5",
+            "primary_pressed": "#003D99",
+
+            # Secondary colors
+            "secondary": "#8E8E93",  # macOS secondary label
+            "secondary_hover": "#AEAEB2",
+            "secondary_pressed": "#6D6D70",
+
+            # macOS dark backgrounds
+            "background": "#1C1C1E",  # macOS background
+            "surface": "#2C2C2E",  # macOS secondary background
+            "surface_elevated": "#3A3A3C",  # macOS tertiary background
+
+            # macOS borders and dividers
+            "border": "#38383A",  # macOS separator
+            "divider": "#48484A",  # macOS opaque separator
+
+            # macOS text hierarchy
+            "text_primary": "#FFFFFF",  # macOS primary label
+            "text_secondary": "#EBEBF5",  # macOS secondary label (60% opacity)
+            "text_muted": "#EBEBF599",  # macOS tertiary label (38% opacity)
+            "text_disabled": "#EBEBF54D",  # macOS quaternary label (18% opacity)
+
+            # macOS status colors
+            "success": "#30D158",  # macOS green
+            "warning": "#FF9F0A",  # macOS orange
+            "error": "#FF453A",  # macOS red
+            "info": "#64D2FF",  # macOS light blue
+
+            # Interactive states
+            "hover_overlay": "rgba(0, 122, 255, 0.1)",
+            "active_overlay": "rgba(0, 122, 255, 0.2)",
+            "focus_ring": "rgba(0, 122, 255, 0.4)",
+
+            # Component backgrounds
+            "input_background": "#2C2C2E",
+            "selection_text": "#FFFFFF",
+            "card_background": "#2C2C2E",
+            "overlay_background": "rgba(44, 44, 46, 0.9)",
+            "error_background": "#2C1B1B",
+            "error_border": "#4A2525",
+            "success_background": "#1B2C20",
+            "success_border": "#254A2A",
+            "danger_hover": "#FF453A",
+            "tooltip_background": "#EBEBF5",
+            "tooltip_text": "#1C1C1E",
+            "plot_background": "#2C2C2E",
+        })
+
+        ApplicationStylist.COLORS.update(macos_dark_colors)
+        ApplicationStylist.apply_complete_styling(app)
+        print("🍎 macOS Dark theme applied")
 
     @staticmethod
     def set_custom_theme(app, color_overrides):
@@ -1469,7 +1564,7 @@ class ApplicationStylist:
             "button": f"""
                 QPushButton {{
                     background: {ApplicationStylist.COLORS['primary']};
-                    color: white;
+                    color: {ApplicationStylist.COLORS['selection_text']};
                     border: none;
                     border-radius: 8px;
                     padding: 12px 24px;

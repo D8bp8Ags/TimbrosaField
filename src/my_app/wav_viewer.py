@@ -50,10 +50,10 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from tag_completer import FileTagAutocomplete
-from user_config_manager import load_user_config  # <- new helper import
+from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
-
+from ui_components import ApplicationStylist
 
 @dataclass
 class ClippingRegionInfo:
@@ -77,17 +77,6 @@ class ClippingRegionInfo:
                      Examples: "Left Channel", "Right Channel", "Mono Mix"
         duration_ms: Duration of the clipping region in milliseconds.
                     Calculated value for quick assessment of clipping severity.
-
-    Example:
-        >>> region = ClippingRegionInfo(
-        ...     start_time=1.523,
-        ...     end_time=1.547,
-        ...     region_idx=0,
-        ...     total_regions=3,
-        ...     channel_name="Left Channel",
-        ...     duration_ms=24.0
-        ... )
-        >>> print(f"Clipping: {region.duration_ms}ms in {region.channel_name}")
 
     Note:
         This dataclass is immutable by design to ensure data integrity during
@@ -545,10 +534,15 @@ class WavViewer(QWidget):
         self.right_layout.addWidget(plots_label)
 
         # Create plot widgets with optimized settings
+        # plot_config = {
+        #     "background": "w",
+        #     "antialias": True,
+        #     "useOpenGL": False,  # Disable for better compatibility
+        # }
         plot_config = {
-            "background": "w",
+            "background": ApplicationStylist.COLORS['plot_background'],
             "antialias": True,
-            "useOpenGL": False,  # Disable for better compatibility
+            "useOpenGL": False,
         }
 
         # Main mono/overlay plot
@@ -1390,42 +1384,6 @@ class WavViewer(QWidget):
             return [
                 (self.waveform_plot, self.cached_mean_signal, "mono_waveform"),
             ]
-
-    def _render_single_plot213(
-        self, plot: pg.PlotWidget, data: np.ndarray, color_key: str
-    ) -> None:
-        """Legacy single plot rendering method with basic optimization.
-
-        Renders a single waveform plot using intelligent downsampling based on
-        the current view range and plot dimensions. This is a legacy method
-        maintained for compatibility.
-
-        Args:
-            plot: PyQtGraph PlotWidget to render the waveform on.
-            data: NumPy array containing audio waveform data to visualize.
-            color_key: String key for color lookup in the plot_colors scheme.
-
-        Note:
-            This legacy method uses basic plot width calculation. The current
-            implementation (_render_single_plot) provides enhanced optimization
-            with adaptive sampling based on zoom level and data density.
-        """
-        # Get current view range
-        view_box = plot.getViewBox()
-        x_range, _ = view_box.viewRange()
-
-        # Calculate optimal width for downsampling
-        plot_width = max(800, plot.width())  # Minimum reasonable width
-
-        # Downsample data for current view
-        x_plot, y_plot = downsample_min_max(
-            data, self.current_sr, x_range[0], x_range[1], plot_width
-        )
-
-        # Render if we have data
-        if len(x_plot) > 0:
-            pen = self.get_pen(color_key)
-            plot.plot(x_plot, y_plot, pen=pen)
 
     def _render_single_plot(
         self, plot: pg.PlotWidget, data: np.ndarray, color_key: str
@@ -2369,16 +2327,13 @@ class WavViewer(QWidget):
                 QTableWidget.DoubleClicked | QTableWidget.SelectedClicked
             )
 
-    #####
     def _reset_info_table_to_defaults(self) -> None:
         """Reset INFO table to show only defaults."""
         reply = QMessageBox.question(
             self,
             "Reset to Defaults",
-            (
-                "Reset all INFO metadata fields to default values?\n\n"
-                "This will clear any custom values.",
-            ),
+            ("Reset all INFO metadata fields to default values?"
+             "This will clear any custom values."),
             QMessageBox.Yes | QMessageBox.No,
         )
 
@@ -3764,6 +3719,24 @@ class WavViewer(QWidget):
 
         logger.info("Mouse labels set to professional mode")
 
+    def set_mouse_labels_professional_advanced(self) -> None:
+        """Set mouse labels with all advanced features enabled."""
+        self.configure_mouse_labels(
+            show_timecode=True,
+            show_remaining_time=True,
+            show_percentage=True,
+            show_peak_detection=True,
+            show_channel_correlation=True,
+            show_frequency_analysis=True,
+            show_cue_proximity=True,
+            show_clipping_detection=True,
+            decimal_precision=3,
+            db_precision=2,
+        )
+        self._current_mouse_mode = "professional_advanced"
+        self._set_default_mouse_labels_dynamic()
+        logger.info("Mouse labels set to professional advanced mode")
+
     def set_mouse_labels_performance(self) -> None:
         """Set mouse labels optimized for performance while keeping essential info."""
         self.configure_mouse_labels(
@@ -3798,6 +3771,8 @@ def test_main() -> None:
 
     # Create standalone WavViewer
     viewer = WavViewer()
+    viewer.setGeometry(100, 100, 1200, 800)  # x, y, width, height
+
     viewer.setWindowTitle("WavViewer Standalone Test")
     viewer.show()
 

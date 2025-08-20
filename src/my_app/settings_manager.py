@@ -76,6 +76,25 @@ class SettingsManager:
         """Get metadata panel visibility setting."""
         return self.settings.value("view/show_metadata", default, type=bool)
 
+    def get_mouse_labels_preset(self, default="performance"):
+        """Get saved mouse labels preset."""
+        preset = self.settings.value("view/mouse_labels_preset", default)
+        return preset
+
+    def save_mouse_labels_preset(self, preset, config):
+        """Save mouse labels preset."""
+        self.settings.setValue("view/mouse_labels_preset", preset)
+        logger.debug(f"Mouse labels preset saved: {preset}")
+
+    def save_theme_settings(self, theme_name="light"):
+        """Save theme preference."""
+        self.settings.setValue("ui/theme", theme_name)
+        logger.debug(f"Theme setting saved: {theme_name}")
+
+    def get_theme(self, default="light"):
+        """Get saved theme preference."""
+        return self.settings.value("ui/theme", default)
+
     # ========== AUDIO SETTINGS ==========
 
     def save_audio_settings(self, volume, auto_play=False, seek_step=10):
@@ -144,6 +163,35 @@ class SettingsManager:
             except Exception as e:
                 logger.warning(f"Could not restore view mode: {e}")
 
+        saved_theme = self.get_theme()
+        main_window.current_theme = saved_theme
+
+        # Theme toepassen via command interface
+        if saved_theme == "dark":
+            main_window.view_commands["apply_dark_theme"]()
+        elif saved_theme == "macos_dark":
+            main_window.view_commands["apply_macos_dark_theme"]()
+        else:
+            main_window.view_commands["apply_light_theme"]()
+
+        # mouse_preset = self.get_mouse_labels_preset("performance")
+        mouse_preset = self.get_mouse_labels_preset("performance")
+        print(mouse_preset)
+
+        if hasattr(main_window, "wav_viewer"):
+            try:
+                if mouse_preset == "minimal":
+                    main_window.wav_viewer.set_mouse_labels_minimal()
+                elif mouse_preset == "professional":
+                    main_window.wav_viewer.set_mouse_labels_professional()
+                elif mouse_preset == "performance":
+                    main_window.wav_viewer.set_mouse_labels_performance()
+                elif mouse_preset == "professional_advanced":
+                    main_window.wav_viewer.set_mouse_labels_professional_advanced()
+
+            except Exception as e:
+                logger.warning(f"Could not restore mouse labels preset: {e}")
+
         # Apply audio settings
         volume = self.get_volume()
         if hasattr(main_window, "wav_viewer") and hasattr(
@@ -172,6 +220,15 @@ class SettingsManager:
         if hasattr(main_window, "wav_viewer"):
             view_mode = getattr(main_window.wav_viewer, "view_mode", "per-kanaal")
             self.save_view_settings(view_mode)
+
+        current_theme = getattr(main_window, 'current_theme', 'light')
+        self.save_theme_settings(current_theme)
+
+        # current_mouse_preset = getattr(main_window.wav_viewer, "_current_mouse_mode", "performance")
+        # self.settings.setValue("view/mouse_labels_preset", current_mouse_preset)
+        current_preset = getattr(main_window.wav_viewer, "_current_mouse_mode", "performance")
+        current_config = main_window.wav_viewer.get_mouse_label_config()
+        self.save_mouse_labels_preset(current_preset, current_config)
 
         # Audio settings
         if hasattr(main_window, "wav_viewer") and hasattr(
