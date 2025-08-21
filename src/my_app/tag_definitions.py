@@ -24,13 +24,13 @@ The tags within each category are carefully curated to:
 
 Usage:
     from tag_definitions import tag_categories
-    
+
     # Get all nature-related tags
     nature_tags = tag_categories["🌿 Nature"]
-    
+
     # Get all available categories
     categories = list(tag_categories.keys())
-    
+
     # Create flat list of all tags
     all_tags = []
     for category_tags in tag_categories.values():
@@ -64,7 +64,6 @@ tag_categories = {
         "meadow",
         "sea",
     ],
-    
     # Urban environments and human-influenced locations
     # Covers built environments, public spaces, and human activity areas
     "🏙️ Urban / Human": [
@@ -78,7 +77,6 @@ tag_categories = {
         "traffic",
         "store",
     ],
-    
     # Animal sound sources for wildlife and domestic animals
     # Identifies specific animals whose sounds are prominent in the recording
     "🐦 Animals (wild & domestic)": [
@@ -101,7 +99,6 @@ tag_categories = {
         "fox",
         "swan",
     ],
-    
     # Insects and small creatures often creating ambient soundscapes
     # Used for recordings where insect or small animal sounds are significant
     "🦗 Insects & Small animals": [
@@ -117,7 +114,6 @@ tag_categories = {
         "worm",
         "wasp",
     ],
-    
     # Weather conditions and natural elements present during recording
     # Describes environmental conditions affecting the soundscape
     "🌧️ Weather & Elements": [
@@ -131,11 +127,9 @@ tag_categories = {
         "wind",
         "sun",
     ],
-    
     # Temporal context indicating when the recording was made
     # Helps categorize recordings by time period for lighting and activity correlation
     "⏰ Time of day": ["evening", "afternoon", "night", "morning", "sunset", "sunrise"],
-    
     # Activity types and sound characteristics in the recording
     # Describes the nature of activities or sound types present
     "🛠️ Sound type / Activity": [
@@ -149,7 +143,6 @@ tag_categories = {
         "traffic",
         "footsteps",
     ],
-    
     # Technical aspects and quality characteristics of the recording
     # Used to describe audio quality, recording technique, and technical properties
     "🎧 Recording quality": [

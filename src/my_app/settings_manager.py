@@ -24,6 +24,7 @@ Typical usage:
     # ... application usage ...
     settings.save_all_settings(main_window)
 """
+
 import logging
 import os
 
@@ -49,27 +50,27 @@ class SettingsManager:
     application settings using Qt's QSettings system. It manages window geometry,
     view preferences, audio settings, theme configurations, and UI customizations
     across application sessions.
-    
+
     The manager organizes settings into logical categories:
     - Window settings: Geometry, position, and size
     - View settings: Display modes, themes, and panel visibility
     - Audio settings: Volume levels and playback preferences
     - UI preferences: Mouse labels, confirmations, and behavior
-    
+
     All settings are stored persistently using the system's native settings
     storage (registry on Windows, preferences on macOS, config files on Linux).
-    
+
     Attributes:
         settings (QSettings): Qt settings instance for persistent storage.
     """
 
     def __init__(self):
         """Initialize the SettingsManager with Qt settings backend.
-        
+
         Creates a QSettings instance using the application's default settings
         format and location. The settings will be stored in the system's
         standard location for application preferences.
-        
+
         Note:
             The QSettings instance uses the application name and organization
             name set in the main application for proper settings scoping.
@@ -81,15 +82,15 @@ class SettingsManager:
 
     def save_window_geometry(self, window):
         """Save the current window geometry and state to persistent storage.
-        
+
         Captures and stores the window's size, position, and state (maximized,
         minimized, etc.) so it can be restored in future application sessions.
-        
+
         Args:
             window (QMainWindow): The main window whose geometry should be saved.
                                  Must be a QMainWindow or compatible widget with
                                  saveGeometry() method.
-                                 
+
         Note:
             The geometry is saved as a binary blob that includes window size,
             position, maximized state, and other window-specific properties.
@@ -99,19 +100,19 @@ class SettingsManager:
 
     def restore_window_geometry(self, window):
         """Restore previously saved window geometry or center window on first run.
-        
+
         Attempts to restore the window to its previously saved size, position,
         and state. If no saved geometry exists (first run), centers the window
         on screen with default dimensions.
-        
+
         Args:
             window (QMainWindow): The main window to restore geometry for.
                                  Must support restoreGeometry() method.
-                                 
+
         Returns:
             bool: True if geometry was successfully restored from saved settings,
                   False if this is a first run and window was centered with defaults.
-                  
+
         Note:
             For first-time runs, the window is set to 1400x900 pixels and
             centered on the primary display.
@@ -130,15 +131,15 @@ class SettingsManager:
 
     def _center_window(self, window):
         """Center the window on the primary screen with default dimensions.
-        
+
         Sets the window to a default size and positions it in the center of
         the primary display. Used for first-time application runs when no
         saved geometry is available.
-        
+
         Args:
             window (QWidget): The window widget to center and resize.
                              Must support resize() and move() methods.
-                             
+
         Note:
             Default window size is set to 1400x900 pixels, which provides
             a good balance for audio analysis tasks on most displays.
@@ -154,10 +155,10 @@ class SettingsManager:
 
     def save_view_settings(self, view_mode, show_metadata=True):
         """Save view and display configuration settings.
-        
+
         Persists the current view mode and metadata panel visibility settings
         for restoration in future application sessions.
-        
+
         Args:
             view_mode (str): Current waveform display mode. Common values:
                            - "mono": Single channel view
@@ -165,7 +166,7 @@ class SettingsManager:
                            - "overlay": Overlaid stereo channels
             show_metadata (bool, optional): Whether metadata panels are visible.
                                           Defaults to True.
-                                          
+
         Note:
             These settings affect the main waveform display and information
             panel visibility in the application interface.
@@ -177,15 +178,15 @@ class SettingsManager:
 
     def get_view_mode(self, default="per-kanaal"):
         """Retrieve the saved waveform display mode setting.
-        
+
         Args:
             default (str, optional): Fallback value if no saved setting exists.
                                    Defaults to "per-kanaal" (stereo per-channel view).
-                                   
+
         Returns:
             str: The saved view mode identifier, or the default value if no
                  setting has been saved previously.
-                 
+
         Note:
             Common return values include "mono", "per_kanaal", and "overlay".
         """
@@ -193,15 +194,15 @@ class SettingsManager:
 
     def get_show_metadata(self, default=True):
         """Retrieve the saved metadata panel visibility setting.
-        
+
         Args:
             default (bool, optional): Fallback value if no saved setting exists.
                                     Defaults to True (panels visible).
-                                    
+
         Returns:
             bool: True if metadata panels should be visible, False if hidden.
                   Returns default value if no setting has been saved.
-                  
+
         Note:
             This setting affects the visibility of format, broadcast extension,
             and info metadata tables in the main interface.
@@ -210,18 +211,18 @@ class SettingsManager:
 
     def get_mouse_labels_preset(self, default="performance"):
         """Retrieve the saved mouse label information preset.
-        
+
         Args:
             default (str, optional): Fallback preset if no saved setting exists.
                                    Defaults to "performance" for balanced functionality.
-                                   
+
         Returns:
             str: The saved mouse label preset identifier. Common values:
                  - "minimal": Essential info only, best performance
                  - "performance": Balanced info and performance
                  - "professional": Complete professional audio info
                  - "professional_advanced": All features including analysis
-                 
+
         Note:
             Mouse label presets control the amount and type of information
             displayed in hover tooltips over waveform plots.
@@ -231,16 +232,16 @@ class SettingsManager:
 
     def save_mouse_labels_preset(self, preset, config):
         """Save the current mouse label preset configuration.
-        
+
         Persists the mouse label preset setting for restoration in future sessions.
         The configuration parameter is reserved for future extensibility.
-        
+
         Args:
             preset (str): Mouse label preset identifier to save. Should be one of:
                          "minimal", "performance", "professional", "professional_advanced".
             config: Reserved for future use. Configuration details for the preset.
                    Currently not used but maintained for API compatibility.
-                   
+
         Note:
             Only the preset identifier is currently persisted. The config parameter
             is included for future extensibility when custom preset configurations
@@ -251,17 +252,17 @@ class SettingsManager:
 
     def save_theme_settings(self, theme_name="light"):
         """Save the current application theme preference.
-        
+
         Persists the theme setting so the application can restore the user's
         preferred appearance in future sessions.
-        
+
         Args:
             theme_name (str, optional): Theme identifier to save. Defaults to "light".
                                       Common values:
                                       - "light": Standard light theme
                                       - "dark": Dark mode theme
                                       - "macos_dark": macOS-style dark theme
-                                      
+
         Note:
             Theme changes affect the overall application appearance including
             backgrounds, text colors, and UI element styling.
@@ -271,16 +272,16 @@ class SettingsManager:
 
     def get_theme(self, default="light"):
         """Retrieve the saved application theme preference.
-        
+
         Args:
             default (str, optional): Fallback theme if no saved setting exists.
                                    Defaults to "light" theme.
-                                   
+
         Returns:
             str: The saved theme identifier, or the default value if no theme
                  has been previously saved. Common values include "light",
                  "dark", and "macos_dark".
-                 
+
         Note:
             The returned theme name should match one of the supported theme
             identifiers in the application's theme system.
@@ -291,18 +292,18 @@ class SettingsManager:
 
     def save_audio_settings(self, volume, auto_play=False, seek_step=10):
         """Save audio playback configuration settings.
-        
+
         Persists audio-related settings for restoration in future sessions.
         Currently only volume is actively saved; other parameters are reserved
         for future functionality.
-        
+
         Args:
             volume (int): Audio volume level to save (typically 0-100).
             auto_play (bool, optional): Reserved for future auto-play functionality.
                                       Defaults to False. Currently not persisted.
             seek_step (int, optional): Reserved for future seek step configuration.
                                      Defaults to 10 seconds. Currently not persisted.
-                                     
+
         Note:
             Only the volume parameter is currently persisted to settings.
             The auto_play and seek_step parameters are included for future
@@ -315,15 +316,15 @@ class SettingsManager:
 
     def get_volume(self, default=70):
         """Retrieve the saved audio volume level.
-        
+
         Args:
             default (int, optional): Fallback volume level if no saved setting exists.
                                    Defaults to 70 (70% volume).
-                                   
+
         Returns:
             int: The saved volume level as an integer (typically 0-100),
                  or the default value if no volume has been previously saved.
-                 
+
         Note:
             Volume levels are stored as integers with 0 representing mute
             and 100 representing maximum volume. The default of 70 provides
@@ -365,26 +366,26 @@ class SettingsManager:
 
     def restore_all_settings(self, main_window):
         """Restore all saved settings to the main window and its components.
-        
+
         This comprehensive method restores all categories of settings from persistent
         storage and applies them to the appropriate components of the main window.
         It handles window geometry, view modes, themes, mouse label presets, and
         audio settings with graceful error handling for missing components.
-        
+
         Args:
             main_window: The main application window to restore settings to.
                         Must have the following attributes/components available:
                         - wav_viewer: For view mode and audio player settings
                         - view_commands: For theme application
                         - current_theme: For theme state tracking
-                        
+
         Settings restored:
         - Window geometry and position
         - Waveform display mode (mono, stereo, overlay)
         - Application theme (light, dark, macOS dark)
         - Mouse label preset configuration
         - Audio volume level
-        
+
         Note:
             All setting applications are wrapped in try-catch blocks to handle
             cases where components may not be fully initialized. Warnings are
@@ -459,12 +460,12 @@ class SettingsManager:
 
     def save_all_settings(self, main_window):
         """Save all current application settings from the main window state.
-        
+
         This comprehensive method captures the current state of all application
         settings from the main window and its components, persisting them for
         restoration in future sessions. It handles window geometry, view preferences,
         theme settings, audio configuration, and UI preferences.
-        
+
         Args:
             main_window: The main application window to save settings from.
                         Settings are extracted from various window attributes:
@@ -472,14 +473,14 @@ class SettingsManager:
                         - wav_viewer for view mode and audio settings
                         - current_theme for theme preference
                         - _current_mouse_mode for mouse label preset
-                        
+
         Settings saved:
         - Window size, position, and state
         - Current waveform display mode
         - Active theme selection
         - Mouse label preset configuration
         - Audio volume level
-        
+
         Note:
             After saving all settings, sync() is called to ensure immediate
             persistence to storage. Audio settings extraction is wrapped in
@@ -500,7 +501,9 @@ class SettingsManager:
 
         # current_mouse_preset = getattr(main_window.wav_viewer, "_current_mouse_mode", "performance")
         # self.settings.setValue("view/mouse_labels_preset", current_mouse_preset)
-        current_preset = getattr(main_window.wav_viewer, "_current_mouse_mode", "performance")
+        current_preset = getattr(
+            main_window.wav_viewer, "_current_mouse_mode", "performance"
+        )
         current_config = main_window.wav_viewer.get_mouse_label_config()
         self.save_mouse_labels_preset(current_preset, current_config)
 

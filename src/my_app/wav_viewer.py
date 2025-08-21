@@ -45,10 +45,11 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from tag_completer import FileTagAutocomplete
+from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
-from ui_components import ApplicationStylist
+
 
 @dataclass
 class ClippingRegionInfo:
@@ -2327,8 +2328,10 @@ class WavViewer(QWidget):
         reply = QMessageBox.question(
             self,
             "Reset to Defaults",
-            ("Reset all INFO metadata fields to default values?"
-             "This will clear any custom values."),
+            (
+                "Reset all INFO metadata fields to default values?"
+                "This will clear any custom values."
+            ),
             QMessageBox.Yes | QMessageBox.No,
         )
 

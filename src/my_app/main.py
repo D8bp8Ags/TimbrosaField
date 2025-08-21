@@ -16,6 +16,7 @@ if __name__ == "__main__":     main()
 import logging
 import os
 import sys
+import time
 
 import app_config
 from batch_tageditor import BatchTagEditor
@@ -25,15 +26,18 @@ from export_manager import ExportManagerInterface
 from file_manager import FileManagerInterface
 from global_manager import GlobalShortcutManager
 from menu_system import MenuBarManager
-from PyQt5.QtGui import QKeySequence, QPixmap, QFont, QPalette
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QApplication, QMainWindow, QMessageBox, QShortcut, QSplashScreen, QWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QMessageBox,
+    QShortcut,
+)
 from settings_manager import SettingsManager
 from tag_completer import TemplateManager, TemplateManagerDialog
-from ui_components import UIComponentManager, ApplicationStylist, SplashScreen
+from ui_components import ApplicationStylist, SplashScreen, UIComponentManager
 from user_config_manager import TagEditor
 from wav_viewer import WavViewer
-import time
 
 # ----------------------------------------------------------------------------
 # Logging
@@ -201,8 +205,8 @@ class MainWindow(QMainWindow):
             "zoom_out": self._zoom_out,
             "zoom_fit": self._zoom_fit_to_window,
             "toggle_metadata": self._toggle_metadata_panel,
-#            "toggle_frequency": self._toggle_frequency_analysis,
-#            "toggle_timecode": self._toggle_timecode_format,
+            #            "toggle_frequency": self._toggle_frequency_analysis,
+            #            "toggle_timecode": self._toggle_timecode_format,
             "set_mouse_labels_minimal": self._set_mouse_labels_minimal,
             "set_mouse_labels_performance": self._set_mouse_labels_performance,
             "set_mouse_labels_professional": self._set_mouse_labels_professional,
@@ -210,7 +214,6 @@ class MainWindow(QMainWindow):
             "apply_light_theme": self._apply_light_theme,
             "apply_dark_theme": self._apply_dark_theme,
             "apply_macos_dark_theme": self._apply_macos_dark_theme,
-
         }
 
         # Audio commands
@@ -853,9 +856,11 @@ class MainWindow(QMainWindow):
     def _update_plot_backgrounds(self):
         """Update plot backgrounds after theme change."""
         bg_color = ApplicationStylist.COLORS.get('plot_background', 'w')
-        for plot in [self.wav_viewer.waveform_plot,
-                     self.wav_viewer.waveform_plot_top,
-                     self.wav_viewer.waveform_plot_bottom]:
+        for plot in [
+            self.wav_viewer.waveform_plot,
+            self.wav_viewer.waveform_plot_top,
+            self.wav_viewer.waveform_plot_bottom,
+        ]:
             plot.setBackground(bg_color)
 
     # ---------------------------------------------------------------------
@@ -1200,6 +1205,7 @@ def main() -> None:
     logger.info("Field Recorder Analyzer started.")
     sys.exit(app.exec_())
 
+
 def main_old() -> None:
     """Initialize and run the Field Recorder Analyzer Qt application.
 
@@ -1212,18 +1218,16 @@ def main_old() -> None:
     """
     logger.info("Starting Field Recorder Analyzer…")
 
-
     app = QApplication(sys.argv)
-
 
     app.setApplicationName(app_config.APP_NAME)
     app.setApplicationVersion(app_config.APP_VERSION)
     app.setOrganizationName(app_config.ORG_NAME)
 
     # Apply application-wide styling if desired:
-    #ApplicationStylist.apply_complete_styling(app)
-    #ApplicationStylist.apply_dark_theme(app)
-    #ApplicationStylist.apply_macos_dark_theme(app)
+    # ApplicationStylist.apply_complete_styling(app)
+    # ApplicationStylist.apply_dark_theme(app)
+    # ApplicationStylist.apply_macos_dark_theme(app)
     main_window = MainWindow()
     main_window.show()
     logger.info("Field Recorder Analyzer started.")

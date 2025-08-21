@@ -519,7 +519,9 @@ class AnalyticsDashboard(QDialog):
             )
             return duration
         except Exception as sf_error:
-            logger.error(f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}")
+            logger.error(
+                f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}"
+            )
 
             # Fallback calculation
             sample_rate = fmt_info.get("Sample rate", 44100)
