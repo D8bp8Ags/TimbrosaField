@@ -264,7 +264,7 @@ def parse_cue_chunk(data: bytes) -> list[dict[str, int]]:
     Usage:
         cue_points = parse_cue_chunk(cue_data)
         for cue in cue_points:
-            print(f"Cue {cue['ID']} at sample {cue['Sample Offset']}")
+            logger.debug(f"Cue {cue['ID']} at sample {cue['Sample Offset']}")
     """
     if len(data) < 4:
         logging.warning("Cue chunk too small for cue point count")

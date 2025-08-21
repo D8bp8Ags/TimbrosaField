@@ -23,7 +23,7 @@ Basic usage in a PyQt5 application:
 Getting current tags:
     tagger = FileTagAutocomplete()
     tags = tagger.get_current_tags()
-    print(f"Current tags: {tags}")
+    logger.debug(f"Current tags: {tags}")
 """
 
 import json
@@ -320,7 +320,7 @@ class FileTagAutocomplete(QWidget):
         if template_data:
             self.template_buttons.apply_template(template_data, template_name)
         else:
-            print(f"Template data not found for: {template_name}")
+            logger.error(f"Template data not found for: {template_name}")
 
     def open_template_manager(self):
         """Open the template manager dialog via F9 keyboard shortcut.
@@ -337,7 +337,7 @@ class FileTagAutocomplete(QWidget):
         if hasattr(self, "template_buttons") and self.template_buttons:
             self.template_buttons.show_template_manager()
         else:
-            print("Template buttons not available")
+            logger.error("Template buttons not available")
 
     def _handle_category_change(self, category: str) -> None:
         """Handle changes in the category filter dropdown selection.
@@ -1055,12 +1055,12 @@ class TemplateManager:
                     #       f"{self.template_file}")
                     return loaded
         except Exception as e:
-            print(f"Error loading templates: {e}")
+            logger.error(f"Error loading templates: {e}")
 
         # Fallback to defaults
         defaults = self.get_default_templates()
         self.save_templates(defaults)
-        print(f"Created default templates ({len(defaults)} templates)")
+        logger.info(f"Created default templates ({len(defaults)} templates)")
         return defaults
 
     def save_templates(self, templates=None):
@@ -1089,9 +1089,9 @@ class TemplateManager:
         try:
             with open(self.template_file, "w", encoding="utf-8") as f:
                 json.dump(templates, f, indent=2, ensure_ascii=False)
-            print(f"Templates saved to {self.template_file}")
+            logger.info(f"Templates saved to {self.template_file}")
         except Exception as e:
-            print(f"Error saving templates: {e}")
+            logger.error(f"Error saving templates: {e}")
 
     def get_template(self, name: str) -> dict[str, Any]:
         """Retrieve a specific template by name.
@@ -1144,7 +1144,7 @@ class TemplateManager:
             "usage_count": 0,
         }
         self.save_templates()
-        print(f"Template added: {name}")
+        logger.info(f"Template added: {name}")
 
     def update_template(self, name: str, tags: list[str], description: str = ""):
         """Update an existing template's tags and description.
@@ -1172,7 +1172,7 @@ class TemplateManager:
             self.templates[name]["tags"] = tags
             self.templates[name]["description"] = description
             self.save_templates()
-            print(f"Template updated: {name}")
+            logger.info(f"Template updated: {name}")
 
     def delete_template(self, name: str):
         """Delete a template from the collection.
@@ -1197,7 +1197,7 @@ class TemplateManager:
         if name in self.templates:
             del self.templates[name]
             self.save_templates()
-            print(f"Template deleted: {name}")
+            logger.info(f"Template deleted: {name}")
 
     def increment_usage(self, name: str):
         """Increment the usage count for a template to track popularity.
@@ -1427,7 +1427,7 @@ class TemplateQuickButtons(QWidget):
         # Increment usage count
         self.template_manager.increment_usage(template_name)
 
-        print(f"Template '{template_name}' applied: {tags} " "(with trailing comma)")
+        logger.info(f"Template '{template_name}' applied: {tags} " "(with trailing comma)")
 
         # Safe refresh - recreate buttons to show new popularity order
         self._create_template_buttons()
@@ -1639,7 +1639,7 @@ class TemplateManagerDialog(QDialog):
             self.tags_input.setText(", ".join(template_data.get("tags", [])))
             self.description_input.setPlainText(template_data.get("description", ""))
 
-            print(f"Loaded template for editing: {template_name}")
+            logger.info(f"Loaded template for editing: {template_name}")
 
     def new_template(self):
         """Clear editor for new template."""
@@ -1648,7 +1648,7 @@ class TemplateManagerDialog(QDialog):
         self.tags_input.clear()
         self.description_input.clear()
         self.name_input.setFocus()
-        print("Ready to create new template")
+        logger.info("Ready to create new template")
 
     def save_template(self):
         """Save current template."""
@@ -1791,12 +1791,12 @@ class TemplateManagerDialog(QDialog):
             if hasattr(parent_widget, "apply_template"):
                 # Use existing apply_template function
                 parent_widget.apply_template(template_data, self.current_template_name)
-                print(
+                logger.info(
                     f"Template '{self.current_template_name}' applied " "via F9 manager"
                 )
                 self.accept()  # Close dialog
             else:
-                print("Could not find parent apply_template function")
+                logger.error("Could not find parent apply_template function")
 
 
 def main() -> None:

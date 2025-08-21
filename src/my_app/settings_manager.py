@@ -424,7 +424,7 @@ class SettingsManager:
 
         # mouse_preset = self.get_mouse_labels_preset("performance")
         mouse_preset = self.get_mouse_labels_preset("performance")
-        print(mouse_preset)
+        logger.debug(f"Mouse labels preset loaded: {mouse_preset}")
 
         if hasattr(main_window, "wav_viewer"):
             try:

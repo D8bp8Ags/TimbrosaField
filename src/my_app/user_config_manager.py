@@ -262,9 +262,9 @@ def main():
     result = editor.exec_()
 
     if result == QDialog.Accepted:
-        print("✅ Configuration saved")
+        logger.info("Configuration saved")
     else:
-        print("❌ Configuration cancelled")
+        logger.info("Configuration cancelled")
     sys.exit(app.exec_())
 
 

@@ -65,6 +65,103 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
+import app_config
+
+
+class SplashScreen(QWidget):
+    """Professional splash screen with background image and loading states."""
+
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        self.loading_label = None
+        self.version_label = None
+        self.setup_ui()
+        self.setup_styling()
+        self.center_on_screen()
+
+    def setup_ui(self):
+        """Setup the splash screen UI components."""
+        self.setFixedSize(400, 250)
+        self.setWindowFlags(Qt.SplashScreen | Qt.WindowStaysOnTopHint)
+
+        # Create layout (mainly for structure, we use absolute positioning)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        layout.addStretch()
+        layout.addStretch()
+
+        # Background image
+        bg_image = QLabel(self)
+        bg_image.setPixmap(QPixmap("./background.png").scaled(600, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        bg_image.setAlignment(Qt.AlignCenter)
+        bg_image.setGeometry(0, 0, 400, 250)
+        bg_image.lower()
+
+        # Loading text (absolute positioning)
+        self.loading_label = QLabel("Loading application...", self)
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        self.loading_label.setProperty("class", "subtitle")
+        self.loading_label.setGeometry(50, 210, 300, 30)
+
+        # Version label (bottom right)
+        self.version_label = QLabel(f"Version {app_config.APP_VERSION}", self)
+        self.version_label.setProperty("class", "caption")
+        self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
+        self.version_label.setGeometry(250, 210, 140, 30)
+
+    def setup_styling(self):
+        """Apply custom styling to the splash screen."""
+        self.setStyleSheet("""
+            QWidget {
+                background: 
+                    qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                  stop: 0 #4a7c59,
+                                  stop: 1 #4a7c59);
+                border-radius: 16px;
+            }
+            QLabel {
+                background: transparent;
+                color: rgba(255, 255, 255, 0.7);
+                border: none;
+            }
+            QLabel[class="caption"] {
+                background: transparent;
+                color: rgba(255, 255, 255, 0.7);
+                border: none;
+                font-size: 9pt;
+            }
+        """)
+
+    def center_on_screen(self):
+        """Center the splash screen on the primary screen."""
+        screen = self.app.primaryScreen().geometry()
+        self.move(
+            (screen.width() - self.width()) // 2,
+            (screen.height() - self.height()) // 2
+        )
+
+    def update_message(self, message):
+        """Update the loading message."""
+        if self.loading_label:
+            self.loading_label.setText(message)
+            self.app.processEvents()
+
+    def set_ready(self):
+        """Set the splash to ready state."""
+        if self.loading_label:
+            self.loading_label.setProperty("class", "success-message")
+            self.loading_label.setText("Ready!")
+            self.app.processEvents()
+
+    def show_and_process(self):
+        """Show the splash screen and process events."""
+        self.show()
+        self.app.processEvents()
 
 class ModernStatusBar(QStatusBar):
     """Enhanced status bar with progress tracking and comprehensive visual feedback.
@@ -699,17 +796,17 @@ class StatusBarManager:
                 self.wav_viewer.audio_player.stateChanged.connect(
                     self._on_audio_state_changed
                 )
-                print("🎵 Audio player status connected to status bar")
+                logger.info("Audio player status connected to status bar")
 
             # Connect file list changes
             if hasattr(self.wav_viewer, "file_list"):
                 self.wav_viewer.file_list.currentRowChanged.connect(
                     self._on_file_selection_changed
                 )
-                print("📁 File list status connected to status bar")
+                logger.info("File list status connected to status bar")
 
         except Exception as e:
-            print(f"⚠️ Error connecting status bar signals: {e}")
+            logger.warning(f"Error connecting status bar signals: {e}")
 
     # def _update_initial_file_count(self):
     #     """Update initial file count."""
@@ -812,7 +909,7 @@ class StatusBarManager:
             self.status_bar.update_file_info(file_path, duration, file_size)
 
         except Exception as e:
-            print(f"⚠️ Error updating file info: {e}")
+            logger.error(f"Error updating file info: {e}")
 
     # === PUBLIC INTERFACE METHODS ===
 
@@ -1101,8 +1198,6 @@ class ApplicationStylist:
         # Set application palette for consistent theming
         palette = ApplicationStylist._create_application_palette()
         app.setPalette(palette)
-
-        print("🎨 Professional application styling applied")
 
     @staticmethod
     def _create_application_palette():
@@ -2082,7 +2177,7 @@ class ApplicationStylist:
 
         ApplicationStylist.apply_complete_styling(app)
         # Apply dark theme stylesheet
-        print("☀️ Light theme applied")
+        # print("☀️ Light theme applied")
 
     @staticmethod
     def apply_dark_theme(app):
@@ -2143,7 +2238,7 @@ class ApplicationStylist:
         ApplicationStylist.COLORS.update(dark_colors)
         ApplicationStylist.apply_complete_styling(app)
         # Apply dark theme stylesheet
-        print("🌙 Dark theme applied")
+        # print("🌙 Dark theme applied")
 
     @staticmethod
     def apply_macos_dark_theme(app):
@@ -2203,7 +2298,7 @@ class ApplicationStylist:
 
         ApplicationStylist.COLORS.update(macos_dark_colors)
         ApplicationStylist.apply_complete_styling(app)
-        print("🍎 macOS Dark theme applied")
+        # print("🍎 macOS Dark theme applied")
 
     @staticmethod
     def set_custom_theme(app, color_overrides):
@@ -2212,7 +2307,7 @@ class ApplicationStylist:
         custom_colors.update(color_overrides)
 
         # Regenerate stylesheet with custom colors
-        print("🎨 Custom theme applied")
+        logger.info("Custom theme applied")
 
     @staticmethod
     def get_component_styles(component_name):
@@ -2262,7 +2357,7 @@ class UIComponentManager:
         # Initialize component managers
         self.status_manager = StatusBarManager(main_window)
 
-        print("🎨 UIComponentManager initialized")
+        # print("🎨 UIComponentManager initialized")
 
     def get_status_manager(self):
         """Get status bar manager."""
@@ -2280,7 +2375,7 @@ class UIComponentManager:
             self.status_manager.status_bar.update_file_count(count)
             return True
         except Exception as e:
-            print(f"⚠️ Fallback file count update failed: {e}")
+            logger.warning(f"Fallback file count update failed: {e}")
             return False
 
     ####
