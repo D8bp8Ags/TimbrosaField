@@ -287,7 +287,7 @@ class AudioPlayer(QWidget):
         """
         parent_window = self.window() if self.window() else self.parent()
         if parent_window is None:
-            print("❌ No parent window found for shortcuts")
+            logger.warning("No parent window found for shortcuts")
             return
 
         # Space = Play/Pause
@@ -333,9 +333,9 @@ class AudioPlayer(QWidget):
             parent_window = self.window()
             if parent_window:
                 self.volume_toast = VolumeToast(parent_window)
-                print("🍞 Volume toast created")
+                logger.debug("Volume toast created")
             else:
-                print("❌ No parent window found for volume toast")
+                logger.warning("No parent window found for volume toast")
 
     # === PUBLIC API METHODS ===
 
@@ -357,7 +357,7 @@ class AudioPlayer(QWidget):
         """
         try:
             if not os.path.exists(filepath):
-                print(f"❌ Audio file not found: {filepath}")
+                logger.error(f"Audio file not found: {filepath}")
                 return False
 
             url = QUrl.fromLocalFile(os.path.abspath(filepath))
@@ -368,7 +368,7 @@ class AudioPlayer(QWidget):
             return True
 
         except Exception as e:
-            print(f"❌ Error loading audio: {e}")
+            logger.error(f"Error loading audio: {e}")
             return False
 
     def play(self):
@@ -384,7 +384,7 @@ class AudioPlayer(QWidget):
         if self._current_filepath and os.path.exists(self._current_filepath):
             self.player.play()
         else:
-            print("❌ No audio file loaded or file not found")
+            logger.warning("No audio file loaded or file not found")
 
     def pause(self):
         """Pause playback.
@@ -409,7 +409,7 @@ class AudioPlayer(QWidget):
         audio. If paused or stopped, starts/resumes playback. This is the primary method
         for spacebar shortcut functionality.
         """
-        print("🎵 Toggle playbook triggered")
+        # print("🎵 Toggle playbook triggered")
         if self.player.state() == QMediaPlayer.PlayingState:
             self.pause()
         else:
@@ -437,7 +437,7 @@ class AudioPlayer(QWidget):
             self._ensure_volume_toast()
             if self.volume_toast:
                 self.volume_toast.show_volume(self._pre_mute_volume)
-            print(f"🔊 Unmuted to {self._pre_mute_volume}%")
+            logger.debug(f"Unmuted to {self._pre_mute_volume}%")
         else:
             # Mute - save current volume and set to 0
             self._pre_mute_volume = current_volume
@@ -445,7 +445,7 @@ class AudioPlayer(QWidget):
             self._ensure_volume_toast()
             if self.volume_toast:
                 self.volume_toast.show_volume(0)
-            print("🔇 Muted")
+            logger.debug("Muted")
 
     def stop_playback(self):
         """Stop playback.
@@ -453,7 +453,7 @@ class AudioPlayer(QWidget):
         Wrapper method for the stop() function, typically used by keyboard shortcuts and
         UI callbacks. Stops audio playback and resets position.
         """
-        print("🛑 Stop playback triggered")
+        logger.debug("Stop playback triggered")
         self.stop()
 
     def seek_to_position(self, position_ms):
@@ -498,7 +498,7 @@ class AudioPlayer(QWidget):
             current_pos = self.player.position()
             new_pos = max(0, current_pos - 10000)  # 10 seconds = 10000ms
             self.seek_to_position(new_pos)
-            print(f"⏪ Seeking backward to {new_pos/1000:.1f}s")
+            logger.debug(f"Seeking backward to {new_pos/1000:.1f}s")
 
     def seek_forward(self):
         """Seek 10 seconds forward.
@@ -513,7 +513,7 @@ class AudioPlayer(QWidget):
             duration = self.player.duration()
             new_pos = min(duration, current_pos + 10000)  # 10 seconds forward
             self.seek_to_position(new_pos)
-            print(f"⏩ Seeking forward to {new_pos/1000:.1f}s")
+            logger.debug(f"Seeking forward to {new_pos/1000:.1f}s")
 
     def volume_up(self):
         """Increase volume by 10 with visual feedback.
@@ -533,7 +533,7 @@ class AudioPlayer(QWidget):
         if self.volume_toast:
             self.volume_toast.show_volume(new_volume)
 
-        print(f"🔊 Volume: {new_volume}%")
+        logger.debug(f"Volume: {new_volume}%")
 
     def volume_down(self):
         """Decrease volume by 10 with visual feedback.
@@ -553,7 +553,7 @@ class AudioPlayer(QWidget):
         if self.volume_toast:
             self.volume_toast.show_volume(new_volume)
 
-        print(f"🔉 Volume: {new_volume}%")
+        logger.debug(f"Volume: {new_volume}%")
 
     # === GETTER METHODS ===
 

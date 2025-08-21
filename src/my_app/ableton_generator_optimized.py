@@ -1873,13 +1873,13 @@ if __name__ == "__main__":
 
         # Show results
         if success:
-            print("✅ Optimized Live Set creation successful!")
+            logger.info("Optimized Live Set creation successful!")
             stats = generator.get_performance_stats()
-            print(f"📊 Performance: {end_time - start_time:.2f}s total")
-            print(f"⚡ Optimizations: {', '.join(stats['optimizations'])}")
+            logger.info(f"Performance: {end_time - start_time:.2f}s total")
+            logger.info(f"Optimizations: {', '.join(stats['optimizations'])}")
         else:
-            print("❌ Optimized Live Set creation failed!")
+            logger.error("Optimized Live Set creation failed!")
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Error: {e}")
         sys.exit(1)

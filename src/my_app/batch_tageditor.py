@@ -480,7 +480,7 @@ def load_wav_files_from_config() -> list[str]:
             raise KeyError("Config paths must contain 'fieldrecording_dir'")
 
         fieldrecording_dir = config["paths"]["fieldrecording_dir"]
-        print(f"📁 Loading WAV files from fieldrecording_dir: {fieldrecording_dir}")
+        logger.info(f"Loading WAV files from fieldrecording_dir: {fieldrecording_dir}")
 
         if not os.path.exists(fieldrecording_dir):
             raise ValueError(
@@ -494,7 +494,7 @@ def load_wav_files_from_config() -> list[str]:
                 full_path = os.path.join(fieldrecording_dir, filename)
                 wav_files.append(full_path)
 
-        print(f"📂 Found {len(wav_files)} WAV files in fieldrecording_dir")
+        logger.info(f"Found {len(wav_files)} WAV files in fieldrecording_dir")
 
         # Filter to only existing files (extra safety check)
         existing_files = []
@@ -502,13 +502,13 @@ def load_wav_files_from_config() -> list[str]:
             if os.path.exists(wav_file):
                 existing_files.append(wav_file)
             else:
-                print(f"⚠️  File not found: {wav_file}")
+                logger.warning(f"File not found: {wav_file}")
 
         if not existing_files:
             raise ValueError("No valid WAV files found in fieldrecording_dir")
 
-        print(
-            f"✅ {len(existing_files)} valid WAV files loaded from fieldrecording_dir"
+        logger.info(
+            f"{len(existing_files)} valid WAV files loaded from fieldrecording_dir"
         )
         return existing_files
 

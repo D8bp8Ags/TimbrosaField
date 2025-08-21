@@ -339,7 +339,7 @@ class AnalyticsDashboard(QDialog):
             return creation_time_str, mod_time_str
 
         except Exception as e:
-            print(f"Warning: Could not get timestamps for {file_path}: {e}")
+            logger.warning(f"Could not get timestamps for {file_path}: {e}")
             fallback_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return fallback_time, fallback_time
 
@@ -357,7 +357,7 @@ class AnalyticsDashboard(QDialog):
         if not self.wav_files:
             return
 
-        print(f"Analyzing {len(self.wav_files)} files...")
+        logger.info(f"Analyzing {len(self.wav_files)} files...")
 
         # Initialize statistics containers
         stats = self._initialize_analysis_stats()
@@ -514,12 +514,12 @@ class AnalyticsDashboard(QDialog):
         try:
             info = sf.info(file_path)
             duration = info.frames / info.samplerate
-            print(
+            logger.debug(
                 f"Got duration from soundfile: {duration:.1f}s for {os.path.basename(file_path)}"
             )
             return duration
         except Exception as sf_error:
-            print(f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}")
+            logger.error(f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}")
 
             # Fallback calculation
             sample_rate = fmt_info.get("Sample rate", 44100)
@@ -530,7 +530,7 @@ class AnalyticsDashboard(QDialog):
             else:
                 duration = 0
 
-            print(f"Using fallback duration estimate: {duration:.1f}s")
+            logger.debug(f"Using fallback duration estimate: {duration:.1f}s")
             return duration
 
     def _extract_tags(self, info_data):
@@ -665,7 +665,7 @@ class AnalyticsDashboard(QDialog):
             stats (dict): Statistics containers to update (modified in-place)
             error_message (str): Description of the analysis failure
         """
-        print(f"Warning: {error_message} for {os.path.basename(file_path)}")
+        logger.warning(f"{error_message} for {os.path.basename(file_path)}")
         stats["analysis_errors"] += 1
 
         try:
@@ -685,7 +685,7 @@ class AnalyticsDashboard(QDialog):
             stats["timeline_data"].append(timeline_entry)
 
         except Exception as nested_e:
-            print(f"Could not even get file stats for {file_path}: {nested_e}")
+            logger.error(f"Could not even get file stats for {file_path}: {nested_e}")
 
     def _finalize_analysis(self, stats):
         """Complete analysis and update displays.
@@ -701,10 +701,10 @@ class AnalyticsDashboard(QDialog):
             details about possible causes and successful analysis count.
         """
         # Report results
-        print("Analysis complete:")
-        print(f"   Successfully analyzed: {stats['successful_analyses']} files")
-        print(f"   Analysis errors: {stats['analysis_errors']} files")
-        print(f"   Total files processed: {len(self.wav_files)}")
+        logger.info("Analysis complete:")
+        logger.info(f"   Successfully analyzed: {stats['successful_analyses']} files")
+        logger.info(f"   Analysis errors: {stats['analysis_errors']} files")
+        logger.info(f"   Total files processed: {len(self.wav_files)}")
 
         # Update displays
         self.update_overview(
@@ -874,10 +874,10 @@ class AnalyticsDashboard(QDialog):
             timeline_data (list[dict]): List of timeline entry dictionaries
                 containing file information, timestamps, and metadata
         """
-        print(f"DEBUG: update_timeline called with {len(timeline_data)} entries")
+        logger.debug(f"update_timeline called with {len(timeline_data)} entries")
 
         if not timeline_data:
-            print("DEBUG: No timeline data, showing empty state")
+            logger.debug("No timeline data, showing empty state")
             self.timeline_table.setRowCount(1)
             for col in range(7):
                 text = "No timeline data" if col == 0 else "-"
@@ -886,7 +886,7 @@ class AnalyticsDashboard(QDialog):
 
         # Debug: print first few entries
         for i, entry in enumerate(timeline_data[:3]):
-            print(f"DEBUG: Entry {i}: {entry}")
+            logger.debug(f"Entry {i}: {entry}")
 
         # Sort by BWF date/time first, then file timestamps
         def sort_key(entry):
@@ -914,9 +914,9 @@ class AnalyticsDashboard(QDialog):
         try:
             timeline_data.sort(key=sort_key)
         except Exception as e:
-            print(f"DEBUG: Sort error: {e}")
+            logger.debug(f"Sort error: {e}")
 
-        print(f"DEBUG: Setting table row count to {len(timeline_data)}")
+        logger.debug(f"Setting table row count to {len(timeline_data)}")
         self.timeline_table.setRowCount(len(timeline_data))
 
         for i, entry in enumerate(timeline_data):
@@ -942,11 +942,11 @@ class AnalyticsDashboard(QDialog):
                 self.timeline_table.setItem(
                     i, 6, QTableWidgetItem(entry.get("source", "N/A"))
                 )
-                print(f"DEBUG: Added row {i} for file {entry.get('file', 'Unknown')}")
+                logger.debug(f"Added row {i} for file {entry.get('file', 'Unknown')}")
             except Exception as e:
-                print(f"DEBUG: Error adding row {i}: {e}")
+                logger.debug(f"Error adding row {i}: {e}")
 
-        print(f"DEBUG: Timeline table now has {self.timeline_table.rowCount()} rows")
+        logger.debug(f"Timeline table now has {self.timeline_table.rowCount()} rows")
 
     def export_report(self):
         """Export analytics report to text file.
