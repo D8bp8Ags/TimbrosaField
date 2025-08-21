@@ -438,7 +438,7 @@ def test_save_strategies():
     This function can be used during development to test the save strategies with mock
     data before integrating into the main application.
     """
-    print("🧪 Testing WavSaveStrategies...")
+    logger.debug("Testing WavSaveStrategies...")
 
     # Mock test data
     # test_metadata = {
@@ -447,11 +447,11 @@ def test_save_strategies():
     #     "ICMT": "test, metadata, injection",
     # }
 
-    print("✅ WavSaveStrategies class loaded successfully")
-    print("✅ SaveResult dataclass initialized")
-    print("✅ All strategy methods defined")
-    print("✅ Helper methods implemented")
-    print("💡 Ready for integration testing with real WAV files")
+    logger.info("WavSaveStrategies class loaded successfully")
+    logger.info("SaveResult dataclass initialized")
+    logger.info("All strategy methods defined")
+    logger.info("Helper methods implemented")
+    logger.info("Ready for integration testing with real WAV files")
 
 
 if __name__ == "__main__":

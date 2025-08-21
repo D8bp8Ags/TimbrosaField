@@ -492,11 +492,11 @@ class WavSaveOptionsDialog(QDialog):
 
 def test_wav_save_manager():
     """Test function for WavSaveManager."""
-    print("🧪 Testing WavSaveManager...")
-    print("✅ WavSaveManager class loaded")
-    print("✅ WavSaveOptionsDialog class loaded")
-    print("✅ Convenience functions available")
-    print("💡 Ready for integration into WavViewer")
+    logger.debug("Testing WavSaveManager...")
+    logger.info("WavSaveManager class loaded")
+    logger.info("WavSaveOptionsDialog class loaded")
+    logger.info("Convenience functions available")
+    logger.info("Ready for integration into WavViewer")
 
 
 if __name__ == "__main__":

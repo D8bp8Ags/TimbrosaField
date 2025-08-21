@@ -12,11 +12,6 @@ operations -> ``ExportManager`` * Dialog operations -> ``DialogManager`` * UI co
 import logging
 import os
 import sys
-
-# try:
-#     from wav_save_manager import quick_save_with_dialog  # type: ignore
-# except ImportError:  # pragma: no cover - optional at runtime
-#     quick_save_with_dialog = None  # type: ignore[assignment]
 from dataclasses import dataclass
 from typing import Any
 
@@ -2453,7 +2448,7 @@ class WavViewer(QWidget):
 
         self.cue_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-        # print(cue_points)
+        # logger.debug(f"Cue points: {cue_points}")
         #
         # # labeled = [(str(int(cid)), label) for cid, label in cue_labels.items()
         # #            if label.strip()]
@@ -3362,8 +3357,8 @@ class WavViewer(QWidget):
             return
 
         position_seconds = position_ms / 1000.0
-        # print('lala')
-        # print(self.playback_line)
+        # logger.debug('Updating playback position')
+        # logger.debug(f'Playback line status: {self.playback_line}')
         # Update cursor position on all plots if cursor exists
         if self.playback_line:
             for line in self.playback_line:
@@ -3759,7 +3754,7 @@ class WavViewer(QWidget):
         logger.info("Mouse labels set to performance mode")
 
 
-def test_main() -> None:
+def main() -> None:
     """Test function to run WavViewer standalone."""
     logger.info("Starting WavViewer standalone test")
 
@@ -3781,4 +3776,4 @@ def test_main() -> None:
 
 
 if __name__ == "__main__":
-    test_main()
+    main()
