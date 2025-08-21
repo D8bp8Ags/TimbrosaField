@@ -1,7 +1,21 @@
 # Global Shortcut Manager - alle shortcuts op één plek!
 
+import logging
+import os
+
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QShortcut
+
+# Configure logging
+logging.basicConfig(
+    level=getattr(
+        logging,
+        os.getenv("LOG_LEVEL", "DEBUG").upper(),
+        logging.INFO,
+    ),
+    format="[%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 class GlobalShortcutManager:
@@ -138,8 +152,8 @@ class GlobalShortcutManager:
         self.add_template_shortcut("Ctrl+3", 3, "Apply Template 3")
         self.add_template_shortcut("Ctrl+4", 4, "Apply Template 4")
 
-        print(
-            f"🎯 {len(self.shortcuts)} global shortcuts installed via command_interface"
+        logger.info(
+            f"{len(self.shortcuts)} global shortcuts installed via command_interface"
         )
 
     def add_command_shortcut(
@@ -182,7 +196,7 @@ class GlobalShortcutManager:
             if command_func:
                 return command_func()
             else:
-                print(f"❌ Command {command_group}.{command_name} not found")
+                logger.error(f"Command {command_group}.{command_name} not found")
 
         shortcut = QShortcut(QKeySequence(key_sequence), self.main_window)
         shortcut.activated.connect(execute_command)

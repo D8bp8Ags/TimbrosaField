@@ -313,7 +313,7 @@ class FileMenuHandler(MenuHandlerBase):
         # Open directory
         open_dir_action = QAction("&Open Directory...", self.main_window)
         # open_dir_action.setShortcut(QKeySequence('Ctrl+O'))
-        self._apply_shortcut(open_dir_action, 'file_commands', 'open_directory')  # ✨ ADD THIS
+        self._apply_shortcut(open_dir_action, 'file_commands', 'open_directory')  
         open_dir_action.setStatusTip("Open a different WAV directory")
         open_dir_action.triggered.connect(
             lambda: self._execute_file_command("open_directory")
@@ -323,7 +323,7 @@ class FileMenuHandler(MenuHandlerBase):
         # Reload
         reload_action = QAction("&Reload Directory", self.main_window)
         # reload_action.setShortcut(QKeySequence('F5'))
-        self._apply_shortcut(reload_action, 'file_commands', 'reload_directory')  # ✨ ADD THIS
+        self._apply_shortcut(reload_action, 'file_commands', 'reload_directory')  
         reload_action.triggered.connect(
             lambda: self._execute_file_command("reload_directory")
         )
@@ -343,7 +343,7 @@ class FileMenuHandler(MenuHandlerBase):
 
         export_ableton_action = QAction("🎛️ Export to Ableton Live...", self.main_window)
         # export_ableton_action.setShortcut(QKeySequence('Ctrl+E'))
-        self._apply_shortcut(export_ableton_action, 'file_commands', 'export_to_ableton')  # ✨ ADD THIS
+        self._apply_shortcut(export_ableton_action, 'file_commands', 'export_to_ableton')  
         export_ableton_action.triggered.connect(
             lambda: self._execute_file_command("export_to_ableton")
         )
@@ -369,7 +369,7 @@ class FileMenuHandler(MenuHandlerBase):
         # Exit
         exit_action = QAction("E&xit", self.main_window)
         # exit_action.setShortcut(QKeySequence('Ctrl+Q'))
-        self._apply_shortcut(exit_action, 'file_commands', 'exit_application')  # ✨ ADD THIS
+        self._apply_shortcut(exit_action, 'file_commands', 'exit_application')  
         exit_action.triggered.connect(
             lambda: self._execute_file_command("exit_application")
         )
@@ -522,7 +522,7 @@ class EditMenuHandler(MenuHandlerBase):
         # User config
         config_action = QAction("⚙️ &User Config...", self.main_window)
         # config_action.setShortcut(QKeySequence('Ctrl+,'))
-        self._apply_shortcut(config_action, 'edit_commands', 'open_user_config_manager')  # ✨ ADD THIS
+        self._apply_shortcut(config_action, 'edit_commands', 'open_user_config_manager')  
         config_action.triggered.connect(
             lambda: self._execute_edit_command("open_user_config_manager")
         )
@@ -533,7 +533,7 @@ class EditMenuHandler(MenuHandlerBase):
         # Tag operations
         clear_tags_action = QAction("🧹 &Clear Current Tags", self.main_window)
         # clear_tags_action.setShortcut(QKeySequence('Ctrl+Shift+C'))
-        self._apply_shortcut(clear_tags_action, 'edit_commands', 'clear_tags')  # ✨ ADD THIS
+        self._apply_shortcut(clear_tags_action, 'edit_commands', 'clear_tags')  
         clear_tags_action.triggered.connect(
             lambda: self._execute_edit_command("clear_tags")
         )
@@ -549,7 +549,7 @@ class EditMenuHandler(MenuHandlerBase):
 
         batch_tag_action = QAction("🏷️ &Batch Tag Editor...", self.main_window)
         # batch_tag_action.setShortcut(QKeySequence('Ctrl+B'))
-        self._apply_shortcut(batch_tag_action, 'edit_commands', 'open_batch_tagger')  # ✨ ADD THIS
+        self._apply_shortcut(batch_tag_action, 'edit_commands', 'open_batch_tagger')  
         batch_tag_action.triggered.connect(
             lambda: self._execute_edit_command("open_batch_tagger")
         )
@@ -560,7 +560,7 @@ class EditMenuHandler(MenuHandlerBase):
         # Template management
         template_action = QAction("📋 &Template Manager...", self.main_window)
         # template_action.setShortcut(QKeySequence('F9'))
-        self._apply_shortcut(template_action, 'edit_commands', 'open_template_manager')  # ✨ ADD THIS
+        self._apply_shortcut(template_action, 'edit_commands', 'open_template_manager')  
         template_action.triggered.connect(
             lambda: self._execute_edit_command("open_template_manager")
         )
@@ -878,7 +878,7 @@ class AudioMenuHandler(MenuHandlerBase):
 
         # Playback controls
         play_pause_action = QAction("⏯️ &Play/Pause", self.main_window)
-        self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')  # ✨ ADD THIS
+        #self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')
         play_pause_action.triggered.connect(
             lambda: self._execute_audio_command("play_pause")
         )
@@ -895,7 +895,7 @@ class AudioMenuHandler(MenuHandlerBase):
         # Volume controls
         volume_up_action = QAction("🔊 Volume +", self.main_window)
         # volume_up_action.setShortcut(QKeySequence(Qt.Key_PageUp))
-        self._apply_shortcut(volume_up_action, 'audio_commands', 'volume_up')  # ✨ ADD THIS
+        self._apply_shortcut(volume_up_action, 'audio_commands', 'volume_up')  
         volume_up_action.triggered.connect(
             lambda: self._execute_audio_command("volume_up")
         )
@@ -903,7 +903,7 @@ class AudioMenuHandler(MenuHandlerBase):
 
         volume_down_action = QAction("🔉 Volume -", self.main_window)
         # volume_down_action.setShortcut(QKeySequence(Qt.Key_PageDown))
-        self._apply_shortcut(volume_down_action, 'audio_commands', 'volume_down')  # ✨ ADD THIS
+        self._apply_shortcut(volume_down_action, 'audio_commands', 'volume_down')  
         volume_down_action.triggered.connect(
             lambda: self._execute_audio_command("volume_down")
         )
@@ -911,7 +911,7 @@ class AudioMenuHandler(MenuHandlerBase):
 
         mute_action = QAction("🔇 &Mute", self.main_window)
         # mute_action.setShortcut(QKeySequence(Qt.Key_M))
-        self._apply_shortcut(mute_action, 'audio_commands', 'toggle_mute')  # ✨ ADD THIS
+        self._apply_shortcut(mute_action, 'audio_commands', 'toggle_mute')  
         mute_action.triggered.connect(
             lambda: self._execute_audio_command("toggle_mute")
         )
@@ -960,7 +960,7 @@ class AnalysisMenuHandler(MenuHandlerBase):
         # Analytics dashboard
         analytics_action = QAction("📊 &Analytics Dashboard...", self.main_window)
         # analytics_action.setShortcut(QKeySequence('Ctrl+A'))
-        self._apply_shortcut(analytics_action, 'analysis_commands', 'show_analytics')  # ✨ ADD THIS
+        self._apply_shortcut(analytics_action, 'analysis_commands', 'show_analytics')  
         analytics_action.triggered.connect(
             lambda: self._execute_analysis_command("show_analytics")
         )
@@ -1038,7 +1038,7 @@ class HelpMenuHandler(MenuHandlerBase):
         # Keyboard shortcuts (stays separate - useful as reference during work)
         shortcuts_action = QAction("⌨️ &Keyboard Shortcuts", self.main_window)
         # shortcuts_action.setShortcut(QKeySequence(Qt.Key_F1))
-        self._apply_shortcut(shortcuts_action, 'help_commands', 'show_keyboard_shortcuts')  # ✨ ADD THIS
+        self._apply_shortcut(shortcuts_action, 'help_commands', 'show_keyboard_shortcuts')  
         shortcuts_action.triggered.connect(
             lambda: self._execute_help_command("show_keyboard_shortcuts")
         )

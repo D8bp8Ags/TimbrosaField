@@ -25,13 +25,15 @@ from export_manager import ExportManagerInterface
 from file_manager import FileManagerInterface
 from global_manager import GlobalShortcutManager
 from menu_system import MenuBarManager
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QShortcut
+from PyQt5.QtGui import QKeySequence, QPixmap, QFont, QPalette
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QApplication, QMainWindow, QMessageBox, QShortcut, QSplashScreen, QWidget
+from PyQt5.QtCore import Qt
 from settings_manager import SettingsManager
 from tag_completer import TemplateManager, TemplateManagerDialog
-from ui_components import UIComponentManager, ApplicationStylist
+from ui_components import UIComponentManager, ApplicationStylist, SplashScreen
 from user_config_manager import TagEditor
 from wav_viewer import WavViewer
+import time
 
 # ----------------------------------------------------------------------------
 # Logging
@@ -1164,6 +1166,41 @@ class MainWindow(QMainWindow):
 
 
 def main() -> None:
+    """Initialize and run the Field Recorder Analyzer Qt application."""
+    logger.info("Starting Field Recorder Analyzer…")
+
+    app = QApplication(sys.argv)
+
+    # App setup
+    app.setApplicationName(app_config.APP_NAME)
+    app.setApplicationVersion(app_config.APP_VERSION)
+    app.setOrganizationName(app_config.ORG_NAME)
+
+    # Import and apply ApplicationStylist FIRST
+    ApplicationStylist.apply_complete_styling(app)
+
+    # Create and show splash screen
+    splash = SplashScreen(app)
+    splash.show_and_process()
+
+    # Update loading text
+    splash.update_message("Initializing components...")
+
+    # Create main window
+    main_window = MainWindow()
+
+    # Final message
+    splash.set_ready()
+    time.sleep(0.5)
+
+    # Hide splash, show main
+    splash.hide()
+    main_window.show()
+
+    logger.info("Field Recorder Analyzer started.")
+    sys.exit(app.exec_())
+
+def main_old() -> None:
     """Initialize and run the Field Recorder Analyzer Qt application.
 
     Creates the QApplication instance, sets up application metadata,
@@ -1175,7 +1212,10 @@ def main() -> None:
     """
     logger.info("Starting Field Recorder Analyzer…")
 
+
     app = QApplication(sys.argv)
+
+
     app.setApplicationName(app_config.APP_NAME)
     app.setApplicationVersion(app_config.APP_VERSION)
     app.setOrganizationName(app_config.ORG_NAME)

@@ -759,8 +759,8 @@ class AbletonExporter:
                 export_dir = self.main_window.user_config_manager.get_updated_config()[
                     "paths"
                 ]["ableton_export_dir"]
-                print(source_wav_dir)
-                print(export_dir)
+                logger.debug(f"Source WAV directory: {source_wav_dir}")
+                logger.debug(f"Export directory: {export_dir}")
                 # Perform export
                 # result = generator.create_multitrack_live_set(
                 #     directory=source_wav_dir,
@@ -785,12 +785,12 @@ class AbletonExporter:
                 end_time = time.time()
 
                 if success:
-                    print("✅ Optimized Live Set creation successful!")
+                    logger.info("Optimized Live Set creation successful!")
                     stats = generator.get_performance_stats()
-                    print(f"📊 Performance: {end_time - start_time:.2f}s total")
-                    print(f"⚡ Optimizations: {', '.join(stats['optimizations'])}")
+                    logger.info(f"Performance: {end_time - start_time:.2f}s total")
+                    logger.info(f"Optimizations: {', '.join(stats['optimizations'])}")
                 else:
-                    print("❌ Optimized Live Set creation failed!")
+                    logger.error("Optimized Live Set creation failed!")
 
                 # Check stats na gebruik:
                 # status = generator.get_sequential_optimization_status()
