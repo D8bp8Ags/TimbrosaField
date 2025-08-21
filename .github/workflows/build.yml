@@ -1,0 +1,125 @@
+# .github/workflows/build.yml
+name: Build TimbrosaField Cross-Platform
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:  # Handmatig triggeren via GitHub UI
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install PyQt5>=5.15.0
+        pip install pyqtgraph>=0.12.0
+        pip install numpy>=1.20.0
+        pip install scipy>=1.7.0
+        pip install soundfile>=0.10.0
+        pip install matplotlib>=3.5.0
+        pip install librosa>=0.9.0
+        pip install mutagen>=1.45.0
+        pip install pyinstaller
+
+    - name: Build macOS app
+      run: |
+        cd src/my_app
+        pyinstaller --onefile --windowed --name="TimbrosaField" main.py
+
+    - name: Create DMG (optional)
+      run: |
+        cd src/my_app/dist
+        mkdir -p dmg_temp
+        cp TimbrosaField dmg_temp/
+        hdiutil create -format UDZO -srcfolder dmg_temp TimbrosaField-macOS.dmg
+
+    - name: Upload macOS executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: TimbrosaField-macOS
+        path: src/my_app/dist/TimbrosaField
+
+    - name: Upload macOS DMG
+      uses: actions/upload-artifact@v3
+      with:
+        name: TimbrosaField-macOS-DMG
+        path: src/my_app/dist/TimbrosaField-macOS.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install PyQt5>=5.15.0
+        pip install pyqtgraph>=0.12.0
+        pip install numpy>=1.20.0
+        pip install scipy>=1.7.0
+        pip install soundfile>=0.10.0
+        pip install matplotlib>=3.5.0
+        pip install librosa>=0.9.0
+        pip install mutagen>=1.45.0
+        pip install pyinstaller
+
+    - name: Build Windows app
+      run: |
+        cd src/my_app
+        pyinstaller --onefile --windowed --name="TimbrosaField" main.py
+
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: TimbrosaField-Windows
+        path: src/my_app/dist/TimbrosaField.exe
+
+  create-release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          TimbrosaField-macOS/TimbrosaField
+          TimbrosaField-macOS-DMG/TimbrosaField-macOS.dmg
+          TimbrosaField-Windows/TimbrosaField.exe
+        generate_release_notes: true
+        draft: false
+        body: |
+          ## TimbrosaField Release
+          
+          🎵 **Field Recording Analysis & Tagging Tool**
+          
+          ### Downloads:
+          - **macOS**: Download `TimbrosaField` executable or `TimbrosaField-macOS.dmg`
+          - **Windows**: Download `TimbrosaField.exe`
+          
+          ### Features:
+          - Advanced waveform visualization
+          - Metadata management & tagging
+          - Ableton Live export
+          - Professional audio analysis
+          
+          Happy field recording! 🎧
