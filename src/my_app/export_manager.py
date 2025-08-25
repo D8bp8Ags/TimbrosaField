@@ -759,8 +759,12 @@ class AbletonExporter:
                 export_dir = self.main_window.user_config_manager.get_updated_config()[
                     "paths"
                 ]["ableton_export_dir"]
+
+                template_dir = export_dir + '/' + 'default_template.als'
+
                 logger.debug(f"Source WAV directory: {source_wav_dir}")
                 logger.debug(f"Export directory: {export_dir}")
+                logger.debug(f"Template directory: {template_dir}")
                 # Perform export
                 # result = generator.create_multitrack_live_set(
                 #     directory=source_wav_dir,
@@ -769,9 +773,9 @@ class AbletonExporter:
                 # )
                 # result = generator.create_multitrack_live_set(directory=source_wav_dir)
                 generator = AbletonLiveSetGeneratorV3Optimized(
-                    "./default_template.als",
+                    template_dir,
                     enable_progress=True,  # Enable progress tracking
-                    max_workers=4,  # Parallel processing (pas aan voor jouw systeem)
+                    max_workers=4,
                 )
                 start_time = time.time()
 
@@ -779,7 +783,7 @@ class AbletonExporter:
                     directory=source_wav_dir,
                     output_path=export_dir,
                     project_name=project_name,
-                    progress_callback=progress_callback,  # ← Hier gebruiken
+                    progress_callback=progress_callback,
                     batch_size=50,
                 )
                 end_time = time.time()

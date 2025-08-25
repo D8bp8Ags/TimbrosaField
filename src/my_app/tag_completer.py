@@ -1652,7 +1652,7 @@ class TemplateManagerDialog(QDialog):
         self.name_input.setFocus()
         logger.info("Ready to create new template")
 
-    def save_template(self):
+    def save_template_old(self):
         """Save current template."""
         name = self.name_input.text().strip()
         tags_text = self.tags_input.text().strip()
@@ -1697,6 +1697,84 @@ class TemplateManagerDialog(QDialog):
         self.refresh_template_list()
 
         QMessageBox.information(self, "Saved", f"Template '{name}' has been saved!")
+
+    def save_template(self):
+        """Save current template with rollback mechanism for safe rename handling."""
+        name = self.name_input.text().strip()
+        tags_text = self.tags_input.text().strip()
+        description = self.description_input.toPlainText().strip()
+
+        if not name:
+            QMessageBox.warning(
+                self, "No name", "Please provide a name for the template."
+            )
+            return
+
+        if not tags_text:
+            QMessageBox.warning(
+                self, "No tags", "Please provide tags for the template."
+            )
+            return
+
+        # Parse tags
+        tags = [tag.strip() for tag in tags_text.split(",") if tag.strip()]
+
+        # Check if this is a rename operation
+        is_rename = self.current_template_name and self.current_template_name != name
+        old_template_name = self.current_template_name
+        old_template_data = None
+
+        # Check if new name already exists (and it's not the current template)
+        if name in self.template_manager.templates and not is_rename:
+            reply = QMessageBox.question(
+                self,
+                "Template exists",
+                f"Template '{name}' already exists. Overwrite?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        try:
+            # For rename operations, backup the old template data
+            if is_rename and old_template_name in self.template_manager.templates:
+                old_template_data = self.template_manager.templates[old_template_name].copy()
+
+            # Save the new template
+            if self.current_template_name and not is_rename:
+                # Update existing template
+                self.template_manager.update_template(name, tags, description)
+            else:
+                # Add new template
+                self.template_manager.add_template(name, tags, description)
+
+            # Verify the new template was saved successfully
+            if name not in self.template_manager.templates:
+                raise Exception("Template was not saved properly")
+
+            # Only now delete the old template (for rename operations)
+            if is_rename and old_template_name in self.template_manager.templates:
+                self.template_manager.delete_template(old_template_name)
+                print(f"Template renamed: {old_template_name} -> {name}")
+
+            self.current_template_name = name
+            self.refresh_template_list()
+
+            QMessageBox.information(self, "Saved", f"Template '{name}' has been saved!")
+
+        except Exception as e:
+            # Rollback: restore old template if rename operation failed
+            if is_rename and old_template_data and old_template_name:
+                self.template_manager.templates[old_template_name] = old_template_data
+                self.template_manager.save_templates()
+                print(f"Rolled back failed rename operation for '{old_template_name}'")
+
+            QMessageBox.critical(
+                self,
+                "Save Error",
+                f"Failed to save template: {str(e)}\n\nThe operation has been rolled back."
+            )
+            print(f"Error saving template '{name}': {e}")
 
     def delete_template(self):
         """Delete selected template."""

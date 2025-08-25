@@ -1265,6 +1265,7 @@ class ApplicationStylist:
         /* === TYPOGRAPHY === */
         QLabel {{
             color: {ApplicationStylist.COLORS['text_primary']};
+            background-color: transparent; 
             font-size: 11pt;
             font-weight: 500;
             line-height: 1.4;

@@ -65,11 +65,19 @@ class MenuHandlerBase:
             a keyboard shortcut. This allows for flexible shortcut assignment
             without breaking menu functionality.
         """
-        shortcut = self.main_window.shortcut_manager.get_shortcut_for_command(
-            command_group, command_name
-        )
-        if shortcut:
-            action.setShortcut(QKeySequence(shortcut))
+        # shortcut = self.main_window.shortcut_manager.get_shortcut_for_command(
+        #     command_group, command_name
+        # )
+        # if shortcut:
+        #     action.setShortcut(QKeySequence(shortcut))
+        """Display shortcut text without registering conflicting shortcut."""
+        shortcut_key = self.main_window.shortcut_manager.get_shortcut_for_command(command_group, command_name)
+        print(f"DEBUG: get_shortcut_for_command('{command_group}', '{command_name}') = '{shortcut_key}'")
+
+        if shortcut_key:
+            current_text = action.text()
+            if '\t' not in current_text:
+                action.setText(f"{current_text}\t{shortcut_key}")
 
 
 class MenuBarManager:
@@ -893,7 +901,7 @@ class AudioMenuHandler(MenuHandlerBase):
 
         # Playback controls
         play_pause_action = QAction("⏯️ &Play/Pause", self.main_window)
-        # self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')
+        self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')
         play_pause_action.triggered.connect(
             lambda: self._execute_audio_command("play_pause")
         )
