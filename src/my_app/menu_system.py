@@ -335,7 +335,7 @@ class FileMenuHandler(MenuHandlerBase):
         # Import/Export submenu
         import_export_menu = file_menu.addMenu("📦 &Import/Export")
 
-        batch_import_action = QAction("Batch Import WAV Files...", self.main_window)
+        batch_import_action = QAction("📥 Batch Import WAV Files...", self.main_window)
         self._apply_shortcut(batch_import_action, 'file_commands', 'batch_import_files')
         batch_import_action.triggered.connect(
             lambda: self._execute_file_command("batch_import_files")
