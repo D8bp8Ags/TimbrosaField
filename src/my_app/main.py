@@ -869,7 +869,7 @@ class MainWindow(QMainWindow):
         ApplicationStylist.apply_light_theme(QApplication.instance())
         self.current_theme = "light"
         self._update_plot_backgrounds()
-        self.ui_manager.show_message("☀️ Light theme applied", 2000)
+        self.ui_manager.show_message("☀ Light theme applied", 2000)
 
     def _apply_dark_theme(self):
         """Apply dark theme via ApplicationStylist."""

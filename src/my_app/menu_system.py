@@ -343,7 +343,7 @@ class FileMenuHandler(MenuHandlerBase):
         import_export_menu.addAction(batch_import_action)
 
         export_ableton_action = QAction(
-            "🎛️ Export to Ableton Live...", self.main_window
+            "🎛 Export to Ableton Live...", self.main_window
         )
         # export_ableton_action.setShortcut(QKeySequence('Ctrl+E'))
         self._apply_shortcut(
@@ -529,7 +529,7 @@ class EditMenuHandler(MenuHandlerBase):
         edit_menu = menubar.addMenu("&Edit")
 
         # User config
-        config_action = QAction("⚙️ &User Config...", self.main_window)
+        config_action = QAction("⚙ &User Config...", self.main_window)
         # config_action.setShortcut(QKeySequence('Ctrl+,'))
         self._apply_shortcut(config_action, 'edit_commands', 'open_user_config_manager')
         config_action.triggered.connect(
@@ -556,7 +556,7 @@ class EditMenuHandler(MenuHandlerBase):
         )
         edit_menu.addAction(reset_defaults_action)
 
-        batch_tag_action = QAction("🏷️ &Batch Tag Editor...", self.main_window)
+        batch_tag_action = QAction("🏷 &Batch Tag Editor...", self.main_window)
         # batch_tag_action.setShortcut(QKeySequence('Ctrl+B'))
         self._apply_shortcut(batch_tag_action, 'edit_commands', 'open_batch_tagger')
         batch_tag_action.triggered.connect(
@@ -728,7 +728,7 @@ class ViewMenuHandler(MenuHandlerBase):
 
     def _setup_mouse_labels_menu(self, view_menu):
         """Setup mouse labels configuration submenu."""
-        mouse_labels_menu = view_menu.addMenu("🖱️ &Mouse Labels")
+        mouse_labels_menu = view_menu.addMenu("🖱 &Mouse Labels")
 
         # Setup preset options
         self._setup_mouse_preset_actions(mouse_labels_menu)
@@ -748,7 +748,7 @@ class ViewMenuHandler(MenuHandlerBase):
         )
         mouse_labels_menu.addAction(minimal_action)
 
-        performance_action = QAction("⚙️ &Performance (Balanced)", self.main_window)
+        performance_action = QAction("⚙ &Performance (Balanced)", self.main_window)
         performance_action.setObjectName("performance")
         performance_action.setStatusTip("Optimized balance of info and performance")
         performance_action.setCheckable(True)
@@ -758,7 +758,7 @@ class ViewMenuHandler(MenuHandlerBase):
         )
         mouse_labels_menu.addAction(performance_action)
 
-        professional_action = QAction("🎛️ &Professional", self.main_window)
+        professional_action = QAction("🎛 &Professional", self.main_window)
         professional_action.setObjectName("professional")
         professional_action.setStatusTip("Complete professional audio information")
         professional_action.setCheckable(True)
@@ -768,7 +768,7 @@ class ViewMenuHandler(MenuHandlerBase):
         mouse_labels_menu.addAction(professional_action)
 
         professional_advanced_action = QAction(
-            "🎛️ &Professional+ (All Features)", self.main_window
+            "🎛 &Professional+ (All Features)", self.main_window
         )
         professional_advanced_action.setObjectName("professional_advanced")
         professional_advanced_action.setStatusTip(
@@ -798,7 +798,7 @@ class ViewMenuHandler(MenuHandlerBase):
         )
         mouse_labels_menu.addAction(frequency_action)
 
-        timecode_action = QAction("⏱️ &Timecode Format", self.main_window)
+        timecode_action = QAction("⏱ &Timecode Format", self.main_window)
         timecode_action.setCheckable(True)
         timecode_action.setChecked(True)
         timecode_action.setStatusTip("Show time in HH:MM:SS.mmm format")
@@ -816,7 +816,7 @@ class ViewMenuHandler(MenuHandlerBase):
         theme_menu = view_menu.addMenu("🎨 &Theme")
 
         # Light theme
-        light_action = QAction("☀️ &Light Theme", self.main_window)
+        light_action = QAction("☀ &Light Theme", self.main_window)
         light_action.setObjectName("light_theme")
         light_action.setCheckable(True)
         light_action.setChecked(True)  # Default
@@ -894,14 +894,14 @@ class AudioMenuHandler(MenuHandlerBase):
         audio_menu = menubar.addMenu("&Audio")
 
         # Playback controls
-        play_pause_action = QAction("⏯️ &Play/Pause", self.main_window)
+        play_pause_action = QAction("⏯ &Play/Pause", self.main_window)
         self._apply_shortcut(play_pause_action, 'audio_commands', 'play_pause')
         play_pause_action.triggered.connect(
             lambda: self._execute_audio_command("play_pause")
         )
         audio_menu.addAction(play_pause_action)
 
-        stop_action = QAction("⏹️ &Stop", self.main_window)
+        stop_action = QAction("⏹ &Stop", self.main_window)
         # stop_action.setShortcut(QKeySequence(Qt.Key_Escape))
         self._apply_shortcut(stop_action, 'audio_commands', 'stop')
         stop_action.triggered.connect(lambda: self._execute_audio_command("stop"))
@@ -1063,7 +1063,7 @@ class HelpMenuHandler(MenuHandlerBase):
         help_menu.addAction(help_quickstart_action)
 
         # Keyboard shortcuts (stays separate - useful as reference during work)
-        shortcuts_action = QAction("⌨️ &Keyboard Shortcuts", self.main_window)
+        shortcuts_action = QAction("⌨ &Keyboard Shortcuts", self.main_window)
         # shortcuts_action.setShortcut(QKeySequence(Qt.Key_F1))
         self._apply_shortcut(
             shortcuts_action, 'help_commands', 'show_keyboard_shortcuts'
@@ -1076,7 +1076,7 @@ class HelpMenuHandler(MenuHandlerBase):
         help_menu.addSeparator()
 
         # About (simplified)
-        about_action = QAction("ℹ️ &About", self.main_window)
+        about_action = QAction("ℹ &About", self.main_window)
         self._apply_shortcut(about_action, 'help_commands', 'show_about')
         about_action.triggered.connect(lambda: self._execute_help_command("show_about"))
         help_menu.addAction(about_action)
