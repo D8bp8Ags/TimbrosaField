@@ -1320,6 +1320,11 @@ class AbletonLiveSetGeneratorV3Optimized:
             )
             self._set_next_pointee_id(template_root, allocator)
 
+            # Store track/clip counts for get_performance_stats()
+            self._stats['tracks_created'] = len(category_clips)
+            self._stats['clips_total'] = sum(len(v) for v in category_clips.values())
+            self._stats['categories'] = sorted(category_clips.keys())
+
             # Write output file with streaming
             self._write_live_set_file_optimized(template_root, output_path)
 

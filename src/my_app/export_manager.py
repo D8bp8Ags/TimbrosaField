@@ -857,11 +857,13 @@ class AbletonExporter:
                 if success:
                     elapsed = end_time - start_time
                     logger.info(f"Ableton export successful in {elapsed:.2f}s")
-                    perf = generator.get_performance_stats()
-                    inner = perf.get("stats", {})
+                    inner = generator.get_performance_stats().get("stats", {})
                     self._show_ableton_success(
                         {
                             "files_processed": inner.get("files_processed", 0),
+                            "tracks_created": inner.get("tracks_created", 0),
+                            "clips_total": inner.get("clips_total", 0),
+                            "categories": inner.get("categories", []),
                             "processing_time": elapsed,
                         },
                         project_name,
@@ -906,12 +908,23 @@ class AbletonExporter:
     def _show_ableton_success(self, result: dict[str, Any], project_name: str):
         """Show Ableton export success dialog."""
         files_processed = result.get("files_processed", 0)
+        tracks_created = result.get("tracks_created", 0)
+        clips_total = result.get("clips_total", 0)
+        categories = result.get("categories", [])
         elapsed = result.get("processing_time", 0.0)
 
         message = "Ableton Live Set export complete.\n\n"
         message += f"Project: {project_name}.als\n\n"
-        message += f"Files processed: {files_processed}\n"
-        message += f"Time: {elapsed:.1f}s\n\n"
+        message += "Statistics:\n"
+        message += f"  Files processed: {files_processed}\n"
+        message += f"  Tracks created:  {tracks_created}\n"
+        message += f"  Clips placed:    {clips_total}\n"
+        if categories:
+            message += f"  Categories: {', '.join(categories[:5])}"
+            if len(categories) > 5:
+                message += f" (+{len(categories) - 5} more)"
+            message += "\n"
+        message += f"  Time: {elapsed:.1f}s\n\n"
         message += "Tips:\n"
         message += "  - Clips contain tags in their name and annotation\n"
         message += "  - Tracks are grouped by category\n"
@@ -919,7 +932,7 @@ class AbletonExporter:
 
         QMessageBox.information(self.main_window, "Ableton Export Complete", message)
         self.main_window.show_status_message(
-            f"Ableton export complete: {files_processed} files processed", 3000
+            f"Ableton export: {tracks_created} tracks, {files_processed} files", 3000
         )
 
     def _show_ableton_error(self, result: dict[str, Any]):
