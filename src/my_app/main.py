@@ -26,6 +26,7 @@ from export_manager import ExportManagerInterface
 from file_manager import FileManagerInterface
 from global_manager import GlobalShortcutManager
 from menu_system import MenuBarManager
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QApplication,
@@ -109,6 +110,10 @@ class MainWindow(QMainWindow):
         self._initialize_all_systems()
         self.settings_manager.restore_all_settings(self)
         logger.info("MainWindow initialized.")
+
+        # Defer first-run check until the event loop is running and the
+        # window is fully visible (singleShot 0 ms = next event loop iteration)
+        QTimer.singleShot(0, self._check_first_run)
 
     # ---------------------------------------------------------------------
     # Bootstrapping
@@ -249,6 +254,33 @@ class MainWindow(QMainWindow):
             "update_file_count": self._ui_update_file_count,
             "get_file_count": self._ui_get_file_count,
         }
+
+    def _check_first_run(self) -> None:
+        """Show a welcome prompt when no WAV directory is configured yet.
+
+        Called once after the event loop starts (via QTimer.singleShot).
+        Detects a fresh installation by checking whether the configured
+        fieldrecording_dir exists on disk; if not, offers to open a folder.
+        """
+        config = self.user_config_manager.get_updated_config()
+        recording_dir = config.get("paths", {}).get("fieldrecording_dir", "")
+
+        if recording_dir and os.path.isdir(recording_dir):
+            return
+
+        answer = QMessageBox.information(
+            self,
+            f"Welcome to {app_config.APP_NAME}",
+            "To get started, open a folder that contains your WAV recordings.\n\n"
+            "TimbrosaField reads and writes metadata directly inside WAV files "
+            "and can generate Ableton Live project templates organised by tag.\n\n"
+            "Would you like to open a folder now?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+
+        if answer == QMessageBox.Yes:
+            self._open_directory()
 
     # ---------------------------------------------------------------------
     # File menu handlers
@@ -1170,37 +1202,6 @@ class MainWindow(QMainWindow):
         event.accept()
 
 
-def _check_first_run(main_window) -> None:
-    """Show a welcome prompt when no WAV directory is configured yet.
-
-    Detects a fresh installation by checking whether the configured
-    fieldrecording_dir actually exists on disk.  If not, a dialog
-    explains the app and offers to open a directory right away.
-
-    Args:
-        main_window: The application MainWindow instance.
-    """
-    config = main_window.user_config_manager.get_updated_config()
-    recording_dir = config.get("paths", {}).get("fieldrecording_dir", "")
-
-    if recording_dir and os.path.isdir(recording_dir):
-        return  # directory already configured and exists
-
-    answer = QMessageBox.information(
-        main_window,
-        f"Welcome to {app_config.APP_NAME}",
-        "To get started, open a folder that contains your WAV recordings.\n\n"
-        "TimbrosaField reads and writes metadata directly inside WAV files "
-        "and can generate Ableton Live project templates organised by tag.\n\n"
-        "Would you like to open a folder now?",
-        QMessageBox.Yes | QMessageBox.No,
-        QMessageBox.Yes,
-    )
-
-    if answer == QMessageBox.Yes:
-        main_window._open_directory()
-
-
 def main() -> None:
     """Initialize and run the Field Recorder Analyzer Qt application."""
     logger.info("Starting Field Recorder Analyzer…")
@@ -1232,9 +1233,6 @@ def main() -> None:
     # Hide splash, show main
     splash.hide()
     main_window.show()
-
-    # First-run check: prompt user to open a directory if none is configured
-    _check_first_run(main_window)
 
     logger.info("Field Recorder Analyzer started.")
     sys.exit(app.exec_())
