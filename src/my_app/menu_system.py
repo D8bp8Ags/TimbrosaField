@@ -422,9 +422,11 @@ class FileMenuHandler(MenuHandlerBase):
                 return result
             else:
                 logger.error(f"File command '{command_name}' not available")
+                self.main_window.show_status_message(f"Action not available: {command_name}", 3000)
                 return False
         except Exception as e:
             logger.error(f"File command '{command_name}' failed: {e}")
+            self.main_window.show_status_message(f"Error: {e}", 4000)
             return False
 
     def update_recent_directories_menu(self):
@@ -599,9 +601,11 @@ class EditMenuHandler(MenuHandlerBase):
                 return command_func()
             else:
                 logger.error(f"Edit command '{command_name}' not available")
+                self.main_window.show_status_message(f"Action not available: {command_name}", 3000)
                 return False
         except Exception as e:
             logger.error(f"Edit command '{command_name}' failed: {e}")
+            self.main_window.show_status_message(f"Error: {e}", 4000)
             return False
 
 
@@ -856,9 +860,11 @@ class ViewMenuHandler(MenuHandlerBase):
                     return command_func()
             else:
                 logger.error(f"View command '{command_name}' not available")
+                self.main_window.show_status_message(f"Action not available: {command_name}", 3000)
                 return False
         except Exception as e:
             logger.error(f"View command '{command_name}' failed: {e}")
+            self.main_window.show_status_message(f"Error: {e}", 4000)
             return False
 
 
@@ -938,9 +944,11 @@ class AudioMenuHandler(MenuHandlerBase):
                 return command_func()
             else:
                 logger.error(f"Audio command '{command_name}' not available")
+                self.main_window.show_status_message(f"Action not available: {command_name}", 3000)
                 return False
         except Exception as e:
             logger.error(f"Audio command '{command_name}' failed: {e}")
+            self.main_window.show_status_message(f"Error: {e}", 4000)
             return False
 
 
@@ -998,9 +1006,11 @@ class AnalysisMenuHandler(MenuHandlerBase):
                 return command_func()
             else:
                 logger.error(f"Analysis command '{command_name}' not available")
+                self.main_window.show_status_message(f"Action not available: {command_name}", 3000)
                 return False
         except Exception as e:
             logger.error(f"Analysis command '{command_name}' failed: {e}")
+            self.main_window.show_status_message(f"Error: {e}", 4000)
             return False
 
 
