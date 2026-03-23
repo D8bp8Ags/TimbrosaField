@@ -855,44 +855,39 @@ class AbletonExporter:
                 end_time = time.time()
 
                 if success:
-                    logger.info("Optimized Live Set creation successful!")
+                    logger.info(f"Ableton export successful in {end_time - start_time:.2f}s")
                     stats = generator.get_performance_stats()
-                    logger.info(f"Performance: {end_time - start_time:.2f}s total")
-                    logger.info(f"Optimizations: {', '.join(stats['optimizations'])}")
+                    self._show_ableton_success(
+                        {
+                            "files_processed": stats.get("files_processed", 0),
+                            "tracks_created": stats.get("tracks_created", 0),
+                            "clips_total": stats.get("clips_total", 0),
+                            "categories": stats.get("categories", []),
+                        },
+                        project_name,
+                    )
                 else:
-                    logger.error("Optimized Live Set creation failed!")
+                    logger.error("Ableton export failed")
+                    self._show_ableton_error({"error": "Generator returned failure status."})
 
-                # Check stats na gebruik:
-                # status = generator.get_sequential_optimization_status()
-                # if status['sequential_optimization_enabled']:
-                #     print("🎯 Sequential optimization gebruikt!")
-                #
-                # if result.get("success", False):
-                #     self._show_ableton_success(result, project_name)
-                #     logger.info(f"Ableton export successful: {result}")
-                #     return True
-                # else:
-                #     self._show_ableton_error(result)
-                #     logger.error(f"Ableton export failed: {result}")
-                #     return False
-            finally:
-                # self._set_export_button_state(True, "🎛️ Export to Ableton Live")
-                self.main_window.show_status_message("Exporting to Ableton Live...", 1000)
+            except Exception as inner_e:
+                logger.error(f"Ableton export inner error: {inner_e}")
+                self._show_ableton_error({"error": str(inner_e)})
 
         except ImportError as e:
             logger.error(f"Ableton generator not available: {e}")
             QMessageBox.critical(
                 self.main_window,
-                "Export Niet Beschikbaar",
-                f"Ableton Live export is niet beschikbaar:\n{str(e)}\n\nControleer of ableton_generator.py bestaat.",
+                "Export Not Available",
+                f"Ableton Live export is not available:\n{str(e)}\n\nCheck that ableton_generator.py exists.",
             )
             return False
         except Exception as e:
             logger.error(f"Ableton export error: {e}")
             QMessageBox.critical(
                 self.main_window,
-                "Export Fout",
-                f"Fout tijdens Ableton export:\n{str(e)}",
+                "Export Error",
+                f"Error during Ableton export:\n{str(e)}",
             )
             return False
 
@@ -944,10 +939,10 @@ class AbletonExporter:
 
         QMessageBox.critical(
             self.main_window,
-            "Ableton Export Gefaald",
-            f"Er is een fout opgetreden tijdens het maken van de Ableton Live Set.\n\n"
+            "Ableton Export Failed",
+            f"An error occurred while creating the Ableton Live Set.\n\n"
             f"Error: {error_msg}\n\n"
-            f"Controleer de console voor meer informatie.",
+            f"Check the log for more details.",
         )
         self.main_window.show_status_message("Ableton export failed", 3000)
 
