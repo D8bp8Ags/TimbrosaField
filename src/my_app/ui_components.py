@@ -99,12 +99,10 @@ class SplashScreen(QWidget):
         # Loading text (absolute positioning)
         self.loading_label = QLabel("Loading application...", self)
         self.loading_label.setAlignment(Qt.AlignCenter)
-        self.loading_label.setProperty("class", "subtitle")
         self.loading_label.setGeometry(50, 210, 300, 30)
 
         # Version label (bottom right)
         self.version_label = QLabel(f"Version {app_config.APP_VERSION}", self)
-        self.version_label.setProperty("class", "caption")
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
         self.version_label.setGeometry(250, 210, 140, 30)
 
@@ -147,7 +145,6 @@ class SplashScreen(QWidget):
     def set_ready(self):
         """Set the splash to ready state."""
         if self.loading_label:
-            self.loading_label.setProperty("class", "success-message")
             self.loading_label.setText("Ready!")
             self.app.processEvents()
 
@@ -1105,7 +1102,6 @@ class StatusBarManager:
 
         Example:
             status_bar = manager.get_status_bar()
-            status_bar.setStyleSheet("custom styling")
             custom_widget = QLabel("Custom")
             status_bar.addPermanentWidget(custom_widget)
 
@@ -1125,8 +1121,8 @@ class ApplicationStylist:
     support - Accessibility considerations
     """
 
-    # Color Palette
-    COLORS = {
+    # Canonical light-theme palette — never mutated, used as the reset baseline.
+    _LIGHT_COLORS = {
         # Primary colors
         "primary": "#2563eb",  # Professional blue
         "primary_hover": "#1d4ed8",
@@ -1168,6 +1164,10 @@ class ApplicationStylist:
         "tooltip_text": "#ffffff",
         "plot_background": "#ffffff",
     }
+
+    # Active palette — replaced on every theme switch; never use this as a base for
+    # building another theme (use _LIGHT_COLORS instead).
+    COLORS = _LIGHT_COLORS.copy()
 
     @staticmethod
     def apply_complete_styling(app):
@@ -1258,40 +1258,6 @@ class ApplicationStylist:
             font-size: 11pt;
             font-weight: 500;
             line-height: 1.4;
-        }}
-
-        QLabel[class="heading-1"] {{
-            font-size: 24pt;
-            font-weight: 700;
-            color: {ApplicationStylist.COLORS['text_primary']};
-            margin: 16px 0px 12px 0px;
-        }}
-
-        QLabel[class="heading-2"] {{
-            font-size: 18pt;
-            font-weight: 600;
-            color: {ApplicationStylist.COLORS['text_primary']};
-            margin: 12px 0px 8px 0px;
-        }}
-
-        QLabel[class="heading-3"] {{
-            font-size: 14pt;
-            font-weight: 600;
-            color: {ApplicationStylist.COLORS['text_primary']};
-            margin: 8px 0px 6px 0px;
-        }}
-
-        QLabel[class="subtitle"] {{
-            font-size: 12pt;
-            font-weight: 400;
-            color: {ApplicationStylist.COLORS['text_secondary']};
-            margin: 4px 0px;
-        }}
-
-        QLabel[class="caption"] {{
-            font-size: 10pt;
-            font-weight: 400;
-            color: {ApplicationStylist.COLORS['text_muted']};
         }}
 
         /* === BUTTONS === */
@@ -2170,17 +2136,13 @@ class ApplicationStylist:
     @staticmethod
     def apply_light_theme(app):
         """Apply the light colour theme to the application."""
-        light_colors = ApplicationStylist.COLORS.copy()
-        ApplicationStylist.COLORS.update(light_colors)
-
+        ApplicationStylist.COLORS = ApplicationStylist._LIGHT_COLORS.copy()
         ApplicationStylist.apply_complete_styling(app)
-        # Apply dark theme stylesheet
-        # print("☀️ Light theme applied")
 
     @staticmethod
     def apply_dark_theme(app):
         """Apply dark theme variant (future enhancement)."""
-        dark_colors = ApplicationStylist.COLORS.copy()
+        dark_colors = ApplicationStylist._LIGHT_COLORS.copy()
         dark_colors.update(
             {
                 # Primary colors - brighter for dark theme
@@ -2234,7 +2196,7 @@ class ApplicationStylist:
     @staticmethod
     def apply_macos_dark_theme(app):
         """Apply macOS-style dark theme."""
-        macos_dark_colors = ApplicationStylist.COLORS.copy()
+        macos_dark_colors = ApplicationStylist._LIGHT_COLORS.copy()
         macos_dark_colors.update(
             {
                 # Primary colors - macOS blue

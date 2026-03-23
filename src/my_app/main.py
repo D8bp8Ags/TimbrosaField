@@ -834,7 +834,7 @@ class MainWindow(QMainWindow):
 
     def _apply_light_theme(self):
         """Apply light theme via ApplicationStylist."""
-        ApplicationStylist.apply_complete_styling(QApplication.instance())
+        ApplicationStylist.apply_light_theme(QApplication.instance())
         self.current_theme = "light"
         self._update_plot_backgrounds()
         self.ui_manager.show_message("☀️ Light theme applied", 2000)
