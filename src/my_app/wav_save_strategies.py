@@ -393,9 +393,7 @@ class WavSaveStrategies:
         Raises:     SaveError: If injection fails
         """
         try:
-
             inject_info_chunk(source_path, target_path, metadata)
-
         except ImportError:
             raise SaveError("wav_analyzer module not available") from None
         except (OSError, struct.error) as e:

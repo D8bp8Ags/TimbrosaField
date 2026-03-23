@@ -48,7 +48,7 @@ from PyQt5.QtWidgets import (
 from tag_completer import FileTagAutocomplete
 from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
-from wav_analyzer import wav_analyze
+from wav_analyzer import inject_ixml_chunk, wav_analyze
 from wav_save_manager import WavSaveManager
 
 
@@ -631,6 +631,15 @@ class WavViewer(QWidget):
         self.info_label = QLabel("INFO Chunk:")
         self.info_table = self._create_metadata_table(["Key", "Value"])
 
+        # GPS table (always 3 editable rows)
+        self.gps_label = QLabel("GPS Location:")
+        self.gps_table = self._create_metadata_table(["Key", "Value"])
+        self.gps_table.setFixedHeight(90)
+        self.gps_table.setEditTriggers(
+            QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked
+        )
+
+
         # Cue points table
         self.cue_label = QLabel("Cue Points:")
         self.cue_table = self._create_metadata_table(["ID", "Positie", "Label"])
@@ -647,6 +656,9 @@ class WavViewer(QWidget):
 
         self.central_top_layout.addWidget(self.info_label)
         self.central_top_layout.addWidget(self.info_table)
+
+        self.central_top_layout.addWidget(self.gps_label)
+        self.central_top_layout.addWidget(self.gps_table)
 
         self.right_layout.addWidget(self.cue_label)
         self.right_layout.addWidget(self.cue_table)
@@ -2262,6 +2274,8 @@ class WavViewer(QWidget):
         # self._populate_two_column_table_with_defaults_test(
         # self.info_table, analysis_result.get("info", {}))
         self._populate_info_table(analysis_result.get("info", {}))
+        self._loaded_gps = analysis_result.get("gps")
+        self._populate_gps_table(self._loaded_gps)
         self._populate_cue_table(analysis_result.get("cue_points", []))
 
         # Resize tables to fit content
@@ -2270,7 +2284,7 @@ class WavViewer(QWidget):
 
     def _clear_all_metadata_tables(self) -> None:
         """Clear all metadata tables."""
-        for table in [self.fmt_table, self.bext_table, self.info_table, self.cue_table]:
+        for table in [self.fmt_table, self.bext_table, self.info_table, self.gps_table, self.cue_table]:
             table.setRowCount(0)
 
     def _populate_fmt_table(self, fmt_data: dict[str, Any]) -> None:
@@ -2294,6 +2308,26 @@ class WavViewer(QWidget):
         """
         self._populate_two_column_table_with_defaults_test(self.info_table, info_data)
         # self._populate_two_column_table(self.info_table, info_data)
+
+    def _populate_gps_table(self, gps_data: dict[str, float] | None) -> None:
+        """Populate GPS location table from iXML GPS data.
+
+        Always shows 3 rows (Latitude, Longitude, Altitude) so the user can
+        fill them in even when no GPS data is present in the file.
+
+        Args:     gps_data: Dict with 'latitude', 'longitude', 'altitude', or None.
+        """
+        rows = [
+            ("Latitude", str(gps_data["latitude"]) if gps_data else ""),
+            ("Longitude", str(gps_data["longitude"]) if gps_data else ""),
+            ("Altitude", str(gps_data.get("altitude", "")) if gps_data else ""),
+        ]
+        for i, (key, value) in enumerate(rows):
+            self.gps_table.insertRow(i)
+            key_item = QTableWidgetItem(key)
+            key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
+            self.gps_table.setItem(i, 0, key_item)
+            self.gps_table.setItem(i, 1, QTableWidgetItem(value))
 
     def _populate_two_column_table(
         self, table: QTableWidget, data: dict[str, Any]
@@ -2420,42 +2454,84 @@ class WavViewer(QWidget):
 
         return info_data
 
+    def _get_gps_from_gps_table(self) -> dict[str, float] | None:
+        """Read and validate GPS values from the GPS table.
+
+        Returns None silently if fields are empty, or shows a warning if invalid.
+        """
+        def cell(row: int) -> str:
+            item = self.gps_table.item(row, 1)
+            return item.text().strip() if item else ""
+
+        lat_str, lon_str, alt_str = cell(0), cell(1), cell(2)
+
+        if not lat_str and not lon_str:
+            return None  # Empty — nothing to save, no warning needed
+
+        if not lat_str or not lon_str:
+            QMessageBox.warning(self, "Missing GPS", "Both Latitude and Longitude are required.")
+            return None
+
+        try:
+            gps_data = {
+                "latitude": float(lat_str),
+                "longitude": float(lon_str),
+                "altitude": float(alt_str) if alt_str else 0.0,
+            }
+        except ValueError:
+            QMessageBox.warning(self, "Invalid GPS", "Latitude, Longitude and Altitude must be numbers.")
+            return None
+
+        if not (-90 <= gps_data["latitude"] <= 90):
+            QMessageBox.warning(self, "Invalid GPS", "Latitude must be between -90 and 90.")
+            return None
+        if not (-180 <= gps_data["longitude"] <= 180):
+            QMessageBox.warning(self, "Invalid GPS", "Longitude must be between -180 and 180.")
+            return None
+
+        return gps_data
+
     def save_info_from_info_table_to_file(self) -> None:
-        """Save tags using the new save manager."""
+        """Save INFO metadata and GPS coordinates in one operation."""
         if not self.filename:
             QMessageBox.warning(self, "No File", "No WAV file loaded.")
             return
 
-        # if quick_save_with_dialog is None:
-        #     QMessageBox.critical(
-        #         self, "Save Unavailable", "Saving module not available."
-        #     )
-        #     return
-
-        # Haal metadata uit tabel + tags uit tagger
         metadata = self.get_info_from_info_table()
         new_tags = getattr(self.tagger_widget, "get_current_tags", lambda: [])()
         existing_tags = metadata.get("ICMT", "")
+        gps_data = self._get_gps_from_gps_table()
 
-        # result = quick_save_with_dialog(
-        #     parent=self,
-        #     filename=self.filename,
-        #     metadata=metadata,
-        #     new_tags=new_tags,
-        #     existing_tags=existing_tags,
-        #     user_config=self.user_config,
-        # )
+        if gps_data is None and not metadata and not new_tags:
+            return
+
         manager = WavSaveManager(parent=self)
+        loaded_gps = getattr(self, "_loaded_gps", None)
+        gps_changed = gps_data is not None and gps_data != loaded_gps
+        gps_info = (
+            f"Lat: {gps_data['latitude']}, Lon: {gps_data['longitude']}, Alt: {gps_data.get('altitude', 0.0)}"
+            if gps_changed else ""
+        )
+
         result = manager.show_save_dialog_and_execute(
             filename=self.filename,
             metadata=metadata,
             new_tags=new_tags,
             existing_tags=existing_tags,
             user_config=self.user_config,
+            gps_info=gps_info,
         )
 
-        # Als succesvol, refresh file list en clear tags
         if result:
+            if gps_changed:
+                try:
+                    inject_ixml_chunk(result.output_path, result.output_path, gps_data)
+                except Exception as e:
+                    QMessageBox.warning(
+                        self, "GPS Save Failed",
+                        f"Metadata saved but GPS could not be written:\n{e}"
+                    )
+
             self.load_wav_files(select_path=result.output_path)
             if hasattr(self, "tagger_widget"):
                 self.tagger_widget.clear_tags()

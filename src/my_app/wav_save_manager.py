@@ -72,6 +72,7 @@ class WavSaveManager:
         new_tags: list[str] = None,
         existing_tags: str = "",
         user_config: dict[str, Any] = None,
+        gps_info: str = "",
     ) -> Optional["SaveResult"]:
         """Show save dialog and execute chosen save operation.
 
@@ -91,7 +92,7 @@ class WavSaveManager:
                 self._show_error("Invalid file", f"File does not exist: {filename}")
                 return None
 
-            if not metadata:
+            if not metadata and not gps_info:
                 self._show_error("No metadata", "No metadata to save")
                 return None
 
@@ -101,7 +102,7 @@ class WavSaveManager:
             # Check if there's anything to save
             has_metadata_changes = self._check_metadata_changes(filename, metadata)
 
-            if not new_tags_string and not has_metadata_changes:
+            if not new_tags_string and not has_metadata_changes and not gps_info:
                 self._show_info(
                     "Nothing to Save",
                     "No new tags entered and no metadata changes detected.",
@@ -118,6 +119,7 @@ class WavSaveManager:
                     else "No new tags (metadata changes only)"
                 ),
                 existing_tags=existing_tags,
+                gps_info=gps_info,
             )
 
             if dialog.exec_() != QDialog.Accepted:
@@ -182,6 +184,7 @@ class WavSaveManager:
             return any(
                 metadata.get(key, "") != original_info.get(key, "")
                 for key in metadata.keys()
+                if key in original_info or metadata.get(key, "").strip()
             )
         except (KeyError, TypeError) as e:
             logger.warning(f"Could not check metadata changes: {e}")
@@ -341,6 +344,7 @@ class WavSaveOptionsDialog(QDialog):
         filename: str = "",
         new_tags: str = "",
         existing_tags: str = "",
+        gps_info: str = "",
     ):
         """Initialize the save options dialog.
 
@@ -351,6 +355,7 @@ class WavSaveOptionsDialog(QDialog):
         self.filename = filename
         self.new_tags = new_tags
         self.existing_tags = existing_tags
+        self.gps_info = gps_info
 
         self.setWindowTitle("Save Options")
         self.setModal(True)
@@ -367,6 +372,9 @@ class WavSaveOptionsDialog(QDialog):
         filename_display = os.path.basename(self.filename)
         layout.addWidget(QLabel(f"<b>File:</b> {filename_display}"))
         layout.addWidget(QLabel(f"<b>New tags:</b> {self.new_tags}"))
+
+        if self.gps_info:
+            layout.addWidget(QLabel(f"<b>GPS:</b> {self.gps_info}"))
 
         if self.existing_tags:
             layout.addWidget(QLabel(f"<b>Existing tags:</b> {self.existing_tags}"))

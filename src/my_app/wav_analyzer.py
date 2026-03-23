@@ -135,6 +135,97 @@ def inject_info_chunk(
         f.write(new_data)
 
 
+def build_ixml_chunk(gps_data: dict[str, float]) -> bytes:
+    """Build an iXML chunk containing GPS location data.
+
+    Constructs a properly formatted iXML chunk with GPS coordinates stored
+    under LOCATION/GPS_LATITUDE, GPS_LONGITUDE, GPS_ALTITUDE as per the
+    iXML specification (AES57).
+
+    Args:
+        gps_data: Dictionary with 'latitude', 'longitude', and optionally
+                  'altitude' (all as floats).
+
+    Returns:
+        Complete iXML chunk as bytes, ready for file injection.
+
+    Usage:
+        chunk = build_ixml_chunk({'latitude': 52.37, 'longitude': 4.90, 'altitude': 5.0})
+    """
+    lat = gps_data["latitude"]
+    lon = gps_data["longitude"]
+    alt = gps_data.get("altitude", 0.0)
+
+    xml_content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<BWFXML>\n"
+        "  <IXML_VERSION>1.61</IXML_VERSION>\n"
+        "  <LOCATION>\n"
+        f"    <GPS_LATITUDE>{lat}</GPS_LATITUDE>\n"
+        f"    <GPS_LONGITUDE>{lon}</GPS_LONGITUDE>\n"
+        f"    <GPS_ALTITUDE>{alt}</GPS_ALTITUDE>\n"
+        "  </LOCATION>\n"
+        "</BWFXML>\n"
+    )
+
+    xml_bytes = xml_content.encode("utf-8")
+    xml_padded = pad_to_even(xml_bytes)
+    return b"iXML" + struct.pack("<I", len(xml_padded)) + xml_padded
+
+
+def inject_ixml_chunk(
+    wav_path: str, output_path: str, gps_data: dict[str, float]
+) -> None:
+    """Inject or replace iXML chunk in a WAV file with GPS location data.
+
+    Adds GPS coordinates to a WAV file as an iXML chunk. If an iXML chunk
+    already exists it is replaced; otherwise a new one is appended.
+    Updates the RIFF size accordingly to maintain file validity.
+
+    Args:
+        wav_path: Path to input WAV file.
+        output_path: Path for output WAV file with GPS metadata.
+        gps_data: Dictionary with 'latitude', 'longitude', and optionally
+                  'altitude' (all as floats).
+
+    Raises:
+        ValueError: If input file is not a valid WAVE file.
+
+    Usage:
+        inject_ixml_chunk('input.wav', 'tagged.wav',
+                          {'latitude': 52.37, 'longitude': 4.90, 'altitude': 5.0})
+    """
+    with open(wav_path, "rb") as f:
+        wav_data = f.read()
+
+    if not wav_data.startswith(b"RIFF") or b"WAVE" not in wav_data[:20]:
+        raise ValueError("Input file is not a valid WAVE file")
+
+    # Rebuild chunk stream, dropping any existing iXML chunk
+    pos = 12  # Skip RIFF+size+WAVE header
+    chunks_data = b""
+    while pos + 8 <= len(wav_data):
+        chunk_id = wav_data[pos : pos + 4]
+        chunk_size = struct.unpack("<I", wav_data[pos + 4 : pos + 8])[0]
+        on_disk_size = chunk_size + (chunk_size % 2)  # padding byte for odd chunks
+        chunk_bytes = wav_data[pos : pos + 8 + on_disk_size]
+
+        if chunk_id != b"iXML":
+            chunks_data += chunk_bytes
+
+        pos += 8 + on_disk_size
+
+    # Append fresh iXML chunk with GPS data
+    chunks_data += build_ixml_chunk(gps_data)
+
+    # Reconstruct RIFF file (RIFF size = 4 bytes for WAVE id + all chunk data)
+    new_riff_size = 4 + len(chunks_data)
+    new_data = b"RIFF" + struct.pack("<I", new_riff_size) + b"WAVE" + chunks_data
+
+    with open(output_path, "wb") as f:
+        f.write(new_data)
+
+
 def read_chunks(file) -> list[tuple[str, int, bytes]]:
     """Read and parse all chunks from a WAV file.
 
