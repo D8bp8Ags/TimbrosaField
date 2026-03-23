@@ -368,17 +368,21 @@ class AboutDialog(QDialog):
 
         layout.addStretch()
 
-        # Version + description
+        # Version + description + license
         about_text = (
-            f"<p><b>Version: </b>{app_config.ORG_NAME} {app_config.APP_VERSION}</p>"
+            f"<p><b>Version:</b> {app_config.ORG_NAME} {app_config.APP_VERSION}</p>"
             f"<p>A comprehensive tool for analyzing and organizing field recordings.</p>"
             f"<hr>"
-            f"<p><i>For detailed help and features, use Help → Help &amp; Quick Start.</i></p>"
+            f"<p><b>License:</b> {app_config.APP_LICENSE} — "
+            f'<a href="{app_config.APP_URL}" style="color:#add8e6;">'
+            f"source on GitHub</a></p>"
+            f"<p><i>For detailed help, use Help → Help &amp; Quick Start.</i></p>"
         )
         info_label = QLabel(about_text)
         info_label.setTextFormat(Qt.RichText)
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setWordWrap(True)
+        info_label.setOpenExternalLinks(True)
         info_label.setStyleSheet("color: white; background: transparent;")
         layout.addWidget(info_label)
 

@@ -97,6 +97,12 @@ Used for system settings storage, application data directories,
 and organizational identification in system integration.
 """
 
+APP_LICENSE = "GPL-3.0"
+"""str: SPDX identifier of the application license."""
+
+APP_URL = "https://github.com/D8bp8Ags/TimbrosaField"
+"""str: Project homepage / source repository URL."""
+
 
 # Audio playback constants
 
