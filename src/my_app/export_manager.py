@@ -805,18 +805,30 @@ class AbletonExporter:
                 # self._set_export_button_state(False, "Genereren van tracks...")
                 self.main_window.show_status_message("Genereren van tracks...", 1000)
 
-                source_wav_dir = (
-                    self.main_window.user_config_manager.get_updated_config()["paths"][
-                        "fieldrecording_dir"
-                    ]
-                )
-                # Get export directory
-                # export_dir = self.wav_viewer.user_config.get("paths", {}).get("ableton_export_dir", "Ableton")
-                export_dir = self.main_window.user_config_manager.get_updated_config()[
-                    "paths"
-                ]["ableton_export_dir"]
+                config = self.main_window.user_config_manager.get_updated_config()
+                paths = config.get("paths", {})
+                source_wav_dir = paths.get("fieldrecording_dir", "")
+                export_dir = paths.get("ableton_export_dir", "")
 
-                template_dir = os.path.join(export_dir, 'default_template.als')
+                if not source_wav_dir or not export_dir:
+                    QMessageBox.warning(
+                        self.main_window,
+                        "Ableton Export",
+                        "Stel eerst de opname- en exportmap in via Instellingen.",
+                    )
+                    return
+
+                template_dir = os.path.join(export_dir, "default_template.als")
+
+                if not os.path.isfile(template_dir):
+                    QMessageBox.warning(
+                        self.main_window,
+                        "Ableton Export",
+                        f"Geen default_template.als gevonden in:\n{export_dir}\n\n"
+                        "Maak een leeg Ableton-project aan en sla het op als "
+                        "default_template.als in de exportmap.",
+                    )
+                    return
 
                 logger.debug(f"Source WAV directory: {source_wav_dir}")
                 logger.debug(f"Export directory: {export_dir}")
@@ -941,15 +953,28 @@ class AbletonExporter:
         )
         self.main_window.show_status_message("Ableton export failed", 3000)
 
-    #
-    # def is_ableton_export_available(self) -> bool:
-    #     """Check if Ableton export functionality is available."""
-    #     try:
-    #         import ableton_generator
-    #
-    #         return True
-    #     except ImportError:
-    #         return False
+    def is_ableton_export_available(self) -> bool:
+        """Check if Ableton export functionality is available.
+
+        Returns True only when both the generator module is importable and a
+        default_template.als exists in the configured export directory.  Users
+        who only want to tag files do not need Ableton at all.
+
+        Returns:
+            bool: True if Ableton export can be performed, False otherwise.
+        """
+        try:
+            import ableton_generator_optimized  # noqa: F401
+        except ImportError:
+            return False
+
+        config = self.main_window.user_config_manager.get_updated_config()
+        export_dir = config.get("paths", {}).get("ableton_export_dir", "")
+        if not export_dir:
+            return False
+
+        template_path = os.path.join(export_dir, "default_template.als")
+        return os.path.isfile(template_path)
 
 
 class AnalyticsLauncher:

@@ -27,8 +27,11 @@ Features:
 
 import logging
 
+import os
+
 import app_config
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -36,6 +39,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 logger = logging.getLogger(__name__)
@@ -319,53 +323,74 @@ class AboutDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(f"About {app_config.APP_NAME}")
-        self.setFixedSize(450, 350)
+        self.setFixedSize(500, 300)
         self._setup_ui()
 
     def _setup_ui(self):
         """Setup the about dialog UI.
 
         Creates the complete user interface including application header,
-        version information, description text, and action button. The content
-        is dynamically populated from application configuration.
+        version information, description text, and action button on top of
+        the splash background image. The content is dynamically populated
+        from application configuration.
 
         UI Components:
+        - Background image (same as splash screen)
         - Application name header with dynamic title
         - Version information from app_config
         - Application description and purpose
-        - Reference to comprehensive help system
         - OK button for dialog dismissal
         """
-        layout = QVBoxLayout(self)
+        # Background image via QLabel (border-image unreliable on macOS)
+        bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "background.png")
+        bg_label = QLabel(self)
+        pixmap = QPixmap(bg_path)
+        if not pixmap.isNull():
+            bg_label.setPixmap(
+                pixmap.scaled(500, 300, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            )
+        bg_label.setGeometry(0, 0, 500, 300)
+        bg_label.lower()
+
+        # Overlay widget so content renders on top of background
+        overlay = QWidget(self)
+        overlay.setGeometry(0, 0, 500, 300)
+        overlay.setAttribute(Qt.WA_TranslucentBackground)
+
+        layout = QVBoxLayout(overlay)
+        layout.setContentsMargins(30, 20, 30, 20)
 
         # Header
         header = QLabel(f"<h2>{app_config.APP_NAME}</h2>")
         header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet("color: white; background: transparent;")
         layout.addWidget(header)
 
-        # Content - SIMPLIFIED
-        about_text = f"""
-<p><b>Version: </b>{app_config.ORG_NAME} {app_config.APP_VERSION}</p>
-<p>A comprehensive tool for analyzing and organizing field recordings.</p>
+        layout.addStretch()
 
-<hr>
-<p><i>For detailed help and features, use Help → Help & Quick Start.</i></p>
-        """
+        # Version + description
+        about_text = (
+            f"<p><b>Version: </b>{app_config.ORG_NAME} {app_config.APP_VERSION}</p>"
+            f"<p>A comprehensive tool for analyzing and organizing field recordings.</p>"
+            f"<hr>"
+            f"<p><i>For detailed help and features, use Help → Help &amp; Quick Start.</i></p>"
+        )
+        info_label = QLabel(about_text)
+        info_label.setTextFormat(Qt.RichText)
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: white; background: transparent;")
+        layout.addWidget(info_label)
 
-        content_label = QLabel(about_text)
-        content_label.setTextFormat(Qt.RichText)
-        content_label.setWordWrap(True)
-        layout.addWidget(content_label)
+        layout.addStretch()
 
-        # OK Button
+        # OK Button row
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-
         ok_button = QPushButton("OK")
         ok_button.clicked.connect(self.accept)
         ok_button.setDefault(True)
         button_layout.addWidget(ok_button)
-
         layout.addLayout(button_layout)
 
 
