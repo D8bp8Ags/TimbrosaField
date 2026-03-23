@@ -50,6 +50,7 @@ from PyQt5.QtGui import QColor, QFont, QPainter, QPalette, QPixmap
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
     QFrame,
+    QHBoxLayout,
     QLabel,
     QProgressBar,
     QStatusBar,
@@ -75,57 +76,50 @@ class SplashScreen(QWidget):
 
     def setup_ui(self):
         """Setup the splash screen UI components."""
-        self.setFixedSize(400, 250)
+        self.setFixedSize(500, 300)
         self.setWindowFlags(Qt.SplashScreen | Qt.WindowStaysOnTopHint)
 
-        # Create layout (mainly for structure, we use absolute positioning)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
-        layout.addStretch()
-        layout.addStretch()
-
-        # Background image
+        # Background image — covers the full widget, sits below everything
+        _bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "background.png")
         bg_image = QLabel(self)
         bg_image.setPixmap(
-            QPixmap("./background.png").scaled(
-                600, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
+            QPixmap(_bg_path).scaled(500, 300, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
         )
-        bg_image.setAlignment(Qt.AlignCenter)
-        bg_image.setGeometry(0, 0, 400, 250)
+        bg_image.setGeometry(0, 0, 500, 300)
         bg_image.lower()
 
-        # Loading text (absolute positioning)
-        self.loading_label = QLabel("Loading application...", self)
-        self.loading_label.setAlignment(Qt.AlignCenter)
-        self.loading_label.setGeometry(50, 210, 300, 30)
+        # Main layout — stretch pushes labels to the bottom
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(0)
+        layout.addStretch()
 
-        # Version label (bottom right)
-        self.version_label = QLabel(f"Version {app_config.APP_VERSION}", self)
-        self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.version_label.setGeometry(250, 210, 140, 30)
+        # Bottom row: loading text (left) + version (right)
+        bottom = QHBoxLayout()
+        bottom.setSpacing(8)
+
+        self.loading_label = QLabel("Loading application...")
+        self.loading_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.version_label = QLabel(f"v{app_config.APP_VERSION}")
+        self.version_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        bottom.addWidget(self.loading_label, stretch=1)
+        bottom.addWidget(self.version_label)
+        layout.addLayout(bottom)
 
     def setup_styling(self):
         """Apply custom styling to the splash screen."""
         self.setStyleSheet("""
             QWidget {
-                background:
-                    qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                  stop: 0 #4a7c59,
-                                  stop: 1 #4a7c59);
+                background: transparent;
                 border-radius: 16px;
             }
             QLabel {
                 background: transparent;
-                color: rgba(255, 255, 255, 0.7);
+                color: rgba(255, 255, 255, 0.85);
                 border: none;
-            }
-            QLabel[class="caption"] {
-                background: transparent;
-                color: rgba(255, 255, 255, 0.7);
-                border: none;
-                font-size: 9pt;
+                font-size: 10pt;
             }
         """)
 
