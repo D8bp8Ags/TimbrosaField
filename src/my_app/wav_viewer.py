@@ -20,6 +20,7 @@ import pyqtgraph as pg
 import soundfile as sf
 
 # Local imports
+import app_config
 from audio_player import AudioPlayer
 from PyQt5 import QtCore
 from PyQt5.QtCore import QEvent, Qt, QThread, pyqtSignal
@@ -1074,6 +1075,27 @@ class WavViewer(QWidget):
         # Get file information
         info = sf.info(filename)
         is_float = info.subtype.startswith("FLOAT")
+
+        # Guard against loading files that would exhaust RAM.
+        # soundfile normalises PCM to float64 (8 bytes/sample).
+        estimated_mb = (info.frames * info.channels * 8) / (1024 ** 2)
+        limit_mb = app_config.MAX_WAVEFORM_RAM_MB
+        if estimated_mb > limit_mb:
+            from PyQt5.QtWidgets import QMessageBox
+            answer = QMessageBox.question(
+                None,
+                "Large File Warning",
+                f"This file requires approximately {estimated_mb:.0f} MB of RAM to display "
+                f"(limit: {limit_mb} MB).\n\nLoading it may slow down or crash the application.\n\n"
+                "Load anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                raise RuntimeError(
+                    f"File loading cancelled: estimated RAM usage {estimated_mb:.0f} MB "
+                    f"exceeds limit of {limit_mb} MB."
+                )
 
         # Load audio data
         data, sample_rate = sf.read(filename, always_2d=True)

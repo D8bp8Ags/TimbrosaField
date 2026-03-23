@@ -104,6 +104,17 @@ APP_URL = "https://github.com/D8bp8Ags/TimbrosaField"
 """str: Project homepage / source repository URL."""
 
 
+# Waveform viewer limits
+
+MAX_WAVEFORM_RAM_MB = 2048
+"""int: Maximum estimated RAM (in MB) allowed for loading a WAV file into the waveform viewer.
+
+soundfile loads PCM data as float64 (8 bytes per sample).  A stereo 96 kHz file uses
+~92 MB per minute, so 2048 MB covers roughly 22 minutes at 96 kHz or 48 minutes at 44.1 kHz.
+Files that would exceed this limit trigger a warning dialog before loading.
+"""
+
+
 # Audio playback constants
 
 DEFAULT_VOLUME = 70
