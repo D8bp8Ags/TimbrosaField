@@ -143,10 +143,18 @@ class BatchTagEditor(QDialog):
         """
         super().__init__(parent)
         self.wav_files = wav_files or []
+        self._tag_worker = None
         self.setWindowTitle("Batch Tag Editor")
         self.setModal(True)
         self.setMinimumSize(600, 500)
         self.setup_ui()
+
+    def closeEvent(self, event):
+        """Stop the background worker before closing the dialog."""
+        if self._tag_worker is not None and self._tag_worker.isRunning():
+            self._tag_worker.quit()
+            self._tag_worker.wait()
+        super().closeEvent(event)
 
     def setup_ui(self):
         """Setup the user interface components.
@@ -315,14 +323,14 @@ class BatchTagEditor(QDialog):
             errors: List of error message strings for failed files.
         """
         if errors:
-            error_msg = f"✅ {success_count} files tagged\n❌ {len(errors)} errors:\n\n"
+            error_msg = f"{success_count} files tagged, {len(errors)} errors:\n\n"
             error_msg += "\n".join(errors[:5])
             if len(errors) > 5:
                 error_msg += f"\n... and {len(errors) - 5} more"
-            QMessageBox.warning(self, "Batch Tagging Completed", error_msg)
+            QMessageBox.warning(self, "Batch Tagging Complete", error_msg)
         else:
             QMessageBox.information(
-                self, "Success!", f"✅ All {success_count} files successfully tagged!"
+                self, "Success", f"All {success_count} files successfully tagged."
             )
         self.accept()
 

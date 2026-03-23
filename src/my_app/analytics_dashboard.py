@@ -118,11 +118,19 @@ class AnalyticsDashboard(QDialog):
         """
         super().__init__(parent)
         self.wav_files = wav_files or []
+        self._analysis_worker = None
         self.setWindowTitle("Recording Analytics Dashboard")
         self.setModal(True)
         self.setMinimumSize(800, 600)
         self.setup_ui()
         self._start_analysis()
+
+    def closeEvent(self, event):
+        """Stop the background analysis worker before closing the dialog."""
+        if self._analysis_worker is not None and self._analysis_worker.isRunning():
+            self._analysis_worker.quit()
+            self._analysis_worker.wait()
+        super().closeEvent(event)
 
     def setup_ui(self):
         """Set up the user interface components.
