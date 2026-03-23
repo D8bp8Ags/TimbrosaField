@@ -24,6 +24,7 @@ Adding metadata:
 import logging
 import os
 import struct
+import xml.etree.ElementTree as ET
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -141,13 +142,14 @@ def read_chunks(file) -> list[tuple[str, int, bytes]]:
     and data. Handles padding bytes correctly.
 
     Args:
-        file: Open file object positioned at start of WAV file.
+    file:
+    Open file object positioned at start of WAV file.
 
     Returns:
-        List of tuples containing (chunk_id, chunk_size, chunk_data).
+    List of tuples containing (chunk_id, chunk_size, chunk_data).
 
     Raises:
-        ValueError: If file is not a valid WAVE file.
+    ValueError: If file is not a valid WAVE file.
     """
     chunks = []
 
@@ -440,6 +442,50 @@ def parse_list_adtl_chunk(data: bytes) -> list[tuple[int, str]]:
     return labels
 
 
+def parse_gps_from_ixml(xml_string: str) -> dict[str, float] | None:
+    """Extract GPS coordinates from an iXML string.
+
+    Looks for a LOCATION element containing GPS_LATITUDE, GPS_LONGITUDE
+    and optionally GPS_ALTITUDE, as defined in the iXML specification.
+
+    Args:
+        xml_string: Raw iXML content as a string.
+
+    Returns:
+        Dict with 'latitude', 'longitude', and 'altitude' (float) if found,
+        or None if the string is not valid XML or contains no GPS data.
+    """
+    if not xml_string or not xml_string.strip():
+        return None
+
+    try:
+        root = ET.fromstring(xml_string.strip())
+    except ET.ParseError as e:
+        logger.debug("iXML is not valid XML, skipping GPS parse: %s", e)
+        return None
+
+    location = root.find(".//LOCATION")
+    if location is None:
+        return None
+
+    lat = location.findtext("GPS_LATITUDE")
+    lon = location.findtext("GPS_LONGITUDE")
+    alt = location.findtext("GPS_ALTITUDE")
+
+    if lat is None or lon is None:
+        return None
+
+    try:
+        return {
+            "latitude": float(lat),
+            "longitude": float(lon),
+            "altitude": float(alt) if alt is not None else 0.0,
+        }
+    except ValueError as e:
+        logger.debug("Could not parse GPS values from iXML: %s", e)
+        return None
+
+
 def parse_ixml_chunk(data: bytes) -> str:
     """Parse iXML chunk for production metadata.
 
@@ -508,6 +554,7 @@ def wav_analyze(filename: str) -> dict[str, Any]:
         "bext": None,
         "info": None,
         "ixml": None,
+        "gps": None,
         "unknown_chunks": [],
         "sample_rate": None,
     }
@@ -536,6 +583,7 @@ def wav_analyze(filename: str) -> dict[str, Any]:
 
         elif chunk_id == "iXML":
             result["ixml"] = parse_ixml_chunk(data)
+            result["gps"] = parse_gps_from_ixml(result["ixml"])
 
         elif chunk_id == "data":
             continue  # Skip audio data
@@ -575,6 +623,10 @@ def print_analysis(result: dict[str, Any]) -> None:
     print_section("🎛️", "Audio Format", result["fmt"])
     print_section("📝", "BWF Metadata (bext)", result["bext"])
     print_section("📇", "INFO Metadata", result["info"])
+    if result["gps"]:
+        print_section("📍", "GPS Location", result["gps"])
+    else:
+        logging.info("📍 GPS Location: (not set)")
 
     # Handle cue points with filtering and statistics
     if result["cue_points"]:
@@ -644,4 +696,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     main()
