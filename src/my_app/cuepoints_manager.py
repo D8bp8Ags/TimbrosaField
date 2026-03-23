@@ -93,8 +93,9 @@ class CuePointsAnalysisDialog(QDialog):
         self.setModal(True)
         self.setMinimumSize(900, 600)
         self.main_window = main_window
-
-        # self.parent_viewer = parent
+        # wav_viewer holds file_list and audio_player; fall back to main_window
+        # itself when the dialog is launched from a standalone WavViewer instance.
+        self.parent_viewer = getattr(main_window, "wav_viewer", main_window)
         self.setup_ui()
         # self.analyze_cue_points()
 
@@ -742,10 +743,10 @@ class CuePointsAnalysisDialog(QDialog):
                 if self.parent_viewer.audio_player.is_stopped():
                     self.parent_viewer.audio_player.play()
 
-            # Close this dialog and bring parent to front
+            # Close this dialog and bring main window to front
             self.accept()
-            self.parent_viewer.activateWindow()
-            self.parent_viewer.raise_()
+            self.main_window.activateWindow()
+            self.main_window.raise_()
 
             logger.info(
                 f"Navigated to {os.path.basename(file_path)} at {time_seconds:.2f}s"
