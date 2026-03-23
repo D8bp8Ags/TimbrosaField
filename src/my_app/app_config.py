@@ -98,6 +98,28 @@ and organizational identification in system integration.
 """
 
 
+# Audio playback constants
+
+DEFAULT_VOLUME = 70
+"""int: Default audio volume level (0–100).
+
+Used as the initial slider value and fallback when no saved setting exists.
+"""
+
+SEEK_STEP_MS = 10000
+"""int: Seek step size in milliseconds (10 seconds).
+
+Used by seek_backward() and seek_forward() in the audio player.
+"""
+
+MAX_FILE_COUNTER = 999
+"""int: Maximum number of filename conflict retries during export.
+
+When an output file already exists, a numeric suffix (_001, _002, …) is
+appended up to this limit before giving up.
+"""
+
+
 # Version history and semantic versioning guide:
 # 1.0.0 = Initial release (Eerste release)
 # 1.0.1 = Bug fixes and patches

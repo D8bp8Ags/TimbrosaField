@@ -36,6 +36,7 @@ import csv
 import json
 import logging
 import os
+import struct
 import time
 from collections import Counter
 from datetime import datetime
@@ -44,20 +45,50 @@ from typing import Any
 # from ableton_generator import AbletonLiveSetGenerator
 from ableton_generator_optimized import AbletonLiveSetGeneratorV3Optimized
 from analytics_dashboard import AnalyticsDashboard
+from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from tag_definitions import tag_categories
 from wav_analyzer import wav_analyze
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
+
+
+class CsvExportWorker(QThread):
+    """Background thread for CSV metadata export.
+
+    Runs ``_write_csv_file`` without calling Qt widgets directly.
+    Progress is reported via signals so the UI thread can update safely.
+    """
+
+    progress = pyqtSignal(int, str)              # (percent, message)
+    finished = pyqtSignal(int, int, int, str)    # (success, errors, total, filename)
+    error = pyqtSignal(str)                      # error message on OSError
+
+    def __init__(
+        self, csv_exporter: "CSVExporter", filename: str, wav_files: list
+    ) -> None:
+        """Initialize the worker.
+
+        Args:
+            csv_exporter: CSVExporter instance whose helper methods to use.
+            filename: Output CSV file path.
+            wav_files: List of WAV file paths to process.
+        """
+        super().__init__()
+        self._exporter = csv_exporter
+        self._filename = filename
+        self._wav_files = wav_files
+
+    def run(self) -> None:
+        """Write the CSV file in the background thread."""
+        try:
+            success, error_count = self._exporter._write_csv_file(
+                self._filename, self._wav_files, progress_fn=self.progress.emit
+            )
+            total = len(self._wav_files)
+            self.finished.emit(success, error_count, total, self._filename)
+        except OSError as exc:
+            self.error.emit(str(exc))
 
 
 class ExportManager:
@@ -165,7 +196,7 @@ class ExportManager:
         """
         return {
             "wav_files_count": len(self.main_window.file_manager.get_all_wav_files()),
-            "has_analytics": self.analytics_launcher.is_analytics_available(),
+            "has_analytics": True,
             "has_ableton_export": self.ableton_exporter.is_ableton_export_available(),
             "export_directory": self.main_window.user_config_manager.user_config.get(
                 "paths", {}
@@ -253,31 +284,54 @@ class CSVExporter:
 
             logger.info(f"Exporting metadata for {len(wav_files)} WAV files to CSV")
 
-            # Show progress
+            # Show progress bar
             self.main_window.ui_manager.show_progress(
                 "Exporting metadata...", len(wav_files) + 10
             )
 
-            success = self._write_csv_file(filename, wav_files)
-
-            # Hide progress
-            self.main_window.ui_manager.hide_progress()
-
-            if success:
-                logger.info(f"CSV export completed successfully: {filename}")
-                return True
-            else:
-                logger.error("CSV export failed")
-                return False
+            self._csv_worker = CsvExportWorker(self, filename, wav_files)
+            self._csv_worker.progress.connect(
+                self.main_window.ui_manager.update_progress
+            )
+            self._csv_worker.finished.connect(self._on_csv_done)
+            self._csv_worker.error.connect(self._on_csv_error)
+            self._csv_worker.start()
+            return True
 
         except Exception as e:
             self.main_window.ui_manager.hide_progress()
-            error_msg = f"CSV export failed: {str(e)}"
-            logger.error(error_msg)
+            logger.error(f"CSV export failed: {e}")
             QMessageBox.critical(
-                self.main_window, "Export Error", f"Fout bij CSV export:\n{str(e)}"
+                self.main_window, "Export Error", f"Fout bij CSV export:\n{e}"
             )
             return False
+
+    def _on_csv_done(
+        self, success_count: int, error_count: int, total: int, filename: str
+    ) -> None:
+        """Handle completed CSV export worker.
+
+        Args:
+            success_count: Number of successfully processed files.
+            error_count: Number of files with errors.
+            total: Total files processed.
+            filename: Output CSV file path.
+        """
+        self.main_window.ui_manager.hide_progress()
+        logger.info(f"CSV export completed: {filename}")
+        self._show_csv_results(filename, success_count, error_count, total)
+
+    def _on_csv_error(self, message: str) -> None:
+        """Handle a fatal CSV export error.
+
+        Args:
+            message: Error description from the worker.
+        """
+        self.main_window.ui_manager.hide_progress()
+        logger.error(f"CSV export failed: {message}")
+        QMessageBox.critical(
+            self.main_window, "Export Error", f"Fout bij CSV export:\n{message}"
+        )
 
     def _get_csv_export_filename(self) -> str | None:
         """Get filename for CSV export via dialog.
@@ -301,7 +355,12 @@ class CSVExporter:
 
         return filename if filename else None
 
-    def _write_csv_file(self, filename: str, wav_files: list[str]) -> bool:
+    def _write_csv_file(
+        self,
+        filename: str,
+        wav_files: list[str],
+        progress_fn: Any = None,
+    ) -> tuple[int, int]:
         """Write metadata to CSV file with progress updates.
 
         Performs the actual CSV file writing with comprehensive metadata extraction
@@ -311,14 +370,21 @@ class CSVExporter:
         Args:
             filename (str): Output CSV filename path
             wav_files (list[str]): List of WAV file paths to process
+            progress_fn: Optional callable ``(percent: int, msg: str) -> None``
+                used for progress updates.  Defaults to
+                ``self.main_window.ui_manager.update_progress`` so the method
+                is safe to call both from the UI thread and from
+                :class:`CsvExportWorker`.
 
         Returns:
-            bool: True if file was written successfully, False on write errors
+            tuple[int, int]: ``(success_count, error_count)``
 
         Note:
             Individual file analysis errors are captured in the CSV status column
             rather than failing the entire export operation.
         """
+        if progress_fn is None:
+            progress_fn = self.main_window.ui_manager.update_progress
         try:
             with open(filename, "w", newline="", encoding="utf-8") as csvfile:
                 writer = csv.writer(csvfile)
@@ -340,7 +406,7 @@ class CSVExporter:
                     "Status",
                 ]
                 writer.writerow(header)
-                self.main_window.ui_manager.update_progress(5, "CSV header written...")
+                progress_fn(5, "CSV header written...")
 
                 success_count = 0
                 error_count = 0
@@ -351,13 +417,12 @@ class CSVExporter:
 
                     try:
                         # Update progress
-                        progress = 5 + ((i + 1) / len(wav_files)) * 90
-                        self.main_window.ui_manager.update_progress(
-                            int(progress),
+                        pct = 5 + ((i + 1) / len(wav_files)) * 90
+                        progress_fn(
+                            int(pct),
                             f"Processing {filename_only}... ({i + 1}/{len(wav_files)})",
                         )
 
-                        # ✅ USE THE COMPLETE _analyze_wav_file METHOD
                         row_data = self._analyze_wav_file(file_path)
                         writer.writerow(row_data)
 
@@ -373,9 +438,7 @@ class CSVExporter:
                                 f"Analysis failed for {filename_only}: {row_data[12]}"
                             )
 
-                    except Exception as e:
-                        # This shouldn't happen since _analyze_wav_file handles its own exceptions
-                        # But just in case...
+                    except (OSError, ValueError) as e:
                         logger.error(
                             f"Unexpected error in CSV processing for {filename_only}: {e}"
                         )
@@ -387,17 +450,10 @@ class CSVExporter:
                         writer.writerow(error_row)
                         error_count += 1
 
-                # Final progress update
-                self.main_window.ui_manager.update_progress(95, "Finalizing CSV...")
+                progress_fn(95, "Finalizing CSV...")
+                return success_count, error_count
 
-                # Show results to user
-                self._show_csv_results(
-                    filename, success_count, error_count, len(wav_files)
-                )
-
-                return True
-
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Error writing CSV file {filename}: {e}")
             raise
 
@@ -488,7 +544,7 @@ class CSVExporter:
             logger.error(f"wav_analyzer import failed for {filename_only}: {e}")
             return [filename_only] + [""] * 11 + ["wav_analyzer not available"]
 
-        except Exception as e:
+        except (OSError, struct.error, ValueError) as e:
             logger.error(f"Unexpected error analyzing {filename_only}: {e}")
             # Truncate error message to prevent CSV formatting issues
             error_msg = str(e)[:50] + "..." if len(str(e)) > 50 else str(e)
@@ -577,7 +633,7 @@ class CSVExporter:
 
             return True
 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"JSON tags export failed: {e}")
             QMessageBox.critical(
                 self.main_window, "Export Error", f"JSON export failed:\n{str(e)}"
@@ -638,7 +694,7 @@ class CSVExporter:
 
                         all_tags.extend(file_tags)
 
-            except Exception as e:
+            except (OSError, KeyError) as e:
                 logger.warning(f"Error collecting tags from {file_path}: {e}")
 
         # Calculate tag statistics
@@ -759,8 +815,12 @@ class AbletonExporter:
                 export_dir = self.main_window.user_config_manager.get_updated_config()[
                     "paths"
                 ]["ableton_export_dir"]
-                print(source_wav_dir)
-                print(export_dir)
+
+                template_dir = os.path.join(export_dir, 'default_template.als')
+
+                logger.debug(f"Source WAV directory: {source_wav_dir}")
+                logger.debug(f"Export directory: {export_dir}")
+                logger.debug(f"Template directory: {template_dir}")
                 # Perform export
                 # result = generator.create_multitrack_live_set(
                 #     directory=source_wav_dir,
@@ -769,9 +829,9 @@ class AbletonExporter:
                 # )
                 # result = generator.create_multitrack_live_set(directory=source_wav_dir)
                 generator = AbletonLiveSetGeneratorV3Optimized(
-                    "./default_template.als",
+                    template_dir,
                     enable_progress=True,  # Enable progress tracking
-                    max_workers=4,  # Parallel processing (pas aan voor jouw systeem)
+                    max_workers=4,
                 )
                 start_time = time.time()
 
@@ -779,18 +839,18 @@ class AbletonExporter:
                     directory=source_wav_dir,
                     output_path=export_dir,
                     project_name=project_name,
-                    progress_callback=progress_callback,  # ← Hier gebruiken
+                    progress_callback=progress_callback,
                     batch_size=50,
                 )
                 end_time = time.time()
 
                 if success:
-                    print("✅ Optimized Live Set creation successful!")
+                    logger.info("Optimized Live Set creation successful!")
                     stats = generator.get_performance_stats()
-                    print(f"📊 Performance: {end_time - start_time:.2f}s total")
-                    print(f"⚡ Optimizations: {', '.join(stats['optimizations'])}")
+                    logger.info(f"Performance: {end_time - start_time:.2f}s total")
+                    logger.info(f"Optimizations: {', '.join(stats['optimizations'])}")
                 else:
-                    print("❌ Optimized Live Set creation failed!")
+                    logger.error("Optimized Live Set creation failed!")
 
                 # Check stats na gebruik:
                 # status = generator.get_sequential_optimization_status()
@@ -950,17 +1010,17 @@ class AnalyticsLauncher:
 
         try:
             # Check if analytics is available
-            if not self.is_analytics_available():
-                self.main_window.show_status_message(
-                    "Analytics dashboard not available", 3000
-                )
-                logger.error("Analytics dashboard import failed")
-                QMessageBox.warning(
-                    self.main_window,
-                    "Analytics Niet Beschikbaar",
-                    "Analytics dashboard is niet beschikbaar.\n\nControleer of analytics_dashboard.py bestaat.",
-                )
-                return False
+            # if not self.is_analytics_available():
+            #     self.main_window.show_status_message(
+            #         "Analytics dashboard not available", 3000
+            #     )
+            #     logger.error("Analytics dashboard import failed")
+            #     QMessageBox.warning(
+            #         self.main_window,
+            #         "Analytics Niet Beschikbaar",
+            #         "Analytics dashboard is niet beschikbaar.\n\nControleer of analytics_dashboard.py bestaat.",
+            #     )
+            #     return False
 
             # Get WAV files via FileManager
             wav_files = self.main_window.file_manager.get_all_wav_files()
@@ -1028,7 +1088,7 @@ class AnalyticsLauncher:
         wav_files = self.main_window.file_manager.get_all_wav_files()
 
         return {
-            "available": self.is_analytics_available(),
+            # "available": self.is_analytics_available(),
             "wav_files_count": len(wav_files),
             "has_tagged_files": self._count_tagged_files(wav_files),
             "categories_detected": self._detect_categories(wav_files),
@@ -1043,7 +1103,7 @@ class AnalyticsLauncher:
                 result = wav_analyze(file_path)
                 if result and result.get("info", {}).get("ICMT"):
                     tagged_count += 1
-            except Exception:
+            except OSError:
                 continue
 
         return tagged_count
@@ -1073,7 +1133,7 @@ class AnalyticsLauncher:
                                     found_categories.add(category)
                                     break
 
-            except Exception:
+            except (OSError, KeyError):
                 continue
 
         return list(found_categories)
@@ -1181,9 +1241,9 @@ class ExportManagerInterface:
         """Show analytics dashboard."""
         return self.export_manager.show_analytics_dashboard()
 
-    def is_analytics_available(self) -> bool:
-        """Check if analytics is available."""
-        return self.export_manager.analytics_launcher.is_analytics_available()
+    # def is_analytics_available(self) -> bool:
+    #     """Check if analytics is available."""
+    #     return self.export_manager.analytics_launcher.is_analytics_available()
 
     # === UTILITY METHODS ===
 

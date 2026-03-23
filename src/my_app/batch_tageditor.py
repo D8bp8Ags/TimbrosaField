@@ -29,10 +29,11 @@ Features:
 import json
 import logging
 import os
+import struct
 import sys
 
 from app_config import get_config_path
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -50,16 +51,55 @@ from tag_completer import FileTagAutocomplete
 from wav_analyzer import wav_analyze
 from wav_save_strategies import WavSaveStrategies
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
+
+
+class BatchTagWorker(QThread):
+    """Background thread that applies tags to a list of WAV files.
+
+    Emits ``progress`` after each file (1-based count) and ``finished`` with
+    the total success count and a list of error strings when the loop completes.
+    No Qt widgets are accessed inside ``run()``.
+    """
+
+    progress = pyqtSignal(int)        # files processed so far
+    finished = pyqtSignal(int, list)  # (success_count, errors)
+
+    def __init__(
+        self,
+        tagger: "BatchTagEditor",
+        files: list,
+        tags: list,
+        use_backup: bool,
+    ) -> None:
+        """Initialize the worker.
+
+        Args:
+            tagger: BatchTagEditor instance (for apply_tags_to_file).
+            files: List of file paths to process.
+            tags: Tags to apply.
+            use_backup: Whether to create backup files.
+        """
+        super().__init__()
+        self._tagger = tagger
+        self._files = files
+        self._tags = tags
+        self._use_backup = use_backup
+
+    def run(self) -> None:
+        """Tag each file in the background thread."""
+        success_count = 0
+        errors = []
+        for i, file_path in enumerate(self._files):
+            try:
+                self._tagger.apply_tags_to_file(
+                    file_path, self._tags, use_backup=self._use_backup
+                )
+                success_count += 1
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{os.path.basename(file_path)}: {exc}")
+            self.progress.emit(i + 1)
+        self.finished.emit(success_count, errors)
 
 
 class BatchTagEditor(QDialog):
@@ -254,28 +294,29 @@ class BatchTagEditor(QDialog):
             QMessageBox.warning(self, "No Tags", "Enter tags to apply.")
             return
 
-        # Show progress
+        # Capture checkbox value before leaving the UI thread
+        use_backup = self.backup_checkbox.isChecked()
+
         self.progress.setVisible(True)
         self.progress.setMaximum(len(selected_files))
+        self.progress.setValue(0)
         self.apply_btn.setEnabled(False)
 
-        success_count = 0
-        errors = []
+        self._tag_worker = BatchTagWorker(self, selected_files, new_tags, use_backup)
+        self._tag_worker.progress.connect(self.progress.setValue)
+        self._tag_worker.finished.connect(self._on_batch_done)
+        self._tag_worker.start()
 
-        for i, file_path in enumerate(selected_files):
-            try:
-                self.apply_tags_to_file(file_path, new_tags)
-                success_count += 1
-            except Exception as e:
-                errors.append(f"{os.path.basename(file_path)}: {str(e)}")
+    def _on_batch_done(self, success_count: int, errors: list) -> None:
+        """Handle completion of the background tagging worker.
 
-            self.progress.setValue(i + 1)
-            QApplication.processEvents()  # Keep UI responsive
-
-        # Show results
+        Args:
+            success_count: Number of files successfully tagged.
+            errors: List of error message strings for failed files.
+        """
         if errors:
             error_msg = f"✅ {success_count} files tagged\n❌ {len(errors)} errors:\n\n"
-            error_msg += "\n".join(errors[:5])  # Show first 5 errors
+            error_msg += "\n".join(errors[:5])
             if len(errors) > 5:
                 error_msg += f"\n... and {len(errors) - 5} more"
             QMessageBox.warning(self, "Batch Tagging Completed", error_msg)
@@ -283,22 +324,24 @@ class BatchTagEditor(QDialog):
             QMessageBox.information(
                 self, "Success!", f"✅ All {success_count} files successfully tagged!"
             )
-
         self.accept()
 
-    def apply_tags_to_file(self, file_path: str, new_tags: list[str]) -> None:
+    def apply_tags_to_file(
+        self, file_path: str, new_tags: list[str], use_backup: bool | None = None
+    ) -> None:
         """Apply tags to a single file using WavSaveStrategies.
 
         Processes a single WAV file by preparing metadata and using the
         centralized WavSaveStrategies for consistency with the main WAV viewer.
         Handles file validation, metadata preparation, and error reporting.
 
-        This method replaces the old apply_tags_to_file implementation and
-        provides centralized save functionality across the application.
 
         Args:
             file_path (str): Path to the WAV file to process
             new_tags (list[str]): List of new tags to apply to the file
+            use_backup (bool | None): Whether to create a backup file.  If
+                ``None`` (default) the value is read from the backup checkbox
+                widget — only safe when called from the UI thread.
 
         Raises:
             Exception: If file doesn't exist, isn't readable, or save operation fails.
@@ -327,10 +370,12 @@ class BatchTagEditor(QDialog):
             logger.debug(
                 f"Calling WavSaveStrategies.save_batch_style for: {os.path.basename(file_path)}"
             )
+            if use_backup is None:
+                use_backup = self.backup_checkbox.isChecked()
             result = WavSaveStrategies.save_batch_style(
                 source_path=file_path,
                 metadata=metadata,
-                use_backup=self.backup_checkbox.isChecked(),
+                use_backup=use_backup,
             )
 
             logger.debug(f"WavSaveStrategies result: {result}")
@@ -402,7 +447,7 @@ class BatchTagEditor(QDialog):
                         f"wav_analyze returned None or invalid result for {file_path}"
                     )
                     current_info = {}
-            except Exception as e:
+            except (OSError, struct.error) as e:
                 logger.warning(f"Failed to analyze {file_path}: {e}")
                 current_info = {}
 
@@ -480,7 +525,7 @@ def load_wav_files_from_config() -> list[str]:
             raise KeyError("Config paths must contain 'fieldrecording_dir'")
 
         fieldrecording_dir = config["paths"]["fieldrecording_dir"]
-        print(f"📁 Loading WAV files from fieldrecording_dir: {fieldrecording_dir}")
+        logger.info(f"Loading WAV files from fieldrecording_dir: {fieldrecording_dir}")
 
         if not os.path.exists(fieldrecording_dir):
             raise ValueError(
@@ -494,7 +539,7 @@ def load_wav_files_from_config() -> list[str]:
                 full_path = os.path.join(fieldrecording_dir, filename)
                 wav_files.append(full_path)
 
-        print(f"📂 Found {len(wav_files)} WAV files in fieldrecording_dir")
+        logger.info(f"Found {len(wav_files)} WAV files in fieldrecording_dir")
 
         # Filter to only existing files (extra safety check)
         existing_files = []
@@ -502,13 +547,13 @@ def load_wav_files_from_config() -> list[str]:
             if os.path.exists(wav_file):
                 existing_files.append(wav_file)
             else:
-                print(f"⚠️  File not found: {wav_file}")
+                logger.warning(f"File not found: {wav_file}")
 
         if not existing_files:
             raise ValueError("No valid WAV files found in fieldrecording_dir")
 
-        print(
-            f"✅ {len(existing_files)} valid WAV files loaded from fieldrecording_dir"
+        logger.info(
+            f"{len(existing_files)} valid WAV files loaded from fieldrecording_dir"
         )
         return existing_files
 

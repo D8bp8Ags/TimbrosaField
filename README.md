@@ -1,61 +1,96 @@
 # TimbrosaField
 
-TimbrosaField is a powerful and user-friendly tool for analyzing, visualizing, and tagging field recordings and other audio files. The application is built with Python and PyQt and supports advanced features such as waveform visualization, dynamic downsampling, metadata management, and channel display.
+TimbrosaField is a desktop application for analyzing, visualizing, and tagging field recordings. It stores metadata directly inside WAV files and can generate Ableton Live project templates organized by tag category — so you can browse your recordings by genre or subject without ever leaving Ableton.
+
+![TimbrosaField screenshot](docs/Screenshot.png)
 
 ---
 
 ## Features
 
-### Core Audio Processing
-- **Multi-format audio support:** Load and analyze WAV files (mono and stereo)
-- **Advanced waveform visualization:** Dynamic downsampling for smooth, real-time rendering
-- **Professional audio analysis:** Built-in spectrum analysis and audio metrics
-- **Cue point management:** Mark and annotate specific segments within recordings
+### Audio analysis & visualization
+- Waveform display with dynamic downsampling for smooth rendering of large files
+- Mono and stereo support with per-channel views
+- Clipping detection and cue point markers
+- Built-in audio player with seek and volume controls
 
-### Metadata & Tagging System
-- **Comprehensive metadata management:** Store extensive information for each recording
-- **Custom tagging system:** Create and apply custom tags with auto-completion
-- **Template system:** Quick-apply predefined tag templates (Ctrl+1-4)
-- **Batch tag editing:** Edit multiple files simultaneously
-- **Tag persistence:** Metadata stored directly in audio files
+### Metadata & tagging
+- Read and write INFO chunk and BEXT metadata directly in WAV files
+- Custom tag system with auto-completion and template support
+- Quick-apply tag templates via `Ctrl+1` – `Ctrl+4`
+- Batch tag editor for applying tags to multiple files at once (`Ctrl+B`)
 
-### Workflow Integration
-- **Ableton Live export:** Generate optimized Ableton Live project templates
-- **File organization:** Advanced file management with directory browsing
-- **Configuration management:** Persistent settings and user preferences
-- **Analytics dashboard:** Visual insights into your recording collection
+### Export & workflow
+- **Ableton Live export** — generates a multitrack `.als` project with category-based tracks
+- **CSV export** — full metadata table for all files in the active directory (`Ctrl+Shift+E`)
+- **JSON tag backup** — export all tags as a portable JSON file
+- **Analytics dashboard** — tag frequency, audio specs, and timeline overview (`Ctrl+A`)
 
-### User Interface
-- **Intuitive PyQt5 interface:** Clean, professional desktop application
-- **Extensive keyboard shortcuts:** Streamlined workflow with 20+ shortcuts
-- **Zoom and navigation controls:** Precise waveform examination
-- **Audio playback controls:** Built-in player with seek and volume controls
+---
+
+## Requirements
+
+- Python 3.11 or newer
+- Dependencies: `PyQt5`, `soundfile`, `numpy`, `pyqtgraph`
 
 ---
 
 ## Installation
 
-1. Make sure you have Python 3.8+ installed.  
-2. Install the required dependencies:
-
 ```bash
+# 1. Clone the repository
+git clone https://github.com/D8bp8Ags/TimbrosaField.git
+cd TimbrosaField
+
+# 2. Create and activate a virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
+
+# 4. Run the application
+python src/my_app/main.py
 ```
 
-3. Start the application:
+### Ableton Live export (optional)
 
-```bash
-python main.py
-```
-4. Ableton Live Export (optional): Create your own default_template.als in Ableton Live 12.2.1 (or a compatible newer version) and place it in the project root. The Ableton export generator relies on this template.
+Create a blank `default_template.als` in Ableton Live 12.2.1 (or a compatible version) and place it in the project root. The export generator uses this file as its base template.
+
 ---
 
 ## Usage
 
-- Open a WAV file via the menu.  
-- View the waveform and use markers to annotate interesting segments.  
-- Edit metadata and tags.  
-- Save your configuration so your tags and settings are retained upon reopening.
+1. Open a directory containing WAV files via **File → Open Directory** (`Ctrl+O`).
+2. Select a file in the list — the waveform and metadata load automatically.
+3. Add or edit tags in the tag field and save with **Save** (`Ctrl+S`).
+4. Use **Batch Tag Editor** (`Ctrl+B`) to apply the same tags to multiple files at once.
+5. Export to Ableton Live (`Ctrl+E`) or CSV (`Ctrl+Shift+E`) when ready.
+
+### Keyboard shortcuts
+
+| Action | Shortcut |
+|---|---|
+| Open directory | `Ctrl+O` |
+| Reload directory | `F5` |
+| Batch import files | `Ctrl+I` |
+| Export to Ableton | `Ctrl+E` |
+| Export metadata CSV | `Ctrl+Shift+E` |
+| Batch tag editor | `Ctrl+B` |
+| Template manager | `F9` |
+| Apply template 1–4 | `Ctrl+1` – `Ctrl+4` |
+| Analytics dashboard | `Ctrl+A` |
+| Cue point analysis | `Ctrl+U` |
+| Play / Pause | `Space` |
+| Stop | `Escape` |
+| Seek ±10 seconds | `←` / `→` |
+| Volume up / down | `=` / `-` |
+| Mute toggle | `M` |
+| Zoom in / out | `Ctrl+=` / `Ctrl+-` |
+| Fit to window | `Ctrl+0` |
+| Toggle metadata panel | `Ctrl+T` |
+| Keyboard shortcuts help | `F1` |
+| Quit | `Ctrl+Q` |
 
 ---
 
@@ -63,67 +98,38 @@ python main.py
 
 ```
 TimbrosaField/
-├── src/                # application source code
-│   └── my_app/         # main package
-├── .gitignore          # rules to exclude files from Git
-├── LICENSE             # GPL‑3.0 license text
-└── README.md           # project documentation (this file)
+├── src/
+│   └── my_app/          # application source
+├── default_template.als # Ableton base template (optional, not in git)
+├── requirements.txt     # pinned dependencies for reproducible installs
+├── pyproject.toml       # build config, ruff, and black settings
+├── LICENSE              # GPL-3.0
+└── README.md
 ```
 
 ---
 
-## Contribution
+## Background
 
-Contributions are welcome! Fork the project, create a feature branch, and submit a pull request.
+I bought a Tascam Portacapture X6 and wanted to integrate my field recordings into Ableton projects. The problem: Ableton doesn't read WAV tags, and manually renaming files took too long. While waiting for a cheese plate, I started analyzing the WAV file format — and before I knew it, this project existed.
+
+The goal is simple: record in the field, tag through this app (metadata stored inside the audio file), then generate an Ableton template so you can browse by genre or tag directly inside Ableton.
+
+If you use this tool or have feature suggestions, I'd love to hear from you.
+
+---
+
+## Community & contact
+
+- **Discord:** [Join the TimbrosaField server](https://discord.gg/d6ntrW3HHc)
+- **Issues & feature requests:** [GitHub Issues](https://github.com/D8bp8Ags/TimbrosaField/issues)
 
 ---
 
 ## License
 
-This project is licensed under the **GNU GENERAL PUBLIC LICENSE v3.0**.
-
-```
-GNU GENERAL PUBLIC LICENSE
-Version 3, 29 June 2007
-
-Copyright (C) <year> <author name>
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-```
-
----
-## Background
-
-Recently, I bought a Tascam Portacapture X6 and was curious how I could integrate these recordings into my Ableton projects. Unfortunately, Ableton does not read tags from WAV files, and manually renaming files with tags took too much time. While waiting for my cheese plate, I started analyzing the WAV files — and before I knew it, this project was born.
-
-My goal is to do field recordings, tag them through this app (with metadata stored inside the audio file), and then generate an Ableton template so I can easily browse by genre or tags within Ableton.
-
-If you end up using this tool and/or have suggestions for new features, I’d love to hear from you!
-
-
-
-## Join the Community
-
-Have ideas, suggestions, or questions? Join the **TimbrosaField Discord server** to share feedback, get help, or connect with others using the tool.
-
-👉 [Join here](https://discord.gg/d6ntrW3HHc)
-
-
-## Contact
-
-For questions or feedback, please open an [issue](https://github.com/D8bp8Ags/TimbrosaField/issues).
+Licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 
-*Happy recording & analyzing!* 🎧
+*Happy recording!*

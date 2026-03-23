@@ -1,9 +1,11 @@
+TASKS.md
 /backups/
 /ableton/
 /fieldrecordings/
 FieldRecordings/
 Ableton/
 /wav/
+timbrosafield/
 *.txt
 *.json
 *.asd

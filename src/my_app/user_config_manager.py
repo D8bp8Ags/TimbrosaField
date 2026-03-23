@@ -28,15 +28,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # CONFIG_FILE = "user_config.json"
@@ -194,13 +185,11 @@ class TagEditor(QDialog):
 
         try:
             # with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            with open(
-                self.config_file, "w", encoding="utf-8"
-            ) as f:  # ✅ Use instance variable
+            with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(self.user_config, f, indent=4)
             self.config_saved = True
             return True
-        except Exception as e:
+        except OSError as e:
             QMessageBox.warning(self, "Error", f"Failed to save config: {e}")
             return False
 
@@ -232,13 +221,13 @@ def load_user_config(config_file: str = None) -> dict[str, Any]:
     cfg: dict[str, Any] = {}
 
     if config_file is None:
-        config_file = app_config.USER_CONFIG  # ✅ Gebruik central config
+        config_file = app_config.USER_CONFIG
 
     if os.path.exists(config_file):
         try:
             with open(config_file, encoding="utf-8") as f:
                 cfg = json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             cfg = {}  # Fallback bij corrupte JSON
 
     cfg.setdefault("wav_tags", {})
@@ -262,9 +251,9 @@ def main():
     result = editor.exec_()
 
     if result == QDialog.Accepted:
-        print("✅ Configuration saved")
+        logger.info("Configuration saved")
     else:
-        print("❌ Configuration cancelled")
+        logger.info("Configuration cancelled")
     sys.exit(app.exec_())
 
 

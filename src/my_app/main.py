@@ -16,6 +16,7 @@ if __name__ == "__main__":     main()
 import logging
 import os
 import sys
+import time
 
 import app_config
 from batch_tageditor import BatchTagEditor
@@ -26,10 +27,15 @@ from file_manager import FileManagerInterface
 from global_manager import GlobalShortcutManager
 from menu_system import MenuBarManager
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QShortcut
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QMessageBox,
+    QShortcut,
+)
 from settings_manager import SettingsManager
 from tag_completer import TemplateManager, TemplateManagerDialog
-from ui_components import UIComponentManager
+from ui_components import ApplicationStylist, SplashScreen, UIComponentManager
 from user_config_manager import TagEditor
 from wav_viewer import WavViewer
 
@@ -199,11 +205,15 @@ class MainWindow(QMainWindow):
             "zoom_out": self._zoom_out,
             "zoom_fit": self._zoom_fit_to_window,
             "toggle_metadata": self._toggle_metadata_panel,
-            "toggle_frequency": self._toggle_frequency_analysis,
-            "toggle_timecode": self._toggle_timecode_format,
+            #            "toggle_frequency": self._toggle_frequency_analysis,
+            #            "toggle_timecode": self._toggle_timecode_format,
             "set_mouse_labels_minimal": self._set_mouse_labels_minimal,
             "set_mouse_labels_performance": self._set_mouse_labels_performance,
             "set_mouse_labels_professional": self._set_mouse_labels_professional,
+            "set_mouse_labels_professional_advanced": self._set_mouse_labels_professional_advanced,
+            "apply_light_theme": self._apply_light_theme,
+            "apply_dark_theme": self._apply_dark_theme,
+            "apply_macos_dark_theme": self._apply_macos_dark_theme,
         }
 
         # Audio commands
@@ -699,7 +709,7 @@ class MainWindow(QMainWindow):
             self.show_status_message(f"Error toggling metadata: {exc}", 3000)
             return False
 
-    def _toggle_frequency_analysis(self, enabled: bool) -> bool:
+    def _toggle_frequency_analysis_old(self, enabled: bool) -> bool:
         """Enable or disable real-time frequency spectrum analysis.
 
         Args:
@@ -720,7 +730,7 @@ class MainWindow(QMainWindow):
             self.show_status_message(f"Error toggling frequency analysis: {exc}", 3000)
             return False
 
-    def _toggle_timecode_format(self, enabled: bool) -> bool:
+    def _toggle_timecode_format_old(self, enabled: bool) -> bool:
         """Toggle between timecode and default time format for mouse labels.
 
         Args:
@@ -801,6 +811,57 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             self.show_status_message(f"Error setting professional mode: {exc}", 3000)
             return False
+
+    def _set_mouse_labels_professional_advanced(self) -> bool:
+        """Switch mouse labels to professional mode with all advanced features.
+
+        Configures mouse hover labels to show comprehensive technical
+        information including CPU-intensive features like frequency analysis.
+
+        Returns:
+            bool: True if professional advanced mode was successfully activated,
+                  False if WavViewer doesn't support this preset.
+        """
+        try:
+            if hasattr(self.wav_viewer, "set_mouse_labels_professional_advanced"):
+                self.wav_viewer.set_mouse_labels_professional_advanced()
+                self.show_status_message("Mouse labels: Professional+ mode", 2000)
+                return True
+            return False
+        except Exception as exc:  # noqa: BLE001
+            self.show_status_message(f"Error setting professional+ mode: {exc}", 3000)
+            return False
+
+    def _apply_light_theme(self):
+        """Apply light theme via ApplicationStylist."""
+        ApplicationStylist.apply_complete_styling(QApplication.instance())
+        self.current_theme = "light"
+        self._update_plot_backgrounds()
+        self.ui_manager.show_message("☀️ Light theme applied", 2000)
+
+    def _apply_dark_theme(self):
+        """Apply dark theme via ApplicationStylist."""
+        ApplicationStylist.apply_dark_theme(QApplication.instance())
+        self.current_theme = "dark"
+        self._update_plot_backgrounds()
+        self.ui_manager.show_message("🌙 Dark theme applied", 2000)
+
+    def _apply_macos_dark_theme(self):
+        """Apply macOS dark theme via ApplicationStylist."""
+        ApplicationStylist.apply_macos_dark_theme(QApplication.instance())
+        self.current_theme = "macos_dark"
+        self._update_plot_backgrounds()
+        self.ui_manager.show_message("🍎 macOS dark theme applied", 2000)
+
+    def _update_plot_backgrounds(self):
+        """Update plot backgrounds after theme change."""
+        bg_color = ApplicationStylist.COLORS.get('plot_background', 'w')
+        for plot in [
+            self.wav_viewer.waveform_plot,
+            self.wav_viewer.waveform_plot_top,
+            self.wav_viewer.waveform_plot_bottom,
+        ]:
+            plot.setBackground(bg_color)
 
     # ---------------------------------------------------------------------
     # Audio menu handlers
@@ -1110,6 +1171,42 @@ class MainWindow(QMainWindow):
 
 
 def main() -> None:
+    """Initialize and run the Field Recorder Analyzer Qt application."""
+    logger.info("Starting Field Recorder Analyzer…")
+
+    app = QApplication(sys.argv)
+
+    # App setup
+    app.setApplicationName(app_config.APP_NAME)
+    app.setApplicationVersion(app_config.APP_VERSION)
+    app.setOrganizationName(app_config.ORG_NAME)
+
+    # Import and apply ApplicationStylist FIRST
+    ApplicationStylist.apply_complete_styling(app)
+
+    # Create and show splash screen
+    splash = SplashScreen(app)
+    splash.show_and_process()
+
+    # Update loading text
+    splash.update_message("Initializing components...")
+
+    # Create main window
+    main_window = MainWindow()
+
+    # Final message
+    splash.set_ready()
+    time.sleep(0.5)
+
+    # Hide splash, show main
+    splash.hide()
+    main_window.show()
+
+    logger.info("Field Recorder Analyzer started.")
+    sys.exit(app.exec_())
+
+
+def main_old() -> None:
     """Initialize and run the Field Recorder Analyzer Qt application.
 
     Creates the QApplication instance, sets up application metadata,
@@ -1122,13 +1219,15 @@ def main() -> None:
     logger.info("Starting Field Recorder Analyzer…")
 
     app = QApplication(sys.argv)
+
     app.setApplicationName(app_config.APP_NAME)
     app.setApplicationVersion(app_config.APP_VERSION)
     app.setOrganizationName(app_config.ORG_NAME)
 
     # Apply application-wide styling if desired:
     # ApplicationStylist.apply_complete_styling(app)
-
+    # ApplicationStylist.apply_dark_theme(app)
+    # ApplicationStylist.apply_macos_dark_theme(app)
     main_window = MainWindow()
     main_window.show()
     logger.info("Field Recorder Analyzer started.")

@@ -49,15 +49,6 @@ from PyQt5.QtWidgets import (
 )
 from wav_analyzer import wav_analyze
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -157,7 +148,7 @@ class CuePointsAnalysisDialog(QDialog):
         self.cue_table.setHorizontalHeaderLabels(
             ["File", "Cue ID", "Label", "Time", "Type", "Actions"]
         )
-        # ✅ FIXED: Set proper column resize modes for consistent behavior
+        # Set proper column resize modes for consistent behavior
         # self.cue_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)  # File - can resize
         # self.cue_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Cue ID - fit content
         # self.cue_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)  # Label - can resize
@@ -167,7 +158,7 @@ class CuePointsAnalysisDialog(QDialog):
             5, QHeaderView.Stretch
         )  # Actions - always stretch
 
-        # ✅ ADDITIONAL: Set minimum widths to prevent squashing
+        # Set minimum widths to prevent squashing
         self.cue_table.setColumnWidth(0, 1250)  # File column minimum width
         self.cue_table.setColumnWidth(2, 200)  # Label column minimum width
 
@@ -319,7 +310,7 @@ class CuePointsAnalysisDialog(QDialog):
         try:
             wav_files = self.main_window.file_manager.get_all_wav_files()
         except Exception as e:  # noqa: BLE001
-            print(f"❌ Error getting WAV files: {e}")
+            logger.error(f"Error getting WAV files: {e}")
             return
 
         # Initialize analysis data
@@ -368,7 +359,7 @@ class CuePointsAnalysisDialog(QDialog):
                     analysis_stats["cue_types"][cue_data["type"]] += 1
 
         except Exception as e:  # noqa: BLE001
-            print(f"❌ Error analyzing cues in {file_path}: {e}")
+            logger.error(f"Error analyzing cues in {file_path}: {e}")
 
     def _process_file_cue_points(self, file_path, cue_points, cue_labels, sample_rate):
         """Process cue points for a single file and return cue data.
@@ -594,19 +585,19 @@ class CuePointsAnalysisDialog(QDialog):
         the filtered view.
         """
         """Apply filters to the cue points table."""
-        print("🔍 === apply_filters() called ===")
-        print(f"🔍 currentText(): '{self.type_filter.currentText()}'")
-        print(f"🔍 currentIndex(): {self.type_filter.currentIndex()}")
-        print(f"🔍 currentData(): {self.type_filter.currentData()}")
+        logger.debug("apply_filters() called")
+        logger.debug(f"currentText(): '{self.type_filter.currentText()}'")
+        logger.debug(f"currentIndex(): {self.type_filter.currentIndex()}")
+        logger.debug(f"currentData(): {self.type_filter.currentData()}")
         """Apply filters to the cue points table."""
         if not hasattr(self, "cue_data") or not self.cue_data:
-            print("📂 No cue data available for filtering")
+            logger.debug("No cue data available for filtering")
             return
 
         filter_type = self.type_filter.currentText()
         show_empty = self.show_empty_checkbox.isChecked()
 
-        print(f"🔍 Applying filters: Type='{filter_type}', Show Empty={show_empty}")
+        logger.debug(f"Applying filters: Type='{filter_type}', Show Empty={show_empty}")
 
         # Start with all cue data
         filtered_data = list(self.cue_data)
@@ -636,8 +627,8 @@ class CuePointsAnalysisDialog(QDialog):
         #     # For now, we'll just keep the current filtered data since empty files wouldn't have cues anyway
         #     pass
 
-        print(
-            f"📊 Filter result: {len(filtered_data)} cue points (from {len(self.cue_data)} total)"
+        logger.debug(
+            f"Filter result: {len(filtered_data)} cue points (from {len(self.cue_data)} total)"
         )
 
         # Update table with filtered data
@@ -756,8 +747,8 @@ class CuePointsAnalysisDialog(QDialog):
             self.parent_viewer.activateWindow()
             self.parent_viewer.raise_()
 
-            print(
-                f"🎯 Navigated to {os.path.basename(file_path)} at {time_seconds:.2f}s"
+            logger.info(
+                f"Navigated to {os.path.basename(file_path)} at {time_seconds:.2f}s"
             )
 
         except Exception as e:
@@ -813,7 +804,7 @@ class CuePointsAnalysisDialog(QDialog):
                     self, "Export Successful", f"Cue points exported to:\n{filename}"
                 )
 
-            except Exception as e:
+            except OSError as e:
                 QMessageBox.critical(
                     self, "Export Error", f"Failed to export:\n{str(e)}"
                 )

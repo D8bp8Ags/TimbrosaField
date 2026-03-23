@@ -1,21 +1,15 @@
+"""WAV file save strategies for in-place, backup, and batch save operations."""
+
 import contextlib
 import logging
 import os
 import shutil
+import struct
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from wav_analyzer import inject_info_chunk
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -103,7 +97,7 @@ class WavSaveStrategies:
                 success=True, output_path=final_output_path, operation_type="edit_copy"
             )
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error in save_as_edit_copy: {e}")
             return SaveResult(
                 success=False, error_message=str(e), operation_type="edit_copy"
@@ -161,7 +155,7 @@ class WavSaveStrategies:
                     with contextlib.suppress(Exception):
                         os.remove(temp_path)
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error in save_in_place: {e}")
             return SaveResult(
                 success=False, error_message=str(e), operation_type="in_place"
@@ -215,7 +209,7 @@ class WavSaveStrategies:
                     with contextlib.suppress(Exception):
                         os.remove(temp_path)
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error in save_with_backup: {e}")
             return SaveResult(
                 success=False, error_message=str(e), operation_type="with_backup"
@@ -273,7 +267,7 @@ class WavSaveStrategies:
                 success=True, output_path=output_path, operation_type="custom_name"
             )
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error in save_with_custom_name: {e}")
             return SaveResult(
                 success=False, error_message=str(e), operation_type="custom_name"
@@ -325,7 +319,7 @@ class WavSaveStrategies:
                     operation_type="batch_suffix",
                 )
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error in save_batch_style: {e}")
             return SaveResult(
                 success=False,
@@ -359,7 +353,7 @@ class WavSaveStrategies:
         try:
             with open(source_path, "rb") as f:
                 f.read(12)  # Read WAV header
-        except Exception as e:
+        except OSError as e:
             raise SaveError(f"Cannot read source file: {e}") from e
 
     @staticmethod
@@ -404,7 +398,7 @@ class WavSaveStrategies:
 
         except ImportError:
             raise SaveError("wav_analyzer module not available") from None
-        except Exception as e:
+        except (OSError, struct.error) as e:
             raise SaveError(f"Failed to inject metadata: {e}") from e
 
 
@@ -438,7 +432,7 @@ def test_save_strategies():
     This function can be used during development to test the save strategies with mock
     data before integrating into the main application.
     """
-    print("🧪 Testing WavSaveStrategies...")
+    logger.debug("Testing WavSaveStrategies...")
 
     # Mock test data
     # test_metadata = {
@@ -447,11 +441,11 @@ def test_save_strategies():
     #     "ICMT": "test, metadata, injection",
     # }
 
-    print("✅ WavSaveStrategies class loaded successfully")
-    print("✅ SaveResult dataclass initialized")
-    print("✅ All strategy methods defined")
-    print("✅ Helper methods implemented")
-    print("💡 Ready for integration testing with real WAV files")
+    logger.info("WavSaveStrategies class loaded successfully")
+    logger.info("SaveResult dataclass initialized")
+    logger.info("All strategy methods defined")
+    logger.info("Helper methods implemented")
+    logger.info("Ready for integration testing with real WAV files")
 
 
 if __name__ == "__main__":

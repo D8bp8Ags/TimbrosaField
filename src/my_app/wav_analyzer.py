@@ -26,15 +26,6 @@ import os
 import struct
 from typing import Any
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -150,14 +141,13 @@ def read_chunks(file) -> list[tuple[str, int, bytes]]:
     and data. Handles padding bytes correctly.
 
     Args:
-    file:
-    Open file object positioned at start of WAV file.
+        file: Open file object positioned at start of WAV file.
 
     Returns:
-    List of tuples containing (chunk_id, chunk_size, chunk_data).
+        List of tuples containing (chunk_id, chunk_size, chunk_data).
 
     Raises:
-    ValueError: If file is not a valid WAVE file.
+        ValueError: If file is not a valid WAVE file.
     """
     chunks = []
 
@@ -264,7 +254,7 @@ def parse_cue_chunk(data: bytes) -> list[dict[str, int]]:
     Usage:
         cue_points = parse_cue_chunk(cue_data)
         for cue in cue_points:
-            print(f"Cue {cue['ID']} at sample {cue['Sample Offset']}")
+            logger.debug(f"Cue {cue['ID']} at sample {cue['Sample Offset']}")
     """
     if len(data) < 4:
         logging.warning("Cue chunk too small for cue point count")
@@ -460,26 +450,25 @@ def parse_ixml_chunk(data: bytes) -> str:
 
     Returns:     XML content as string, or empty string if parsing fails.
     """
-    try:
-        xml = data.decode("utf-8", errors="ignore")
-        return xml
-    except Exception:
-        return ""
+    return data.decode("utf-8", errors="ignore")
 
 
 def hex_dump(data: bytes, length: int = 64) -> str:
-    """Create hexadecimal representation of binary data.
+    r"""Create hexadecimal representation of binary data.
 
     Generates a space-separated hexadecimal dump of binary data, useful for debugging
     unknown chunk formats.
 
-    Args:     data: Binary data to convert.     length: Maximum number of bytes to
-    include (default: 64).
+    Args:
+        data: Binary data to convert.
+        length: Maximum number of bytes to include (default: 64).
 
-    Returns:     Space-separated hexadecimal string.
+    Returns:
+        Space-separated hexadecimal string.
 
-    Test with binary data:     hex_dump(b'\\x00\\x01\\x02\\x03') returns '00 01 02 03'
-    hex_dump(b'Hello', length=3) returns '48 65 6C'
+    Example:
+        hex_dump(b'\x00\x01\x02\x03') returns '00 01 02 03'
+        hex_dump(b'Hello', length=3) returns '48 65 6C'
     """
     return " ".join(f"{b:02X}" for b in data[:length])
 

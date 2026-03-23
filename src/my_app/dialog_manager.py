@@ -26,7 +26,6 @@ Features:
 """
 
 import logging
-import os
 
 import app_config
 from PyQt5.QtCore import Qt
@@ -39,15 +38,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
