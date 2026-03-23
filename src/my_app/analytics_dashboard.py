@@ -580,12 +580,14 @@ class AnalyticsDashboard(QDialog):
                 f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}"
             )
 
-            # Fallback calculation
+            # Fallback: derive bytes-per-second from actual fmt chunk values
             sample_rate = fmt_info.get("Sample rate", 44100)
-            if sample_rate > 0:
-                duration = file_size / (
-                    sample_rate * 2 * 2
-                )  # Estimate for 16-bit stereo
+            channels = fmt_info.get("Channels", 2)
+            bit_depth = fmt_info.get("Bit depth", 16)
+            bytes_per_sample = max(1, bit_depth // 8)
+            bytes_per_second = sample_rate * channels * bytes_per_sample
+            if bytes_per_second > 0:
+                duration = file_size / bytes_per_second
             else:
                 duration = 0
 
