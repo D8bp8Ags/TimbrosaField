@@ -886,14 +886,11 @@ class WavViewer(QWidget):
         wav_dir = self.user_config["paths"]["fieldrecording_dir"]
         #     wav_dir = self.user_config["paths"]["fieldrecording_dir"]
 
-        # Create directory if it doesn't exist
+        # Skip silently if directory doesn't exist yet (first run or misconfigured path).
+        # The user will be prompted to open a directory via the first-run welcome dialog.
         if not os.path.exists(wav_dir):
-            try:
-                os.makedirs(wav_dir)
-                logger.info(f"Created directory: {wav_dir}")
-            except OSError as exc:
-                logger.error("Cannot create directory %s: %s", wav_dir, exc)
-                raise  # re-raise dezelfde OSError (B904 is hier niet van toepassing)
+            logger.debug("WAV directory does not exist, skipping load: %s", wav_dir)
+            return
 
         # Clear existing file list
         self.file_list.clear()
