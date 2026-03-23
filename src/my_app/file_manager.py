@@ -452,10 +452,13 @@ class DirectoryLoader:
                     f"No WAV files found in directory:\n{directory}\n\nDirectory will still be loaded.",
                 )
 
-            # Update configuration
-            self.main_window.user_config_manager.get_updated_config()["paths"][
-                "fieldrecording_dir"
-            ] = directory
+            # Update configuration in memory
+            cfg_editor = self.main_window.user_config_manager
+            cfg_editor.get_updated_config()["paths"]["fieldrecording_dir"] = directory
+            # Also sync the path widget so save_config() reads the correct value
+            if "fieldrecording_dir" in cfg_editor.path_edits:
+                cfg_editor.path_edits["fieldrecording_dir"].setText(directory)
+            cfg_editor.save_config()
 
             # Update UI
             self.main_window.ui_manager.update_file_count()
