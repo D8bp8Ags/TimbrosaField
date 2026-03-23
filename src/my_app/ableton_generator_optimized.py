@@ -1067,6 +1067,7 @@ class AbletonLiveSetGeneratorV3Optimized:
             end_time = time.time()
             processing_time = end_time - start_time
             self._stats['processing_time'] = processing_time
+            self._stats['files_processed'] = len(metadata_dict)
 
             logger.info("🎉 Optimized Live Set creation completed!")
             logger.info("📊 Performance Statistics:")
