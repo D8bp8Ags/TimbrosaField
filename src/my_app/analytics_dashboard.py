@@ -27,7 +27,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 
 import soundfile as sf
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
@@ -47,16 +47,38 @@ from PyQt5.QtWidgets import (
 from tag_definitions import tag_categories
 from wav_analyzer import wav_analyze
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
+
+
+class AnalysisDashboardWorker(QThread):
+    """Background thread that runs the WAV file analysis loop.
+
+    Emits ``progress`` after each file and ``finished`` with the complete
+    stats dict when the loop is done.  No Qt widgets are touched inside
+    ``run()``; all UI updates happen in the connected slots on the main thread.
+    """
+
+    progress = pyqtSignal(int, int)  # (current, total)
+    finished = pyqtSignal(dict)
+
+    def __init__(self, dashboard: "AnalyticsDashboard") -> None:
+        """Initialize with a reference to the dashboard.
+
+        Args:
+            dashboard: The AnalyticsDashboard instance whose helper methods
+                will be used for per-file processing.
+        """
+        super().__init__()
+        self._dashboard = dashboard
+
+    def run(self) -> None:
+        """Run the analysis loop in the background thread."""
+        stats = self._dashboard._initialize_analysis_stats()
+        total = len(self._dashboard.wav_files)
+        for i, file_path in enumerate(self._dashboard.wav_files):
+            self._dashboard._process_single_file(file_path, stats)
+            self.progress.emit(i + 1, total)
+        self.finished.emit(stats)
 
 
 class AnalyticsDashboard(QDialog):
@@ -100,7 +122,7 @@ class AnalyticsDashboard(QDialog):
         self.setModal(True)
         self.setMinimumSize(800, 600)
         self.setup_ui()
-        self.analyze_files()
+        self._start_analysis()
 
     def setup_ui(self):
         """Set up the user interface components.
@@ -115,6 +137,12 @@ class AnalyticsDashboard(QDialog):
         header = QLabel("<h2>Field Recording Analytics</h2>")
         header.setAlignment(Qt.AlignCenter)
         layout.addWidget(header)
+
+        # Loading indicator — shown while background analysis runs
+        self._loading_label = QLabel("Analysing files...")
+        self._loading_label.setAlignment(Qt.AlignCenter)
+        self._loading_label.setVisible(False)
+        layout.addWidget(self._loading_label)
 
         # Tab widget for different views
         self.tabs = QTabWidget()
@@ -338,10 +366,39 @@ class AnalyticsDashboard(QDialog):
 
             return creation_time_str, mod_time_str
 
-        except Exception as e:
-            print(f"Warning: Could not get timestamps for {file_path}: {e}")
+        except OSError as e:
+            logger.warning(f"Could not get timestamps for {file_path}: {e}")
             fallback_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return fallback_time, fallback_time
+
+    def _start_analysis(self) -> None:
+        """Launch background analysis worker."""
+        if not self.wav_files:
+            return
+        self._loading_label.setText(f"Analysing 0/{len(self.wav_files)} files...")
+        self._loading_label.setVisible(True)
+        self._analysis_worker = AnalysisDashboardWorker(self)
+        self._analysis_worker.progress.connect(self._on_analysis_progress)
+        self._analysis_worker.finished.connect(self._on_analysis_done)
+        self._analysis_worker.start()
+
+    def _on_analysis_progress(self, current: int, total: int) -> None:
+        """Update loading label with current progress.
+
+        Args:
+            current: Number of files processed so far.
+            total: Total number of files to process.
+        """
+        self._loading_label.setText(f"Analysing {current}/{total} files...")
+
+    def _on_analysis_done(self, stats: dict) -> None:
+        """Handle completed background analysis.
+
+        Args:
+            stats: Accumulated statistics dict from the worker.
+        """
+        self._loading_label.setVisible(False)
+        self._finalize_analysis(stats)
 
     def analyze_files(self):
         """Analyze all WAV files and populate statistics.
@@ -357,7 +414,7 @@ class AnalyticsDashboard(QDialog):
         if not self.wav_files:
             return
 
-        print(f"Analyzing {len(self.wav_files)} files...")
+        logger.info(f"Analyzing {len(self.wav_files)} files...")
 
         # Initialize statistics containers
         stats = self._initialize_analysis_stats()
@@ -437,7 +494,7 @@ class AnalyticsDashboard(QDialog):
             # Update statistics
             self._update_statistics(stats, file_data)
 
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             self._handle_analysis_failure(
                 file_path, None, stats, f"Error: {str(e)[:30]}..."
             )
@@ -514,12 +571,14 @@ class AnalyticsDashboard(QDialog):
         try:
             info = sf.info(file_path)
             duration = info.frames / info.samplerate
-            print(
+            logger.debug(
                 f"Got duration from soundfile: {duration:.1f}s for {os.path.basename(file_path)}"
             )
             return duration
-        except Exception as sf_error:
-            print(f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}")
+        except (OSError, RuntimeError) as sf_error:
+            logger.error(
+                f"Soundfile failed for {os.path.basename(file_path)}: {sf_error}"
+            )
 
             # Fallback calculation
             sample_rate = fmt_info.get("Sample rate", 44100)
@@ -530,7 +589,7 @@ class AnalyticsDashboard(QDialog):
             else:
                 duration = 0
 
-            print(f"Using fallback duration estimate: {duration:.1f}s")
+            logger.debug(f"Using fallback duration estimate: {duration:.1f}s")
             return duration
 
     def _extract_tags(self, info_data):
@@ -665,7 +724,7 @@ class AnalyticsDashboard(QDialog):
             stats (dict): Statistics containers to update (modified in-place)
             error_message (str): Description of the analysis failure
         """
-        print(f"Warning: {error_message} for {os.path.basename(file_path)}")
+        logger.warning(f"{error_message} for {os.path.basename(file_path)}")
         stats["analysis_errors"] += 1
 
         try:
@@ -684,8 +743,8 @@ class AnalyticsDashboard(QDialog):
             }
             stats["timeline_data"].append(timeline_entry)
 
-        except Exception as nested_e:
-            print(f"Could not even get file stats for {file_path}: {nested_e}")
+        except OSError as nested_e:
+            logger.error(f"Could not even get file stats for {file_path}: {nested_e}")
 
     def _finalize_analysis(self, stats):
         """Complete analysis and update displays.
@@ -701,10 +760,10 @@ class AnalyticsDashboard(QDialog):
             details about possible causes and successful analysis count.
         """
         # Report results
-        print("Analysis complete:")
-        print(f"   Successfully analyzed: {stats['successful_analyses']} files")
-        print(f"   Analysis errors: {stats['analysis_errors']} files")
-        print(f"   Total files processed: {len(self.wav_files)}")
+        logger.info("Analysis complete:")
+        logger.info(f"   Successfully analyzed: {stats['successful_analyses']} files")
+        logger.info(f"   Analysis errors: {stats['analysis_errors']} files")
+        logger.info(f"   Total files processed: {len(self.wav_files)}")
 
         # Update displays
         self.update_overview(
@@ -874,10 +933,10 @@ class AnalyticsDashboard(QDialog):
             timeline_data (list[dict]): List of timeline entry dictionaries
                 containing file information, timestamps, and metadata
         """
-        print(f"DEBUG: update_timeline called with {len(timeline_data)} entries")
+        logger.debug(f"update_timeline called with {len(timeline_data)} entries")
 
         if not timeline_data:
-            print("DEBUG: No timeline data, showing empty state")
+            logger.debug("No timeline data, showing empty state")
             self.timeline_table.setRowCount(1)
             for col in range(7):
                 text = "No timeline data" if col == 0 else "-"
@@ -886,7 +945,7 @@ class AnalyticsDashboard(QDialog):
 
         # Debug: print first few entries
         for i, entry in enumerate(timeline_data[:3]):
-            print(f"DEBUG: Entry {i}: {entry}")
+            logger.debug(f"Entry {i}: {entry}")
 
         # Sort by BWF date/time first, then file timestamps
         def sort_key(entry):
@@ -905,7 +964,7 @@ class AnalyticsDashboard(QDialog):
                 try:
                     # BWF format: YYYY-MM-DD and HH:MM:SS
                     return f"{entry['bwf_date']} {entry['bwf_time']}"
-                except Exception:
+                except KeyError:
                     pass
 
             # Fallback to file creation time
@@ -913,10 +972,10 @@ class AnalyticsDashboard(QDialog):
 
         try:
             timeline_data.sort(key=sort_key)
-        except Exception as e:
-            print(f"DEBUG: Sort error: {e}")
+        except (TypeError, KeyError) as e:
+            logger.debug(f"Sort error: {e}")
 
-        print(f"DEBUG: Setting table row count to {len(timeline_data)}")
+        logger.debug(f"Setting table row count to {len(timeline_data)}")
         self.timeline_table.setRowCount(len(timeline_data))
 
         for i, entry in enumerate(timeline_data):
@@ -942,11 +1001,11 @@ class AnalyticsDashboard(QDialog):
                 self.timeline_table.setItem(
                     i, 6, QTableWidgetItem(entry.get("source", "N/A"))
                 )
-                print(f"DEBUG: Added row {i} for file {entry.get('file', 'Unknown')}")
-            except Exception as e:
-                print(f"DEBUG: Error adding row {i}: {e}")
+                logger.debug(f"Added row {i} for file {entry.get('file', 'Unknown')}")
+            except (KeyError, TypeError) as e:
+                logger.debug(f"Error adding row {i}: {e}")
 
-        print(f"DEBUG: Timeline table now has {self.timeline_table.rowCount()} rows")
+        logger.debug(f"Timeline table now has {self.timeline_table.rowCount()} rows")
 
     def export_report(self):
         """Export analytics report to text file.
@@ -1014,7 +1073,7 @@ class AnalyticsDashboard(QDialog):
                     self, "Export Successful", f"Report exported to:\n{filename}"
                 )
 
-            except Exception as e:
+            except OSError as e:
                 QMessageBox.critical(
                     self, "Export Error", f"Failed to export report:\n{str(e)}"
                 )

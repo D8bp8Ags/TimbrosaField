@@ -12,11 +12,6 @@ operations -> ``ExportManager`` * Dialog operations -> ``DialogManager`` * UI co
 import logging
 import os
 import sys
-
-# try:
-#     from wav_save_manager import quick_save_with_dialog  # type: ignore
-# except ImportError:  # pragma: no cover - optional at runtime
-#     quick_save_with_dialog = None  # type: ignore[assignment]
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,7 +22,7 @@ import soundfile as sf
 # Local imports
 from audio_player import AudioPlayer
 from PyQt5 import QtCore
-from PyQt5.QtCore import QEvent, Qt
+from PyQt5.QtCore import QEvent, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QMouseEvent
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
@@ -50,9 +45,39 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from tag_completer import FileTagAutocomplete
-from user_config_manager import load_user_config  # <- new helper import
+from ui_components import ApplicationStylist
+from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
+
+
+class WavAnalysisWorker(QThread):
+    """Background thread for running wav_analyze() without blocking the UI.
+
+    Emits ``finished`` with the analysis result dict on success, or ``error``
+    with an exception message on failure.  The ``filename`` attribute lets the
+    caller verify the result still matches the currently selected file.
+    """
+
+    finished = pyqtSignal(str, dict)   # (filename, analysis_result)
+    error = pyqtSignal(str, str)       # (filename, error_message)
+
+    def __init__(self, filename: str) -> None:
+        """Initialize the worker with the file to analyse.
+
+        Args:
+            filename: Absolute path to the WAV file to analyse.
+        """
+        super().__init__()
+        self.filename = filename
+
+    def run(self) -> None:
+        """Run wav_analyze in the background thread."""
+        try:
+            result = wav_analyze(self.filename)
+            self.finished.emit(self.filename, result)
+        except Exception as exc:  # noqa: BLE001 — worker must never crash silently
+            self.error.emit(self.filename, str(exc))
 
 
 @dataclass
@@ -78,17 +103,6 @@ class ClippingRegionInfo:
         duration_ms: Duration of the clipping region in milliseconds.
                     Calculated value for quick assessment of clipping severity.
 
-    Example:
-        >>> region = ClippingRegionInfo(
-        ...     start_time=1.523,
-        ...     end_time=1.547,
-        ...     region_idx=0,
-        ...     total_regions=3,
-        ...     channel_name="Left Channel",
-        ...     duration_ms=24.0
-        ... )
-        >>> print(f"Clipping: {region.duration_ms}ms in {region.channel_name}")
-
     Note:
         This dataclass is immutable by design to ensure data integrity during
         analysis operations. Duration values are pre-calculated for performance
@@ -103,15 +117,6 @@ class ClippingRegionInfo:
     duration_ms: float
 
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -545,10 +550,15 @@ class WavViewer(QWidget):
         self.right_layout.addWidget(plots_label)
 
         # Create plot widgets with optimized settings
+        # plot_config = {
+        #     "background": "w",
+        #     "antialias": True,
+        #     "useOpenGL": False,  # Disable for better compatibility
+        # }
         plot_config = {
-            "background": "w",
+            "background": ApplicationStylist.COLORS['plot_background'],
             "antialias": True,
-            "useOpenGL": False,  # Disable for better compatibility
+            "useOpenGL": False,
         }
 
         # Main mono/overlay plot
@@ -1391,42 +1401,6 @@ class WavViewer(QWidget):
                 (self.waveform_plot, self.cached_mean_signal, "mono_waveform"),
             ]
 
-    def _render_single_plot213(
-        self, plot: pg.PlotWidget, data: np.ndarray, color_key: str
-    ) -> None:
-        """Legacy single plot rendering method with basic optimization.
-
-        Renders a single waveform plot using intelligent downsampling based on
-        the current view range and plot dimensions. This is a legacy method
-        maintained for compatibility.
-
-        Args:
-            plot: PyQtGraph PlotWidget to render the waveform on.
-            data: NumPy array containing audio waveform data to visualize.
-            color_key: String key for color lookup in the plot_colors scheme.
-
-        Note:
-            This legacy method uses basic plot width calculation. The current
-            implementation (_render_single_plot) provides enhanced optimization
-            with adaptive sampling based on zoom level and data density.
-        """
-        # Get current view range
-        view_box = plot.getViewBox()
-        x_range, _ = view_box.viewRange()
-
-        # Calculate optimal width for downsampling
-        plot_width = max(800, plot.width())  # Minimum reasonable width
-
-        # Downsample data for current view
-        x_plot, y_plot = downsample_min_max(
-            data, self.current_sr, x_range[0], x_range[1], plot_width
-        )
-
-        # Render if we have data
-        if len(x_plot) > 0:
-            pen = self.get_pen(color_key)
-            plot.plot(x_plot, y_plot, pen=pen)
-
     def _render_single_plot(
         self, plot: pg.PlotWidget, data: np.ndarray, color_key: str
     ) -> None:
@@ -1965,29 +1939,54 @@ class WavViewer(QWidget):
 
     #######
     def _process_file_metadata(self, filename: str) -> None:
-        """Process and display file metadata and cue points.
+        """Start background analysis of WAV metadata.
 
-        Args:     filename: Path to WAV file to analyze
+        Launches a :class:`WavAnalysisWorker` thread.  Results are delivered to
+        :meth:`_on_metadata_ready`; errors to :meth:`_on_metadata_error`.
+        Any previously running worker for a different file is stopped first.
+
+        Args:
+            filename: Path to WAV file to analyse.
         """
-        try:
-            # Analyze WAV file structure
-            analysis_result = wav_analyze(filename)
+        # Stop any in-flight worker so stale results don't overwrite new selection
+        if hasattr(self, "_metadata_worker") and self._metadata_worker is not None:
+            self._metadata_worker.finished.disconnect()
+            self._metadata_worker.error.disconnect()
+            self._metadata_worker.quit()
+            self._metadata_worker = None
 
-            # Process cue points if present
-            self._process_cue_markers(analysis_result)
+        worker = WavAnalysisWorker(filename)
+        worker.finished.connect(self._on_metadata_ready)
+        worker.error.connect(self._on_metadata_error)
+        # Keep a reference so we can cancel it on next selection
+        self._metadata_worker = worker
+        worker.start()
 
-            # Display metadata in tables
-            self.show_metadata(analysis_result)
+    def _on_metadata_ready(self, filename: str, analysis_result: dict) -> None:
+        """Handle completed background WAV analysis.
 
-        except (
-            AttributeError,
-            IndexError,
-            KeyError,
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ) as exc:
-            logger.warning(f"Could not process metadata for {filename}: {exc}")
+        Called on the UI thread via Qt signal.  Ignored if the file no longer
+        matches the currently selected file (user moved on).
+
+        Args:
+            filename: File that was analysed.
+            analysis_result: Result dict from :func:`wav_analyze`.
+        """
+        if filename != self.filename:
+            logger.debug(f"Discarding stale metadata result for {os.path.basename(filename)}")
+            return
+
+        self._process_cue_markers(analysis_result)
+        self.show_metadata(analysis_result)
+
+    def _on_metadata_error(self, filename: str, message: str) -> None:
+        """Handle a failed background WAV analysis.
+
+        Args:
+            filename: File that failed analysis.
+            message: Error description.
+        """
+        logger.warning(f"Could not process metadata for {os.path.basename(filename)}: {message}")
 
     def _process_cue_markers(self, analysis_result: dict[str, Any]) -> None:
         """Process and display cue point markers.
@@ -2369,15 +2368,14 @@ class WavViewer(QWidget):
                 QTableWidget.DoubleClicked | QTableWidget.SelectedClicked
             )
 
-    #####
     def _reset_info_table_to_defaults(self) -> None:
         """Reset INFO table to show only defaults."""
         reply = QMessageBox.question(
             self,
             "Reset to Defaults",
             (
-                "Reset all INFO metadata fields to default values?\n\n"
-                "This will clear any custom values.",
+                "Reset all INFO metadata fields to default values?"
+                "This will clear any custom values."
             ),
             QMessageBox.Yes | QMessageBox.No,
         )
@@ -2498,7 +2496,7 @@ class WavViewer(QWidget):
 
         self.cue_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-        # print(cue_points)
+        # logger.debug(f"Cue points: {cue_points}")
         #
         # # labeled = [(str(int(cid)), label) for cid, label in cue_labels.items()
         # #            if label.strip()]
@@ -3407,8 +3405,8 @@ class WavViewer(QWidget):
             return
 
         position_seconds = position_ms / 1000.0
-        # print('lala')
-        # print(self.playback_line)
+        # logger.debug('Updating playback position')
+        # logger.debug(f'Playback line status: {self.playback_line}')
         # Update cursor position on all plots if cursor exists
         if self.playback_line:
             for line in self.playback_line:
@@ -3764,6 +3762,24 @@ class WavViewer(QWidget):
 
         logger.info("Mouse labels set to professional mode")
 
+    def set_mouse_labels_professional_advanced(self) -> None:
+        """Set mouse labels with all advanced features enabled."""
+        self.configure_mouse_labels(
+            show_timecode=True,
+            show_remaining_time=True,
+            show_percentage=True,
+            show_peak_detection=True,
+            show_channel_correlation=True,
+            show_frequency_analysis=True,
+            show_cue_proximity=True,
+            show_clipping_detection=True,
+            decimal_precision=3,
+            db_precision=2,
+        )
+        self._current_mouse_mode = "professional_advanced"
+        self._set_default_mouse_labels_dynamic()
+        logger.info("Mouse labels set to professional advanced mode")
+
     def set_mouse_labels_performance(self) -> None:
         """Set mouse labels optimized for performance while keeping essential info."""
         self.configure_mouse_labels(
@@ -3786,7 +3802,7 @@ class WavViewer(QWidget):
         logger.info("Mouse labels set to performance mode")
 
 
-def test_main() -> None:
+def main() -> None:
     """Test function to run WavViewer standalone."""
     logger.info("Starting WavViewer standalone test")
 
@@ -3798,6 +3814,8 @@ def test_main() -> None:
 
     # Create standalone WavViewer
     viewer = WavViewer()
+    viewer.setGeometry(100, 100, 1200, 800)  # x, y, width, height
+
     viewer.setWindowTitle("WavViewer Standalone Test")
     viewer.show()
 
@@ -3806,4 +3824,4 @@ def test_main() -> None:
 
 
 if __name__ == "__main__":
-    test_main()
+    main()

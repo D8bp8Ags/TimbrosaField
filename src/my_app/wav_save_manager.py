@@ -25,6 +25,7 @@ Usage:
 
 import logging
 import os
+import struct
 from typing import Any, Optional
 
 from PyQt5.QtWidgets import (
@@ -40,17 +41,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 from wav_analyzer import wav_analyze
-from wav_save_strategies import SaveResult, WavSaveStrategies
+from wav_save_strategies import SaveError, SaveResult, WavSaveStrategies
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -191,7 +183,7 @@ class WavSaveManager:
                 metadata.get(key, "") != original_info.get(key, "")
                 for key in metadata.keys()
             )
-        except Exception as e:
+        except (KeyError, TypeError) as e:
             logger.warning(f"Could not check metadata changes: {e}")
             return True  # Assume changes if we can't check
 
@@ -276,7 +268,7 @@ class WavSaveManager:
 
             return strategies[save_method]()
 
-        except Exception as e:
+        except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error executing save strategy: {e}")
             return None
 
@@ -492,11 +484,11 @@ class WavSaveOptionsDialog(QDialog):
 
 def test_wav_save_manager():
     """Test function for WavSaveManager."""
-    print("🧪 Testing WavSaveManager...")
-    print("✅ WavSaveManager class loaded")
-    print("✅ WavSaveOptionsDialog class loaded")
-    print("✅ Convenience functions available")
-    print("💡 Ready for integration into WavViewer")
+    logger.debug("Testing WavSaveManager...")
+    logger.info("WavSaveManager class loaded")
+    logger.info("WavSaveOptionsDialog class loaded")
+    logger.info("Convenience functions available")
+    logger.info("Ready for integration into WavViewer")
 
 
 if __name__ == "__main__":

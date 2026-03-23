@@ -29,6 +29,7 @@ import gzip
 import logging
 import os
 import re
+import struct
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
@@ -39,6 +40,7 @@ from typing import Any
 from weakref import WeakValueDictionary
 
 import soundfile as sf
+from app_config import MAX_FILE_COUNTER
 from tag_definitions import tag_categories
 from wav_analyzer import wav_analyze
 
@@ -127,7 +129,7 @@ class AudioFileValidator:
 
             return True, ""
 
-        except Exception as validation_error:
+        except (OSError, struct.error, RuntimeError) as validation_error:
             return False, f"Validation error: {validation_error}"
 
 
@@ -161,7 +163,7 @@ class FilePathManager:
         """
         try:
             return Path(path).expanduser().resolve()
-        except Exception as path_error:
+        except (OSError, RuntimeError) as path_error:
             logger.error(f"Path normalization failed for {path}: {path_error}")
             return Path(str(path))
 
@@ -212,20 +214,14 @@ class FilePathManager:
             - Escapes XML special characters: & < > " '
             - Falls back to basic slash conversion if escaping fails
         """
-        try:
-            # Convert to forward slashes (Ableton expects this)
-            forward_path = str(path).replace('\\', '/')
-
-            # XML escape special characters
-            return (
-                forward_path.replace('&', '&amp;')
-                .replace('<', '&lt;')
-                .replace('>', '&gt;')
-                .replace('"', '&quot;')
-                .replace("'", '&apos;')
-            )
-        except Exception:
-            return str(path).replace('\\', '/')
+        forward_path = str(path).replace('\\', '/')
+        return (
+            forward_path.replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&apos;')
+        )
 
 
 class SequentialIDAllocator:
@@ -405,11 +401,6 @@ class TemplateIDExtractor:
         return template_ids
 
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO').upper(), logging.INFO),
-    format='[%(levelname)s] %(name)s: %(message)s',
-)
 logger = logging.getLogger(__name__)
 
 
@@ -491,7 +482,7 @@ class OptimizedMetadataExtractor:
                     # Cache the result
                     self._metadata_cache[path] = metadata
 
-                except Exception as e:
+                except (OSError, struct.error, KeyError) as e:
                     logger.error(f"Failed to extract metadata for {path}: {e}")
 
         return metadata_results
@@ -531,7 +522,7 @@ class OptimizedMetadataExtractor:
                 categories=categories,
             )
 
-        except Exception as e:
+        except (OSError, struct.error, RuntimeError) as e:
             logger.warning(f"Metadata extraction failed for {filepath.name}: {e}")
             # Return fallback metadata
             return FileMetadata(
@@ -577,7 +568,7 @@ class OptimizedMetadataExtractor:
                     'duration_seconds': duration,
                     'duration_beats': duration,
                 }
-        except Exception:
+        except (OSError, RuntimeError):
             return {
                 'samplerate': 44100,
                 'frames': 441000,
@@ -607,7 +598,7 @@ class OptimizedMetadataExtractor:
             if result and result.get('info', {}).get('ICMT'):
                 return result['info']['ICMT'].strip()
             return ""
-        except Exception:
+        except (OSError, struct.error):
             return ""
 
     def _get_categories_for_tags(self, icmt_tags: str) -> list[str]:
@@ -920,7 +911,7 @@ class OptimizedXMLGenerator:
                 samplerate=metadata.samplerate,
             )
 
-        except Exception as e:
+        except (ET.ParseError, KeyError, ValueError) as e:
             logger.error(f"Failed to create clip XML for {metadata.path}: {e}")
             return self.create_empty_slot_xml_optimized(slot_id)
 
@@ -1247,7 +1238,7 @@ class AbletonLiveSetGeneratorV3Optimized:
             self._template_cache = template_content
             return template_content
 
-        except Exception as e:
+        except (OSError, ET.ParseError) as e:
             raise RuntimeError(f"Failed to load template: {e}") from e
 
     def _validate_template_structure(self, root: ET.Element):
@@ -1399,7 +1390,7 @@ class AbletonLiveSetGeneratorV3Optimized:
                             f"Creating clips for {path.name}",
                         )
 
-                except Exception as e:
+                except (OSError, ET.ParseError, KeyError) as e:
                     logger.error(f"Failed to process {path}: {e}")
                     continue
 
@@ -1517,7 +1508,7 @@ class AbletonLiveSetGeneratorV3Optimized:
                     insert_index = list(tracks_container).index(return_tracks[0])
                     tracks_container.insert(
                         insert_index, new_track
-                    )  # ✅ Insert VOOR return tracks
+                    )  # Insert before return tracks
                 else:
                     tracks_container.append(
                         new_track
@@ -1581,7 +1572,7 @@ class AbletonLiveSetGeneratorV3Optimized:
 
             return new_track
 
-        except Exception as e:
+        except (ET.ParseError, KeyError, ValueError) as e:
             logger.error(f"Failed to create track for '{category}': {e}")
             return None
 
@@ -1795,7 +1786,7 @@ class AbletonLiveSetGeneratorV3Optimized:
             suffix = final_output_path.suffix
             parent = final_output_path.parent
 
-            while final_output_path.exists() and counter <= 999:
+            while final_output_path.exists() and counter <= MAX_FILE_COUNTER:
                 new_name = f"{stem}_{counter:03d}{suffix}"
                 final_output_path = parent / new_name
                 counter += 1
@@ -1873,13 +1864,13 @@ if __name__ == "__main__":
 
         # Show results
         if success:
-            print("✅ Optimized Live Set creation successful!")
+            logger.info("Optimized Live Set creation successful!")
             stats = generator.get_performance_stats()
-            print(f"📊 Performance: {end_time - start_time:.2f}s total")
-            print(f"⚡ Optimizations: {', '.join(stats['optimizations'])}")
+            logger.info(f"Performance: {end_time - start_time:.2f}s total")
+            logger.info(f"Optimizations: {', '.join(stats['optimizations'])}")
         else:
-            print("❌ Optimized Live Set creation failed!")
+            logger.error("Optimized Live Set creation failed!")
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Error: {e}")
         sys.exit(1)

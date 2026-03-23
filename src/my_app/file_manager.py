@@ -51,15 +51,6 @@ from typing import Any
 import app_config
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(
-        logging,
-        os.getenv("LOG_LEVEL", "DEBUG").upper(),
-        logging.INFO,
-    ),
-    format="[%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -231,7 +222,7 @@ class RecentDirectoriesManager:
             else:
                 self.recent_directories = []
                 logger.debug("No recent directories file found - starting fresh")
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Could not load recent directories: {e}")
             self.recent_directories = []
 
@@ -254,7 +245,7 @@ class RecentDirectoriesManager:
                 json.dump(self.recent_directories, f, indent=2, ensure_ascii=False)
             logger.debug(f"Saved {len(self.recent_directories)} recent directories")
             return True
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Could not save recent directories: {e}")
             return False
 
@@ -509,7 +500,7 @@ class DirectoryLoader:
                 f for f in os.listdir(directory) if f.lower().endswith((".wav", ".WAV"))
             ]
             return len(wav_files) > 0
-        except Exception as e:
+        except OSError as e:
             logger.warning(f"Error validating directory {directory}: {e}")
             return False
 
@@ -543,7 +534,7 @@ class DirectoryLoader:
                     full_path = os.path.join(current_dir, filename)
                     wav_files.append(full_path)
             return sorted(wav_files)
-        except Exception as e:
+        except OSError as e:
             logger.warning(f"Error getting WAV files from {current_dir}: {e}")
             return []
 
@@ -597,7 +588,7 @@ class DirectoryLoader:
                 if latest_time > 0:
                     info["last_modified"] = datetime.fromtimestamp(latest_time)
 
-            except Exception as e:
+            except OSError as e:
                 logger.warning(f"Error getting directory info for {current_dir}: {e}")
 
         return info
@@ -699,7 +690,7 @@ class FileImporter:
             try:
                 os.makedirs(target_dir)
                 logger.info(f"Created target directory: {target_dir}")
-            except Exception as e:
+            except OSError as e:
                 logger.error(f"Could not create target directory {target_dir}: {e}")
                 QMessageBox.critical(
                     self.main_window,
@@ -746,7 +737,7 @@ class FileImporter:
                 imported += 1
                 logger.debug(f"Successfully imported: {filename}")
 
-            except Exception as e:
+            except OSError as e:
                 error_msg = f"{os.path.basename(file_path)}: {str(e)}"
                 errors.append(error_msg)
                 logger.error(f"Import failed for {filename}: {e}")
