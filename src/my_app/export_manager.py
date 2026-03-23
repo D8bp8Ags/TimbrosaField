@@ -564,23 +564,21 @@ class CSVExporter:
             error_count (int): Number of files with processing errors
             total_count (int): Total number of files processed (unused)
         """
-        message = "Metadata export voltooid!\n\n"
-        message += f"📄 Bestand: {os.path.basename(filename)}\n"
-        message += f"✅ Succesvol verwerkt: {success_count} bestanden\n"
+        message = "Metadata export complete.\n\n"
+        message += f"File: {os.path.basename(filename)}\n"
+        message += f"Processed successfully: {success_count} files\n"
 
         if error_count > 0:
-            message += f"❌ Fouten: {error_count} bestanden\n"
-            message += "\nCheck de Status kolom in de CSV voor details."
+            message += f"Errors: {error_count} files\n"
+            message += "\nCheck the Status column in the CSV for details."
 
         # Choose appropriate message box type
         if error_count > 0 and success_count == 0:
-            QMessageBox.critical(self.main_window, "Export Gefaald", message)
+            QMessageBox.critical(self.main_window, "Export Failed", message)
         elif error_count > 0:
-            QMessageBox.warning(
-                self.main_window, "Export Voltooid met Waarschuwingen", message
-            )
+            QMessageBox.warning(self.main_window, "Export Complete with Warnings", message)
         else:
-            QMessageBox.information(self.main_window, "Export Voltooid", message)
+            QMessageBox.information(self.main_window, "Export Complete", message)
 
         # Update status bar
         if success_count > 0:
@@ -879,7 +877,7 @@ class AbletonExporter:
                 #     return False
             finally:
                 # self._set_export_button_state(True, "🎛️ Export to Ableton Live")
-                self.main_window.show_status_message("🎛️ Export to Ableton Live", 1000)
+                self.main_window.show_status_message("Exporting to Ableton Live...", 1000)
 
         except ImportError as e:
             logger.error(f"Ableton generator not available: {e}")
@@ -917,25 +915,25 @@ class AbletonExporter:
         clips_total = result.get("clips_total", 0)
         categories = result.get("categories", [])
 
-        message = "Ableton Live Set export voltooid! 🎛️\n\n"
-        message += f"📁 Project: {project_name}.als\n\n"
-        message += "📊 Statistieken:\n"
-        message += f"• Bestanden verwerkt: {files_processed}\n"
-        message += f"• Tracks aangemaakt: {tracks_created}\n"
-        message += f"• Clips geplaatst: {clips_total}\n"
+        message = "Ableton Live Set export complete.\n\n"
+        message += f"Project: {project_name}.als\n\n"
+        message += "Statistics:\n"
+        message += f"  Files processed: {files_processed}\n"
+        message += f"  Tracks created:  {tracks_created}\n"
+        message += f"  Clips placed:    {clips_total}\n"
 
         if categories:
-            message += f"• Categorieën: {', '.join(categories[:5])}"
+            message += f"  Categories: {', '.join(categories[:5])}"
             if len(categories) > 5:
-                message += f" (+{len(categories) - 5} meer)"
+                message += f" (+{len(categories) - 5} more)"
             message += "\n"
 
-        message += "\n💡 Tips:\n"
-        message += "• Clips bevatten tags in de naam en annotation\n"
-        message += "• Tracks zijn gegroepeerd per categorie\n"
-        message += "• Scenes zijn dynamisch aangepast"
+        message += "\nTips:\n"
+        message += "  - Clips contain tags in their name and annotation\n"
+        message += "  - Tracks are grouped by category\n"
+        message += "  - Scenes are dynamically adjusted"
 
-        QMessageBox.information(self.main_window, "Ableton Export Voltooid", message)
+        QMessageBox.information(self.main_window, "Ableton Export Complete", message)
         self.main_window.show_status_message(
             f"Ableton export: {tracks_created} tracks created", 3000
         )
