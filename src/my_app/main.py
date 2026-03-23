@@ -1238,34 +1238,5 @@ def main() -> None:
     sys.exit(app.exec_())
 
 
-def main_old() -> None:
-    """Initialize and run the Field Recorder Analyzer Qt application.
-
-    Creates the QApplication instance, sets up application metadata,
-    initializes the main window, and starts the Qt event loop.
-
-    Note:
-        This is the main entry point for the application. The function
-        will not return until the user closes the application.
-    """
-    logger.info("Starting Field Recorder Analyzer…")
-
-    app = QApplication(sys.argv)
-
-    app.setApplicationName(app_config.APP_NAME)
-    app.setApplicationVersion(app_config.APP_VERSION)
-    app.setOrganizationName(app_config.ORG_NAME)
-
-    # Apply application-wide styling if desired:
-    # ApplicationStylist.apply_complete_styling(app)
-    # ApplicationStylist.apply_dark_theme(app)
-    # ApplicationStylist.apply_macos_dark_theme(app)
-    main_window = MainWindow()
-    main_window.show()
-    logger.info("Field Recorder Analyzer started.")
-
-    sys.exit(app.exec_())
-
-
 if __name__ == "__main__":
     main()
