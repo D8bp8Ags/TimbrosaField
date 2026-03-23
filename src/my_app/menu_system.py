@@ -333,7 +333,7 @@ class FileMenuHandler(MenuHandlerBase):
         file_menu.addSeparator()
 
         # Import/Export submenu
-        import_export_menu = file_menu.addMenu("📥📤 &Import/Export")
+        import_export_menu = file_menu.addMenu("📦 &Import/Export")
 
         batch_import_action = QAction("Batch Import WAV Files...", self.main_window)
         self._apply_shortcut(batch_import_action, 'file_commands', 'batch_import_files')
