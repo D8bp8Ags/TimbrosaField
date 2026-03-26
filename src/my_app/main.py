@@ -899,7 +899,10 @@ class MainWindow(QMainWindow):
 
     def _update_plot_backgrounds(self):
         """Update plot backgrounds after theme change."""
-        bg_color = ApplicationStylist.COLORS.get('plot_background', 'w')
+        if self.current_theme == "native_macos":
+            bg_color = QApplication.instance().palette().color(QPalette.Window)
+        else:
+            bg_color = ApplicationStylist.COLORS.get('plot_background', 'w')
         for plot in [
             self.wav_viewer.waveform_plot,
             self.wav_viewer.waveform_plot_top,
