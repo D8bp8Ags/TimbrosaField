@@ -63,7 +63,6 @@ class WavSaveManager:
         Args:     parent: Parent widget for dialogs (usually WavViewer instance)
         """
         self.parent = parent
-        logger.debug("WavSaveManager initialized")
 
     def show_save_dialog_and_execute(
         self,
@@ -72,7 +71,7 @@ class WavSaveManager:
         new_tags: list[str] = None,
         existing_tags: str = "",
         user_config: dict[str, Any] = None,
-        gps_info: str = "",
+        gps_data: dict[str, float] | None = None,
     ) -> Optional["SaveResult"]:
         """Show save dialog and execute chosen save operation.
 
@@ -92,6 +91,13 @@ class WavSaveManager:
                 self._show_error("Invalid file", f"File does not exist: {filename}")
                 return None
 
+            if gps_data:
+                gps_info = f"Lat: {gps_data['latitude']}, Lon: {gps_data['longitude']}, Alt: {gps_data.get('altitude', 0.0)}"
+            elif gps_data is not None:  # {} → removal
+                gps_info = "GPS location will be removed"
+            else:
+                gps_info = ""
+
             if not metadata and not gps_info:
                 self._show_error("No metadata", "No metadata to save")
                 return None
@@ -103,6 +109,7 @@ class WavSaveManager:
             has_metadata_changes = self._check_metadata_changes(filename, metadata)
 
             if not new_tags_string and not has_metadata_changes and not gps_info:
+                logger.debug("Nothing to save: no tag changes, no metadata changes, no GPS changes")
                 self._show_info(
                     "Nothing to Save",
                     "No new tags entered and no metadata changes detected.",
@@ -148,6 +155,7 @@ class WavSaveManager:
                 metadata=metadata,
                 custom_name=custom_name,
                 user_config=user_config,
+                gps_data=gps_data,
             )
 
             # Show result to user
@@ -235,6 +243,7 @@ class WavSaveManager:
         metadata: dict[str, str],
         custom_name: str,
         user_config: dict[str, Any],
+        gps_data: dict[str, float] | None = None,
     ) -> Optional["SaveResult"]:
         """Execute the chosen save strategy.
 
@@ -254,14 +263,14 @@ class WavSaveManager:
             # Create strategy mapping
             strategies = {
                 1: lambda: WavSaveStrategies.save_as_edit_copy(
-                    filename, metadata, output_dir
+                    filename, metadata, gps_data, output_dir
                 ),
                 2: lambda: WavSaveStrategies.save_in_place(
-                    filename, metadata, self._confirm_overwrite
+                    filename, metadata, gps_data, self._confirm_overwrite
                 ),
-                3: lambda: WavSaveStrategies.save_with_backup(filename, metadata),
+                3: lambda: WavSaveStrategies.save_with_backup(filename, metadata, gps_data),
                 4: lambda: WavSaveStrategies.save_with_custom_name(
-                    filename, metadata, custom_name, output_dir
+                    filename, metadata, custom_name, output_dir, gps_data
                 ),
             }
 
@@ -362,7 +371,6 @@ class WavSaveOptionsDialog(QDialog):
         self.setFixedSize(520, 380)
 
         self._setup_ui()
-        logger.debug("WavSaveOptionsDialog initialized")
 
     def _setup_ui(self) -> None:
         """Setup the dialog user interface."""

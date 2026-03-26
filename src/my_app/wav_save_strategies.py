@@ -8,7 +8,7 @@ import struct
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from wav_analyzer import inject_info_chunk
+from wav_analyzer import inject_info_chunk, inject_ixml_chunk, remove_ixml_chunk
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,8 @@ class WavSaveStrategies:
 
     @staticmethod
     def save_as_edit_copy(
-        source_path: str, metadata: dict[str, str], output_dir: str | None = None
+        source_path: str, metadata: dict[str, str], gps_data: dict[str, float] | None = None,
+        output_dir: str | None = None,
     ) -> SaveResult:
         """Save as copy with _edit suffix.
 
@@ -90,6 +91,7 @@ class WavSaveStrategies:
             WavSaveStrategies._inject_metadata_to_file(
                 source_path, final_output_path, metadata
             )
+            WavSaveStrategies._handle_gps(final_output_path, final_output_path, gps_data)
 
             logger.info(f"Saved as edit copy: {os.path.basename(final_output_path)}")
 
@@ -107,6 +109,7 @@ class WavSaveStrategies:
     def save_in_place(
         source_path: str,
         metadata: dict[str, str],
+        gps_data: dict[str, float] | None = None,
         confirm_callback: Callable[[], bool] | None = None,
     ) -> SaveResult:
         """Save in place (overwrite original file).
@@ -138,6 +141,7 @@ class WavSaveStrategies:
                 WavSaveStrategies._inject_metadata_to_file(
                     source_path, temp_path, metadata
                 )
+                WavSaveStrategies._handle_gps(temp_path, temp_path, gps_data)
 
                 # Atomically replace original
                 os.replace(temp_path, source_path)
@@ -162,7 +166,9 @@ class WavSaveStrategies:
             )
 
     @staticmethod
-    def save_with_backup(source_path: str, metadata: dict[str, str]) -> SaveResult:
+    def save_with_backup(
+        source_path: str, metadata: dict[str, str], gps_data: dict[str, float] | None = None,
+    ) -> SaveResult:
         """Create .bak backup then replace original.
 
         Creates a backup copy with .bak extension, then overwrites original. Provides
@@ -188,6 +194,7 @@ class WavSaveStrategies:
                 WavSaveStrategies._inject_metadata_to_file(
                     source_path, temp_path, metadata
                 )
+                WavSaveStrategies._handle_gps(temp_path, temp_path, gps_data)
 
                 # Replace original
                 os.replace(temp_path, source_path)
@@ -221,6 +228,7 @@ class WavSaveStrategies:
         metadata: dict[str, str],
         custom_name: str,
         output_dir: str | None = None,
+        gps_data: dict[str, float] | None = None,
     ) -> SaveResult:
         """Save with user-specified filename.
 
@@ -260,6 +268,7 @@ class WavSaveStrategies:
             WavSaveStrategies._inject_metadata_to_file(
                 source_path, output_path, metadata
             )
+            WavSaveStrategies._handle_gps(output_path, output_path, gps_data)
 
             logger.info(f"Saved with custom name: {os.path.basename(output_path)}")
 
@@ -398,6 +407,53 @@ class WavSaveStrategies:
             raise SaveError("wav_analyzer module not available") from None
         except (OSError, struct.error) as e:
             raise SaveError(f"Failed to inject metadata: {e}") from e
+
+    @staticmethod
+    def _inject_gps_to_file(
+        source_path: str, target_path: str, gps_data: dict[str, float]
+    ) -> None:
+        """Inject GPS data into WAV file as iXML chunk.
+
+        Args:     source_path: Source WAV file     target_path: Target WAV file
+        gps_data: GPS data to inject
+
+        Raises:     SaveError: If injection fails
+        """
+        try:
+            inject_ixml_chunk(source_path, target_path, gps_data)
+        except (OSError, struct.error, ValueError) as e:
+            raise SaveError(f"Failed to inject GPS data: {e}") from e
+
+    @staticmethod
+    def _remove_gps_from_file(source_path: str, target_path: str) -> None:
+        """Remove iXML chunk (GPS data) from WAV file.
+
+        Args:     source_path: Source WAV file     target_path: Target WAV file
+
+        Raises:     SaveError: If removal fails
+        """
+        try:
+            remove_ixml_chunk(source_path, target_path)
+        except (OSError, struct.error, ValueError) as e:
+            raise SaveError(f"Failed to remove GPS data: {e}") from e
+
+    @staticmethod
+    def _handle_gps(source_path: str, target_path: str, gps_data: dict[str, float] | None) -> None:
+        """Inject or remove GPS data based on gps_data value.
+
+        Args:
+            gps_data: non-empty dict → inject GPS; empty dict {} → remove GPS; None → no-op
+        """
+        if gps_data:
+            logger.debug("GPS inject: lat=%s, lon=%s, alt=%s → %s",
+                         gps_data.get("latitude"), gps_data.get("longitude"),
+                         gps_data.get("altitude"), os.path.basename(target_path))
+            WavSaveStrategies._inject_gps_to_file(source_path, target_path, gps_data)
+        elif gps_data is not None:  # {} → remove
+            logger.debug("GPS remove: stripping iXML from %s", os.path.basename(target_path))
+            WavSaveStrategies._remove_gps_from_file(source_path, target_path)
+        else:
+            logger.debug("GPS no-op: gps_data is None, iXML chunk unchanged")
 
 
 # === CONVENIENCE FUNCTIONS FOR BACKWARDS COMPATIBILITY ===

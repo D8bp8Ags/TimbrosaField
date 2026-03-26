@@ -23,7 +23,7 @@ import soundfile as sf
 import app_config
 from audio_player import AudioPlayer
 from PyQt5 import QtCore
-from PyQt5.QtCore import QEvent, Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QEvent, QModelIndex, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QMouseEvent
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
@@ -48,7 +48,7 @@ from PyQt5.QtWidgets import (
 from tag_completer import FileTagAutocomplete
 from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
-from wav_analyzer import inject_ixml_chunk, wav_analyze
+from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
 
 
@@ -634,10 +634,7 @@ class WavViewer(QWidget):
         # GPS table (always 3 editable rows)
         self.gps_label = QLabel("GPS Location:")
         self.gps_table = self._create_metadata_table(["Key", "Value"])
-        self.gps_table.setFixedHeight(90)
-        self.gps_table.setEditTriggers(
-            QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked
-        )
+        # self.gps_table.setFixedHeight(90)
 
 
         # Cue points table
@@ -693,7 +690,8 @@ class WavViewer(QWidget):
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         # table.setMaximumHeight(150)
         # table.setFixedHeight(200)
-        table.setMinimumHeight(175)
+        # table.setMinimumHeight(175)
+        table.setMinimumHeight(145)
         # table.setMaximumWidth(50)
         return table
 
@@ -2274,8 +2272,7 @@ class WavViewer(QWidget):
         # self._populate_two_column_table_with_defaults_test(
         # self.info_table, analysis_result.get("info", {}))
         self._populate_info_table(analysis_result.get("info", {}))
-        self._loaded_gps = analysis_result.get("gps")
-        self._populate_gps_table(self._loaded_gps)
+        self._populate_gps_table(analysis_result.get("gps", None))
         self._populate_cue_table(analysis_result.get("cue_points", []))
 
         # Resize tables to fit content
@@ -2317,17 +2314,11 @@ class WavViewer(QWidget):
 
         Args:     gps_data: Dict with 'latitude', 'longitude', 'altitude', or None.
         """
-        rows = [
-            ("Latitude", str(gps_data["latitude"]) if gps_data else ""),
-            ("Longitude", str(gps_data["longitude"]) if gps_data else ""),
-            ("Altitude", str(gps_data.get("altitude", "")) if gps_data else ""),
-        ]
-        for i, (key, value) in enumerate(rows):
-            self.gps_table.insertRow(i)
-            key_item = QTableWidgetItem(key)
-            key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
-            self.gps_table.setItem(i, 0, key_item)
-            self.gps_table.setItem(i, 1, QTableWidgetItem(value))
+        self._populate_two_column_table_editable(self.gps_table, {
+            "Latitude": str(gps_data["latitude"]) if gps_data else "",
+            "Longitude": str(gps_data["longitude"]) if gps_data else "",
+            "Altitude": str(gps_data.get("altitude", "")) if gps_data else "",
+        })
 
     def _populate_two_column_table(
         self, table: QTableWidget, data: dict[str, Any]
@@ -2352,6 +2343,31 @@ class WavViewer(QWidget):
             table.setItem(i, 1, value_item)
 
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+    def _populate_two_column_table_editable(
+        self, table: QTableWidget, data: dict[str, Any]
+    ) -> None:
+        """Populate a two-column table with editable value cells.
+
+        Args:
+            table: Table widget to populate.
+            data: Dictionary of key-value pairs.
+        """
+        for i, (key, value) in enumerate((data or {}).items()):
+            table.insertRow(i)
+
+            key_item = QTableWidgetItem(str(key))
+            key_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
+            table.setItem(i, 0, key_item)
+
+            value_item = QTableWidgetItem(str(value))
+            value_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            table.setItem(i, 1, value_item)
+
+        table.setEditTriggers(
+            QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked
+        )
 
     #####
     def _populate_two_column_table_with_defaults_test(
@@ -2454,10 +2470,13 @@ class WavViewer(QWidget):
 
         return info_data
 
-    def _get_gps_from_gps_table(self) -> dict[str, float] | None:
+    def _get_gps_from_gps_table(self) -> dict[str, float] | None | bool:
         """Read and validate GPS values from the GPS table.
 
-        Returns None silently if fields are empty, or shows a warning if invalid.
+        Returns:
+            dict  — valid GPS data
+            None  — all GPS fields empty (no GPS to save, continue normally)
+            False — validation failed, warning already shown (caller should abort)
         """
         def cell(row: int) -> str:
             item = self.gps_table.item(row, 1)
@@ -2466,11 +2485,13 @@ class WavViewer(QWidget):
         lat_str, lon_str, alt_str = cell(0), cell(1), cell(2)
 
         if not lat_str and not lon_str:
+            logger.debug("GPS fields empty — no GPS to save")
             return None  # Empty — nothing to save, no warning needed
 
         if not lat_str or not lon_str:
+            logger.debug("GPS validation failed: only one of lat/lon filled (lat=%r, lon=%r)", lat_str, lon_str)
             QMessageBox.warning(self, "Missing GPS", "Both Latitude and Longitude are required.")
-            return None
+            return False
 
         try:
             gps_data = {
@@ -2478,17 +2499,22 @@ class WavViewer(QWidget):
                 "longitude": float(lon_str),
                 "altitude": float(alt_str) if alt_str else 0.0,
             }
+
         except ValueError:
+            logger.debug("GPS validation failed: non-numeric value (lat=%r, lon=%r, alt=%r)", lat_str, lon_str, alt_str)
             QMessageBox.warning(self, "Invalid GPS", "Latitude, Longitude and Altitude must be numbers.")
-            return None
+            return False
 
         if not (-90 <= gps_data["latitude"] <= 90):
+            logger.debug("GPS validation failed: latitude %s out of range", gps_data["latitude"])
             QMessageBox.warning(self, "Invalid GPS", "Latitude must be between -90 and 90.")
-            return None
+            return False
         if not (-180 <= gps_data["longitude"] <= 180):
+            logger.debug("GPS validation failed: longitude %s out of range", gps_data["longitude"])
             QMessageBox.warning(self, "Invalid GPS", "Longitude must be between -180 and 180.")
-            return None
+            return False
 
+        logger.debug("GPS parsed: lat=%s, lon=%s, alt=%s", gps_data["latitude"], gps_data["longitude"], gps_data["altitude"])
         return gps_data
 
     def save_info_from_info_table_to_file(self) -> None:
@@ -2500,18 +2526,26 @@ class WavViewer(QWidget):
         metadata = self.get_info_from_info_table()
         new_tags = getattr(self.tagger_widget, "get_current_tags", lambda: [])()
         existing_tags = metadata.get("ICMT", "")
+        logger.debug("Save triggered: %d metadata fields, %d new tags", len(metadata), len(new_tags))
+
         gps_data = self._get_gps_from_gps_table()
+
+        if gps_data is False:  # validation failed, warning already shown
+            return
+
+        if gps_data is None:
+            # Check if file currently has GPS — if so, user intentionally cleared it
+            try:
+                if wav_analyze(self.filename).get("gps"):
+                    logger.debug("GPS fields cleared — will remove GPS from file")
+                    gps_data = {}  # signal: remove GPS from file
+            except Exception:
+                pass
 
         if gps_data is None and not metadata and not new_tags:
             return
 
         manager = WavSaveManager(parent=self)
-        loaded_gps = getattr(self, "_loaded_gps", None)
-        gps_changed = gps_data is not None and gps_data != loaded_gps
-        gps_info = (
-            f"Lat: {gps_data['latitude']}, Lon: {gps_data['longitude']}, Alt: {gps_data.get('altitude', 0.0)}"
-            if gps_changed else ""
-        )
 
         result = manager.show_save_dialog_and_execute(
             filename=self.filename,
@@ -2519,19 +2553,10 @@ class WavViewer(QWidget):
             new_tags=new_tags,
             existing_tags=existing_tags,
             user_config=self.user_config,
-            gps_info=gps_info,
+            gps_data=gps_data,
         )
 
         if result:
-            if gps_changed:
-                try:
-                    inject_ixml_chunk(result.output_path, result.output_path, gps_data)
-                except Exception as e:
-                    QMessageBox.warning(
-                        self, "GPS Save Failed",
-                        f"Metadata saved but GPS could not be written:\n{e}"
-                    )
-
             self.load_wav_files(select_path=result.output_path)
             if hasattr(self, "tagger_widget"):
                 self.tagger_widget.clear_tags()
@@ -3910,6 +3935,7 @@ def main() -> None:
     # Create standalone WavViewer
     viewer = WavViewer()
     viewer.setGeometry(100, 100, 1200, 800)  # x, y, width, height
+    #viewer.setGeometry(100, 100, 200, 400)  # x, y, width, height
 
     viewer.setWindowTitle("WavViewer Standalone Test")
     viewer.show()

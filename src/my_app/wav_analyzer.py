@@ -114,6 +114,9 @@ def inject_info_chunk(
         }
         inject_info_chunk('input.wav', 'tagged.wav', metadata)
     """
+    logger.debug("inject_info_chunk: %s → %s (%d fields)",
+                 os.path.basename(wav_path), os.path.basename(output_path), len(metadata))
+
     with open(wav_path, "rb") as f:
         wav_data = f.read()
 
@@ -133,6 +136,8 @@ def inject_info_chunk(
 
     with open(output_path, "wb") as f:
         f.write(new_data)
+
+    logger.debug("inject_info_chunk: done (%d bytes written)", len(new_data))
 
 
 def build_ixml_chunk(gps_data: dict[str, float]) -> bytes:
@@ -195,6 +200,10 @@ def inject_ixml_chunk(
         inject_ixml_chunk('input.wav', 'tagged.wav',
                           {'latitude': 52.37, 'longitude': 4.90, 'altitude': 5.0})
     """
+    logger.debug("inject_ixml_chunk: %s → %s (lat=%s, lon=%s, alt=%s)",
+                 os.path.basename(wav_path), os.path.basename(output_path),
+                 gps_data.get("latitude"), gps_data.get("longitude"), gps_data.get("altitude"))
+
     with open(wav_path, "rb") as f:
         wav_data = f.read()
 
@@ -224,6 +233,47 @@ def inject_ixml_chunk(
 
     with open(output_path, "wb") as f:
         f.write(new_data)
+
+    logger.debug("inject_ixml_chunk: done (%d bytes written)", len(new_data))
+
+
+def remove_ixml_chunk(wav_path: str, output_path: str) -> None:
+    """Remove the iXML chunk from a WAV file.
+
+    Rewrites the file without any iXML chunk. Has no effect if no iXML chunk exists.
+
+    Args:
+        wav_path: Path to input WAV file.
+        output_path: Path for output WAV file without iXML chunk.
+
+    Raises:
+        ValueError: If input file is not a valid WAVE file.
+    """
+    logger.debug("remove_ixml_chunk: %s → %s", os.path.basename(wav_path), os.path.basename(output_path))
+
+    with open(wav_path, "rb") as f:
+        wav_data = f.read()
+
+    if not wav_data.startswith(b"RIFF") or b"WAVE" not in wav_data[:20]:
+        raise ValueError("Input file is not a valid WAVE file")
+
+    pos = 12
+    chunks_data = b""
+    while pos + 8 <= len(wav_data):
+        chunk_id = wav_data[pos : pos + 4]
+        chunk_size = struct.unpack("<I", wav_data[pos + 4 : pos + 8])[0]
+        on_disk_size = chunk_size + (chunk_size % 2)
+        if chunk_id != b"iXML":
+            chunks_data += wav_data[pos : pos + 8 + on_disk_size]
+        pos += 8 + on_disk_size
+
+    new_riff_size = 4 + len(chunks_data)
+    new_data = b"RIFF" + struct.pack("<I", new_riff_size) + b"WAVE" + chunks_data
+
+    with open(output_path, "wb") as f:
+        f.write(new_data)
+
+    logger.debug("remove_ixml_chunk: done (%d bytes written)", len(new_data))
 
 
 def read_chunks(file) -> list[tuple[str, int, bytes]]:
