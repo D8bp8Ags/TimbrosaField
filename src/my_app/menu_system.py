@@ -843,11 +843,22 @@ class ViewMenuHandler(MenuHandlerBase):
         )
         theme_menu.addAction(macos_action)
 
+        theme_menu.addSeparator()
+
+        native_action = QAction(" &Native macOS", self.main_window)
+        native_action.setObjectName("native_macos_theme")
+        native_action.setCheckable(True)
+        native_action.triggered.connect(
+            lambda: self._execute_view_command("apply_native_macos_theme")
+        )
+        theme_menu.addAction(native_action)
+
         # Group voor mutual exclusivity
         self.theme_group = QActionGroup(self.main_window)
         self.theme_group.addAction(light_action)
         self.theme_group.addAction(dark_action)
         self.theme_group.addAction(macos_action)
+        self.theme_group.addAction(native_action)
 
     def _execute_view_command(self, command_name, *args):
         """Execute view command via command interface with error handling."""

@@ -27,7 +27,7 @@ from file_manager import FileManagerInterface
 from global_manager import GlobalShortcutManager
 from menu_system import MenuBarManager
 from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QPalette
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -220,6 +220,7 @@ class MainWindow(QMainWindow):
             "apply_light_theme": self._apply_light_theme,
             "apply_dark_theme": self._apply_dark_theme,
             "apply_macos_dark_theme": self._apply_macos_dark_theme,
+            "apply_native_macos_theme": self._apply_native_macos_theme,
         }
 
         # Audio commands
@@ -885,6 +886,16 @@ class MainWindow(QMainWindow):
         self.current_theme = "macos_dark"
         self._update_plot_backgrounds()
         self.ui_manager.show_message("🍎 macOS dark theme applied", 2000)
+
+    def _apply_native_macos_theme(self):
+        """Remove custom stylesheet and let macOS control appearance natively."""
+        app = QApplication.instance()
+        app.setStyle("macos")
+        app.setStyleSheet("")
+        app.setPalette(app.style().standardPalette())
+        self.current_theme = "native_macos"
+        self._update_plot_backgrounds()
+        self.ui_manager.show_message("macOS native theme applied", 2000)
 
     def _update_plot_backgrounds(self):
         """Update plot backgrounds after theme change."""

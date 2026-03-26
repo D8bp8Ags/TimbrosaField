@@ -411,6 +411,8 @@ class SettingsManager:
             main_window.view_commands["apply_dark_theme"]()
         elif saved_theme == "macos_dark":
             main_window.view_commands["apply_macos_dark_theme"]()
+        elif saved_theme == "native_macos":
+            main_window.view_commands["apply_native_macos_theme"]()
         else:
             main_window.view_commands["apply_light_theme"]()
 
