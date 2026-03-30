@@ -741,11 +741,17 @@ class PhotoGpsMatcher(QDialog):
                 self._table.setItem(row, col, QTableWidgetItem(text))
 
     def _apply_gps(self) -> None:
-        tasks = [
-            {"wav_path": m["path"], "gps_data": m["gps"]}
-            for m in self._matches
-            if m["gps"]
-        ]
+        tasks = []
+        for m in self._matches:
+            if not m["gps"]:
+                continue
+            gps_data = dict(m["gps"])
+            photo_path = m.get("photo_path")
+            if photo_path and os.path.exists(photo_path):
+                gps_data["photo_ref"] = os.path.relpath(
+                    photo_path, os.path.dirname(m["path"])
+                )
+            tasks.append({"wav_path": m["path"], "gps_data": gps_data})
         if not tasks:
             QMessageBox.information(self, "Geen matches", "Geen WAV-bestanden met GPS-match gevonden.")
             return
