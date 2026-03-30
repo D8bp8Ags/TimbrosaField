@@ -22,7 +22,6 @@ import urllib.request
 from datetime import datetime, timedelta
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -694,7 +693,7 @@ class PhotoGpsMatcher(QDialog):
         # --- Photo thumbnail ---
         photo_path = m.get("photo_path")
         if photo_path and os.path.exists(photo_path):
-            pixmap = self._load_pixmap(photo_path, 300)
+            pixmap = load_photo_pixmap(photo_path, 300)
             if pixmap:
                 self._preview_image.setPixmap(pixmap)
             else:
@@ -751,9 +750,6 @@ class PhotoGpsMatcher(QDialog):
                     )
                 )
                 self._geocode_worker.start()
-
-    def _load_pixmap(self, path: str, max_size: int) -> QPixmap | None:
-        return load_photo_pixmap(path, max_size)
 
     def _start_scan(self) -> None:
         self._table.setRowCount(0)

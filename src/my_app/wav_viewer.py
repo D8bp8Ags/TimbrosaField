@@ -46,10 +46,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-
-from ui_components import load_photo_pixmap
+from ui_components import load_photo_pixmap, ApplicationStylist
 from tag_completer import FileTagAutocomplete
-from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
