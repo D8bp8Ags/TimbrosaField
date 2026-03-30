@@ -140,26 +140,32 @@ def inject_info_chunk(
     logger.debug("inject_info_chunk: done (%d bytes written)", len(new_data))
 
 
-def build_ixml_chunk(gps_data: dict[str, float]) -> bytes:
-    """Build an iXML chunk containing GPS location data.
+def build_ixml_chunk(gps_data: dict) -> bytes:
+    """Build an iXML chunk containing GPS location data and optional photo reference.
 
     Constructs a properly formatted iXML chunk with GPS coordinates stored
     under LOCATION/GPS_LATITUDE, GPS_LONGITUDE, GPS_ALTITUDE as per the
-    iXML specification (AES57).
+    iXML specification (AES57), and an optional PHOTO_REF element pointing
+    to the reference photo used for GPS extraction.
 
     Args:
-        gps_data: Dictionary with 'latitude', 'longitude', and optionally
-                  'altitude' (all as floats).
+        gps_data: Dictionary with 'latitude', 'longitude', optionally
+                  'altitude' (floats), and optionally 'photo_ref' (str).
 
     Returns:
         Complete iXML chunk as bytes, ready for file injection.
 
     Usage:
-        chunk = build_ixml_chunk({'latitude': 52.37, 'longitude': 4.90, 'altitude': 5.0})
+        chunk = build_ixml_chunk({'latitude': 52.37, 'longitude': 4.90,
+                                  'altitude': 5.0, 'photo_ref': '../Photos/IMG_001.jpg'})
     """
     lat = gps_data["latitude"]
     lon = gps_data["longitude"]
     alt = gps_data.get("altitude", 0.0)
+    photo_ref = gps_data.get("photo_ref")
+
+    alt_line = f"    <GPS_ALTITUDE>{alt}</GPS_ALTITUDE>\n" if alt is not None else ""
+    photo_line = f"    <PHOTO_REF>{photo_ref}</PHOTO_REF>\n" if photo_ref else ""
 
     xml_content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -168,7 +174,8 @@ def build_ixml_chunk(gps_data: dict[str, float]) -> bytes:
         "  <LOCATION>\n"
         f"    <GPS_LATITUDE>{lat}</GPS_LATITUDE>\n"
         f"    <GPS_LONGITUDE>{lon}</GPS_LONGITUDE>\n"
-        f"    <GPS_ALTITUDE>{alt}</GPS_ALTITUDE>\n"
+        f"{alt_line}"
+        f"{photo_line}"
         "  </LOCATION>\n"
         "</BWFXML>\n"
     )
@@ -612,16 +619,20 @@ def parse_gps_from_ixml(xml_string: str) -> dict[str, float] | None:
     lat = location.findtext("GPS_LATITUDE")
     lon = location.findtext("GPS_LONGITUDE")
     alt = location.findtext("GPS_ALTITUDE")
+    photo_ref = location.findtext("PHOTO_REF")
 
     if lat is None or lon is None:
         return None
 
     try:
-        return {
+        result = {
             "latitude": float(lat),
             "longitude": float(lon),
-            "altitude": float(alt) if alt is not None else 0.0,
+            "altitude": float(alt) if alt is not None else None,
         }
+        if photo_ref:
+            result["photo_ref"] = photo_ref
+        return result
     except ValueError as e:
         logger.debug("Could not parse GPS values from iXML: %s", e)
         return None
