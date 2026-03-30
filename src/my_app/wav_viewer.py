@@ -45,6 +45,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from photo_gps_matcher import load_photo_pixmap
 from tag_completer import FileTagAutocomplete
 from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
@@ -656,6 +657,15 @@ class WavViewer(QWidget):
 
         self.central_top_layout.addWidget(self.gps_label)
         self.central_top_layout.addWidget(self.gps_table)
+
+        # Photo preview (shown when WAV has a PHOTO_REF in iXML)
+        self.photo_preview_label = QLabel("📷 Foto:")
+        self.photo_preview_label.setVisible(False)
+        self.photo_preview_image = QLabel()
+        self.photo_preview_image.setAlignment(Qt.AlignLeft)
+        self.photo_preview_image.setVisible(False)
+        self.central_top_layout.addWidget(self.photo_preview_label)
+        self.central_top_layout.addWidget(self.photo_preview_image)
 
         self.right_layout.addWidget(self.cue_label)
         self.right_layout.addWidget(self.cue_table)
@@ -2283,6 +2293,8 @@ class WavViewer(QWidget):
         """Clear all metadata tables."""
         for table in [self.fmt_table, self.bext_table, self.info_table, self.gps_table, self.cue_table]:
             table.setRowCount(0)
+        self.photo_preview_label.setVisible(False)
+        self.photo_preview_image.setVisible(False)
 
     def _populate_fmt_table(self, fmt_data: dict[str, Any]) -> None:
         """Populate FMT chunk information table.
@@ -2306,7 +2318,7 @@ class WavViewer(QWidget):
         self._populate_two_column_table_with_defaults_test(self.info_table, info_data)
         # self._populate_two_column_table(self.info_table, info_data)
 
-    def _populate_gps_table(self, gps_data: dict[str, float] | None) -> None:
+    def _populate_gps_table(self, gps_data: dict | None) -> None:
         """Populate GPS location table from iXML GPS data.
 
         Always shows 3 rows (Latitude, Longitude, Altitude) so the user can
@@ -2319,6 +2331,21 @@ class WavViewer(QWidget):
             "Longitude": str(gps_data["longitude"]) if gps_data else "",
             "Altitude": str(gps_data.get("altitude", "")) if gps_data else "",
         })
+
+        # Photo preview
+        photo_ref = gps_data.get("photo_ref") if gps_data else None
+        if photo_ref and self.filename:
+            abs_path = os.path.normpath(
+                os.path.join(os.path.dirname(self.filename), photo_ref)
+            )
+            pixmap = load_photo_pixmap(abs_path, 220) if os.path.exists(abs_path) else None
+            if pixmap:
+                self.photo_preview_image.setPixmap(pixmap)
+                self.photo_preview_label.setVisible(True)
+                self.photo_preview_image.setVisible(True)
+                return
+        self.photo_preview_label.setVisible(False)
+        self.photo_preview_image.setVisible(False)
 
     def _populate_two_column_table(
         self, table: QTableWidget, data: dict[str, Any]
