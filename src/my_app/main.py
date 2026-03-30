@@ -1112,7 +1112,10 @@ class MainWindow(QMainWindow):
                              Result depends on dialog implementation (typically QDialog.Accepted/Rejected).
         """
         try:
+            from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
+            QApplication.processEvents()  # allow spinner to render before blocking analysis
             self.cuepoints_manager.analyze_cue_points()
+            self.ui_manager.hide_progress()  # stop spinner before dialog opens
             return self.cuepoints_manager.exec_()
         except Exception as exc:  # noqa: BLE001
             self.show_status_message(f"Cue analysis error: {exc}", 3000)

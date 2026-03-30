@@ -406,6 +406,10 @@ class AnalyticsDashboard(QDialog):
             stats: Accumulated statistics dict from the worker.
         """
         self._loading_label.setVisible(False)
+        # Stop the status bar spinner now that analysis is done, not when dialog closes
+        main_window = self.parent()
+        if main_window and hasattr(main_window, "ui_manager"):
+            main_window.ui_manager.hide_progress()
         self._finalize_analysis(stats)
 
     def analyze_files(self):
