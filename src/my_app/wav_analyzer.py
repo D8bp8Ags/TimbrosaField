@@ -163,9 +163,14 @@ def build_ixml_chunk(gps_data: dict) -> bytes:
     lon = gps_data["longitude"]
     alt = gps_data.get("altitude", 0.0)
     photo_ref = gps_data.get("photo_ref")
+    location_name = gps_data.get("location_name")
+
+    def _xe(s: str) -> str:
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     alt_line = f"    <GPS_ALTITUDE>{alt}</GPS_ALTITUDE>\n" if alt is not None else ""
-    photo_line = f"    <PHOTO_REF>{photo_ref}</PHOTO_REF>\n" if photo_ref else ""
+    photo_line = f"    <PHOTO_REF>{_xe(photo_ref)}</PHOTO_REF>\n" if photo_ref else ""
+    location_line = f"    <LOCATION_NAME>{_xe(location_name)}</LOCATION_NAME>\n" if location_name else ""
 
     xml_content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -176,13 +181,15 @@ def build_ixml_chunk(gps_data: dict) -> bytes:
         f"    <GPS_LONGITUDE>{lon}</GPS_LONGITUDE>\n"
         f"{alt_line}"
         f"{photo_line}"
+        f"{location_line}"
         "  </LOCATION>\n"
         "</BWFXML>\n"
     )
 
     xml_bytes = xml_content.encode("utf-8")
     xml_padded = pad_to_even(xml_bytes)
-    return b"iXML" + struct.pack("<I", len(xml_padded)) + xml_padded
+    # Chunk size must reflect the actual data length, not the padded length (WAV spec)
+    return b"iXML" + struct.pack("<I", len(xml_bytes)) + xml_padded
 
 
 def inject_ixml_chunk(
@@ -607,9 +614,9 @@ def parse_gps_from_ixml(xml_string: str) -> dict[str, float] | None:
         return None
 
     try:
-        root = ET.fromstring(xml_string.strip())
+        root = ET.fromstring(xml_string.strip().rstrip("\x00"))
     except ET.ParseError as e:
-        logger.debug("iXML is not valid XML, skipping GPS parse: %s", e)
+        logger.debug("iXML is not valid XML, skipping GPS parse: %s\n--- iXML content ---\n%s\n---", e, xml_string[:500])
         return None
 
     location = root.find(".//LOCATION")
@@ -620,6 +627,7 @@ def parse_gps_from_ixml(xml_string: str) -> dict[str, float] | None:
     lon = location.findtext("GPS_LONGITUDE")
     alt = location.findtext("GPS_ALTITUDE")
     photo_ref = location.findtext("PHOTO_REF")
+    location_name = location.findtext("LOCATION_NAME")
 
     if lat is None or lon is None:
         return None
@@ -632,6 +640,8 @@ def parse_gps_from_ixml(xml_string: str) -> dict[str, float] | None:
         }
         if photo_ref:
             result["photo_ref"] = photo_ref
+        if location_name:
+            result["location_name"] = location_name
         return result
     except ValueError as e:
         logger.debug("Could not parse GPS values from iXML: %s", e)

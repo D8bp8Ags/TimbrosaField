@@ -41,7 +41,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from wav_analyzer import inject_ixml_chunk, wav_analyze
+from wav_analyzer import inject_ixml_chunk, remove_ixml_chunk, wav_analyze
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ _COL_PHOTO = 2
 _COL_PHOTO_TIME = 3
 _COL_DIFF = 4
 _COL_GPS = 5
+_COL_IXML = 6
 
 # Photo file extensions to scan
 _PHOTO_EXTENSIONS = (".jpg", ".jpeg", ".heic", ".png", ".tif", ".tiff")
@@ -208,11 +209,17 @@ def _propagate_gps(matches: list, max_gap_hours: float) -> list:
             result.append({**m, "propagated": False, "propagated_from": None})
             continue
 
-        nearest = min(
-            (s for s in matched if abs(m["datetime"] - s["datetime"]) <= max_gap),
-            key=lambda s: abs(m["datetime"] - s["datetime"]),
-            default=None,
-        )
+        # Prefer the most recent matched WAV *before* this one (photographer arrived
+        # at a location and all subsequent files inherit that GPS).  Only fall back to
+        # a future match when no earlier one exists within the max gap.
+        before = [s for s in matched if s["datetime"] <= m["datetime"]
+                  and (m["datetime"] - s["datetime"]) <= max_gap]
+        if before:
+            nearest = max(before, key=lambda s: s["datetime"])
+        else:
+            after = [s for s in matched if s["datetime"] > m["datetime"]
+                     and (s["datetime"] - m["datetime"]) <= max_gap]
+            nearest = min(after, key=lambda s: s["datetime"], default=None)
         if nearest:
             photo_dt = nearest.get("photo_datetime")
             diff = abs(m["datetime"] - photo_dt) if photo_dt else None
@@ -229,6 +236,27 @@ def _propagate_gps(matches: list, max_gap_hours: float) -> list:
             result.append({**m, "propagated": False, "propagated_from": None})
 
     return result
+
+
+def _reverse_geocode_sync(lat: float, lon: float) -> str:
+    """Synchronous Nominatim reverse-geocode. Returns display_name or empty string."""
+    try:
+        params = urllib.parse.urlencode({
+            "format": "json",
+            "lat": lat,
+            "lon": lon,
+            "zoom": 10,
+            "addressdetails": 0,
+        })
+        url = f"https://nominatim.openstreetmap.org/reverse?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": "FieldRecordingApp/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            import json  # noqa: PLC0415
+            data = json.loads(resp.read())
+            return data.get("display_name", "")
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Sync reverse geocode failed: %s", exc)
+        return ""
 
 
 def load_photo_pixmap(path: str, max_size: int) -> "QPixmap | None":
@@ -388,9 +416,18 @@ class GpsApplyWorker(QThread):
         """Inject GPS into each WAV file."""
         success_count = 0
         errors = []
+        _geocode_cache: dict[tuple, str] = {}
         for i, task in enumerate(self._tasks):
             wav_path = task["wav_path"]
-            gps_data = task["gps_data"]
+            gps_data = dict(task["gps_data"])
+            # Fetch location name if not already present
+            if "location_name" not in gps_data:
+                lat, lon = gps_data["latitude"], gps_data["longitude"]
+                cache_key = (round(lat, 4), round(lon, 4))
+                if cache_key not in _geocode_cache:
+                    _geocode_cache[cache_key] = _reverse_geocode_sync(lat, lon)
+                if _geocode_cache[cache_key]:
+                    gps_data["location_name"] = _geocode_cache[cache_key]
             try:
                 if self._use_backup:
                     shutil.copy2(wav_path, wav_path + ".bak")
@@ -412,6 +449,47 @@ class GpsApplyWorker(QThread):
                 errors.append(f"{os.path.basename(wav_path)}: {exc}")
             self.progress.emit(i + 1)
 
+        self.finished.emit(success_count, errors)
+
+
+class IxmlRemoveWorker(QThread):
+    """Background thread: remove iXML chunks from WAV files.
+
+    Emits ``progress`` after each file and ``finished`` with success count and
+    error list when the loop completes.  No Qt widgets are accessed in ``run()``.
+    """
+
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(int, list)
+
+    def __init__(self, wav_paths: list, use_backup: bool) -> None:
+        super().__init__()
+        self._wav_paths = wav_paths
+        self._use_backup = use_backup
+
+    def run(self) -> None:
+        """Remove iXML chunk from each WAV file."""
+        success_count = 0
+        errors = []
+        for i, wav_path in enumerate(self._wav_paths):
+            try:
+                if self._use_backup:
+                    shutil.copy2(wav_path, wav_path + ".bak")
+                fd, tmp = tempfile.mkstemp(suffix=".wav", dir=os.path.dirname(wav_path))
+                os.close(fd)
+                try:
+                    remove_ixml_chunk(wav_path, tmp)
+                    os.replace(tmp, wav_path)
+                except Exception:
+                    if os.path.exists(tmp):
+                        os.unlink(tmp)
+                    raise
+                logger.debug("iXML removed: %s", os.path.basename(wav_path))
+                success_count += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.error("iXML remove failed for %s: %s", os.path.basename(wav_path), exc)
+                errors.append(f"{os.path.basename(wav_path)}: {exc}")
+            self.progress.emit(i + 1)
         self.finished.emit(success_count, errors)
 
 
@@ -444,6 +522,7 @@ class PhotoGpsMatcher(QDialog):
         self._matches: list = []
         self._scan_worker: PhotoScanWorker | None = None
         self._apply_worker: GpsApplyWorker | None = None
+        self._remove_worker: IxmlRemoveWorker | None = None
         self._geocode_worker: ReverseGeocodeWorker | None = None
         self._geocode_cache: dict[tuple, str] = {}
 
@@ -453,6 +532,10 @@ class PhotoGpsMatcher(QDialog):
 
         self._build_wav_entries()
         self._setup_ui()
+
+        # Enable remove button immediately if any WAV already has iXML
+        if any(e.get("has_ixml") for e in self._wav_entries):
+            self._remove_btn.setEnabled(True)
 
         # Restore last used photo folder
         if self._settings:
@@ -465,7 +548,7 @@ class PhotoGpsMatcher(QDialog):
 
     def closeEvent(self, event) -> None:
         """Stop background workers before closing."""
-        for worker in (self._scan_worker, self._apply_worker, self._geocode_worker):
+        for worker in (self._scan_worker, self._apply_worker, self._remove_worker, self._geocode_worker):
             if worker and worker.isRunning():
                 worker.quit()
                 worker.wait()
@@ -476,16 +559,18 @@ class PhotoGpsMatcher(QDialog):
     # ------------------------------------------------------------------
 
     def _build_wav_entries(self) -> None:
-        """Read origination datetime from each WAV file's bext chunk."""
+        """Read origination datetime and existing iXML status from each WAV file."""
         for path in self.wav_files:
             dt = None
+            has_ixml = False
             try:
                 result = wav_analyze(path)
                 if result:
                     dt = _parse_wav_datetime(result.get("bext", {}))
+                    has_ixml = result.get("gps") is not None
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Cannot read bext from %s: %s", os.path.basename(path), exc)
-            self._wav_entries.append({"path": path, "datetime": dt})
+            self._wav_entries.append({"path": path, "datetime": dt, "has_ixml": has_ixml})
 
     def _setup_ui(self) -> None:
         """Build all UI components."""
@@ -522,14 +607,14 @@ class PhotoGpsMatcher(QDialog):
 
         # GPS propagation option
         propagate_row = QHBoxLayout()
-        self._propagate_checkbox = QCheckBox("GPS doorgeven aan files zonder match")
+        self._propagate_checkbox = QCheckBox("Propagate GPS to unmatched files")
         self._propagate_checkbox.setChecked(True)
         propagate_row.addWidget(self._propagate_checkbox)
         propagate_row.addWidget(QLabel("max gap:"))
         self._max_gap_spin = QDoubleSpinBox()
         self._max_gap_spin.setRange(0.5, 24.0)
         self._max_gap_spin.setValue(4.0)
-        self._max_gap_spin.setSuffix(" uur")
+        self._max_gap_spin.setSuffix(" hrs")
         self._max_gap_spin.setMaximumWidth(100)
         propagate_row.addWidget(self._max_gap_spin)
         propagate_row.addStretch()
@@ -543,9 +628,9 @@ class PhotoGpsMatcher(QDialog):
         # Splitter: table (left) | preview (right)
         splitter = QSplitter(Qt.Horizontal)
 
-        self._table = QTableWidget(0, 6)
+        self._table = QTableWidget(0, 7)
         self._table.setHorizontalHeaderLabels(
-            ["WAV", "Opnametijd", "Foto", "Fototijd", "Verschil", "GPS"]
+            ["WAV", "Rec. Time", "Photo", "Photo Time", "Diff", "GPS", "iXML"]
         )
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(QHeaderView.Interactive)
@@ -555,6 +640,7 @@ class PhotoGpsMatcher(QDialog):
         hdr.setSectionResizeMode(_COL_PHOTO_TIME, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(_COL_DIFF, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(_COL_GPS, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(_COL_IXML, QHeaderView.ResizeToContents)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.selectionModel().selectionChanged.connect(self._on_row_selected)
@@ -570,7 +656,7 @@ class PhotoGpsMatcher(QDialog):
         self._preview_image.setMinimumSize(280, 200)
         self._preview_image.setMaximumHeight(320)
         self._preview_image.setFrameShape(QFrame.StyledPanel)
-        self._preview_image.setText("Klik op een rij\nvoor een preview")
+        self._preview_image.setText("Select a row\nfor a preview")
         self._preview_image.setStyleSheet("color: grey;")
         preview_layout.addWidget(self._preview_image)
 
@@ -587,16 +673,21 @@ class PhotoGpsMatcher(QDialog):
 
         # Backup + action buttons
         button_row = QHBoxLayout()
-        self._backup_checkbox = QCheckBox("Backup maken (.bak)")
+        self._backup_checkbox = QCheckBox("Create backup (.bak)")
         self._backup_checkbox.setChecked(True)
         button_row.addWidget(self._backup_checkbox)
         button_row.addStretch()
 
-        cancel_btn = QPushButton("Annuleren")
+        self._remove_btn = QPushButton("🗑 Remove iXML")
+        self._remove_btn.setEnabled(False)
+        self._remove_btn.clicked.connect(self._remove_ixml)
+        button_row.addWidget(self._remove_btn)
+
+        cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         button_row.addWidget(cancel_btn)
 
-        self._apply_btn = QPushButton("GPS Toepassen →")
+        self._apply_btn = QPushButton("Apply GPS →")
         self._apply_btn.setEnabled(False)
         self._apply_btn.clicked.connect(self._apply_gps)
         button_row.addWidget(self._apply_btn)
@@ -608,7 +699,7 @@ class PhotoGpsMatcher(QDialog):
     # ------------------------------------------------------------------
 
     def _browse_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Selecteer foto map")
+        folder = QFileDialog.getExistingDirectory(self, "Select photo folder")
         if folder:
             self._photo_dir = folder
             self._folder_label.setText(folder)
@@ -634,10 +725,10 @@ class PhotoGpsMatcher(QDialog):
             if pixmap:
                 self._preview_image.setPixmap(pixmap)
             else:
-                self._preview_image.setText("(kan foto niet laden)")
+                self._preview_image.setText("(cannot load photo)")
         else:
             self._preview_image.clear()
-            self._preview_image.setText("Geen foto gevonden")
+            self._preview_image.setText("No photo found")
 
         # --- Info text ---
         wav_name = os.path.basename(m["path"])
@@ -651,22 +742,22 @@ class PhotoGpsMatcher(QDialog):
         if gps:
             coords_str = f"{gps['latitude']:.6f}, {gps['longitude']:.6f}"
             alt = gps.get("altitude")
-            alt_str = f"{alt:.1f} m" if alt is not None else "niet beschikbaar"
+            alt_str = f"{alt:.1f} m" if alt is not None else "not available"
         else:
             coords_str = "—"
             alt_str = "—"
 
-        source_label = "↑ doorgegeven van" if propagated else "📷 Foto"
+        source_label = "↑ propagated from" if propagated else "Photo"
         source_value = m.get("propagated_from", photo_name) if propagated else photo_name
 
         info = (
             f"<b>WAV:</b> {wav_name}<br>"
-            f"<b>Opnametijd:</b> {wav_time}<br>"
+            f"<b>Rec. time:</b> {wav_time}<br>"
             f"<b>{source_label}:</b> {source_value}<br>"
-            f"<b>Fototijd:</b> {photo_time}<br>"
-            f"<b>Tijdsverschil:</b> {diff_str}<br>"
+            f"<b>Photo time:</b> {photo_time}<br>"
+            f"<b>Time diff:</b> {diff_str}<br>"
             f"<b>GPS:</b> {coords_str}<br>"
-            f"<b>Hoogte:</b> {alt_str}<br>"
+            f"<b>Altitude:</b> {alt_str}<br>"
         )
         self._preview_info.setText(info)
 
@@ -674,16 +765,16 @@ class PhotoGpsMatcher(QDialog):
         if gps:
             cache_key = (round(gps["latitude"], 4), round(gps["longitude"], 4))
             if cache_key in self._geocode_cache:
-                self._preview_info.setText(info + f"<b>Locatie:</b> {self._geocode_cache[cache_key] or '—'}")
+                self._preview_info.setText(info + f"<b>Location:</b> {self._geocode_cache[cache_key] or '—'}")
             else:
-                self._preview_info.setText(info + "<b>Locatie:</b> ophalen…")
+                self._preview_info.setText(info + "<b>Location:</b> fetching…")
                 if self._geocode_worker and self._geocode_worker.isRunning():
                     self._geocode_worker.quit()
                 self._geocode_worker = ReverseGeocodeWorker(gps["latitude"], gps["longitude"])
                 self._geocode_worker.finished.connect(
                     lambda place, i=info, k=cache_key: (
                         self._geocode_cache.update({k: place}),
-                        self._preview_info.setText(i + f"<b>Locatie:</b> {place or '—'}"),
+                        self._preview_info.setText(i + f"<b>Location:</b> {place or '—'}"),
                     )
                 )
                 self._geocode_worker.start()
@@ -721,6 +812,7 @@ class PhotoGpsMatcher(QDialog):
         self._scan_btn.setEnabled(True)
         self._populate_table(matches)
         self._apply_btn.setEnabled(any(m["gps"] for m in matches))
+        self._remove_btn.setEnabled(any(m.get("has_ixml") for m in matches))
 
     def _populate_table(self, matches: list) -> None:
         self._table.setRowCount(len(matches))
@@ -734,12 +826,13 @@ class PhotoGpsMatcher(QDialog):
                 diff_str = _format_diff(m["diff"]) if m["diff"] is not None else "—"
                 gps_str = "↑"
             else:
-                photo_name = os.path.basename(m["photo_path"]) if m["photo_path"] else "geen match"
+                photo_name = os.path.basename(m["photo_path"]) if m["photo_path"] else "no match"
                 photo_time = m["photo_datetime"].strftime("%H:%M:%S") if m["photo_datetime"] else "—"
                 diff_str = _format_diff(m["diff"]) if m["diff"] is not None else "—"
                 gps_str = "✓" if m["gps"] else "✗"
 
-            for col, text in enumerate([wav_name, wav_time, photo_name, photo_time, diff_str, gps_str]):
+            ixml_str = "✓" if m.get("has_ixml") else "—"
+            for col, text in enumerate([wav_name, wav_time, photo_name, photo_time, diff_str, gps_str, ixml_str]):
                 self._table.setItem(row, col, QTableWidgetItem(text))
 
     def _apply_gps(self) -> None:
@@ -753,9 +846,13 @@ class PhotoGpsMatcher(QDialog):
                 gps_data["photo_ref"] = os.path.relpath(
                     photo_path, os.path.dirname(m["path"])
                 )
+            # Pass cached location name to avoid redundant geocode requests
+            cache_key = (round(gps_data["latitude"], 4), round(gps_data["longitude"], 4))
+            if cache_key in self._geocode_cache and self._geocode_cache[cache_key]:
+                gps_data["location_name"] = self._geocode_cache[cache_key]
             tasks.append({"wav_path": m["path"], "gps_data": gps_data})
         if not tasks:
-            QMessageBox.information(self, "Geen matches", "Geen WAV-bestanden met GPS-match gevonden.")
+            QMessageBox.information(self, "No matches", "No WAV files with a GPS match found.")
             return
 
         self._progress.setMaximum(len(tasks))
@@ -771,11 +868,47 @@ class PhotoGpsMatcher(QDialog):
     def _on_apply_done(self, success_count: int, errors: list) -> None:
         self._progress.setVisible(False)
         if errors:
-            msg = f"{success_count} bestanden bijgewerkt, {len(errors)} fouten:\n\n"
+            msg = f"{success_count} files updated, {len(errors)} error(s):\n\n"
             msg += "\n".join(errors[:5])
             if len(errors) > 5:
-                msg += f"\n… en {len(errors) - 5} meer"
-            QMessageBox.warning(self, "Klaar met fouten", msg)
+                msg += f"\n… and {len(errors) - 5} more"
+            QMessageBox.warning(self, "Done with errors", msg)
         else:
-            QMessageBox.information(self, "Klaar", f"GPS toegevoegd aan {success_count} WAV-bestanden.")
+            QMessageBox.information(self, "Done", f"GPS added to {success_count} WAV files.")
+        self.accept()
+
+    def _remove_ixml(self) -> None:
+        targets = [m["path"] for m in self._matches if m.get("has_ixml")]
+        if not targets:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Remove iXML",
+            f"Remove iXML chunk from {len(targets)} file(s)?\n\nThis cannot be undone unless a backup is made.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        self._progress.setMaximum(len(targets))
+        self._progress.setValue(0)
+        self._progress.setVisible(True)
+        self._remove_btn.setEnabled(False)
+        self._apply_btn.setEnabled(False)
+
+        self._remove_worker = IxmlRemoveWorker(targets, self._backup_checkbox.isChecked())
+        self._remove_worker.progress.connect(self._progress.setValue)
+        self._remove_worker.finished.connect(self._on_remove_done)
+        self._remove_worker.start()
+
+    def _on_remove_done(self, success_count: int, errors: list) -> None:
+        self._progress.setVisible(False)
+        if errors:
+            msg = f"{success_count} files cleaned, {len(errors)} error(s):\n\n"
+            msg += "\n".join(errors[:5])
+            if len(errors) > 5:
+                msg += f"\n… and {len(errors) - 5} more"
+            QMessageBox.warning(self, "Done with errors", msg)
+        else:
+            QMessageBox.information(self, "Done", f"iXML removed from {success_count} WAV files.")
         self.accept()

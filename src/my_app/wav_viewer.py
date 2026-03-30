@@ -659,7 +659,7 @@ class WavViewer(QWidget):
         self.central_top_layout.addWidget(self.gps_table)
 
         # Photo preview (shown when WAV has a PHOTO_REF in iXML)
-        self.photo_preview_label = QLabel("📷 Foto:")
+        self.photo_preview_label = QLabel("Photo:")
         self.photo_preview_label.setVisible(False)
         self.photo_preview_image = QLabel()
         self.photo_preview_image.setAlignment(Qt.AlignLeft)
@@ -728,28 +728,29 @@ class WavViewer(QWidget):
             the currently selected WAV file and provides intelligent
             suggestions based on established field recording categories.
         """
-        # Tag input section
+        # Tag input section — placed in left panel, between file list and view controls
         tag_label = QLabel("Tags and Metadata:")
-        # tag_label.setStyleSheet("font-weight: bold; margin: 10px 0 5px 0;")
-        self.central_bottom_layout.addWidget(tag_label)
+        self.left_layout.addWidget(tag_label)
 
-        # Create tag input widget
         self.tagger_widget = FileTagAutocomplete()
-        self.central_bottom_layout.addWidget(self.tagger_widget)
+        self.left_layout.addWidget(self.tagger_widget)
+
+        tag_buttons_layout = QHBoxLayout()
 
         self.reset_tags_button = QPushButton("Reset")
         self.reset_tags_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.reset_tags_button.setToolTip("Reset tags to default")
         self.reset_tags_button.clicked.connect(self._reset_info_table_to_defaults)
-        self.central_controls_layout.addWidget(self.reset_tags_button)
+        tag_buttons_layout.addWidget(self.reset_tags_button)
 
         self.save_tags_button = QPushButton("Save")
         self.save_tags_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.save_tags_button.setToolTip("Save tags to file")
         self.save_tags_button.clicked.connect(self.save_info_from_info_table_to_file)
-        self.central_controls_layout.addWidget(self.save_tags_button)
+        tag_buttons_layout.addWidget(self.save_tags_button)
 
-        self.central_controls_layout.addStretch(1)
+        tag_buttons_layout.addStretch()
+        self.left_layout.addLayout(tag_buttons_layout)
 
     def _setup_view_controls(self) -> None:
         """Set up view mode controls for waveform display configuration.
@@ -2331,6 +2332,20 @@ class WavViewer(QWidget):
             "Longitude": str(gps_data["longitude"]) if gps_data else "",
             "Altitude": str(gps_data.get("altitude", "")) if gps_data else "",
         })
+
+        # Read-only extra rows: Photo and Location (if present in iXML)
+        photo_ref = gps_data.get("photo_ref") if gps_data else None
+        location_name = gps_data.get("location_name") if gps_data else None
+        for label, value in [("Photo", photo_ref), ("Location", location_name)]:
+            if value:
+                row = self.gps_table.rowCount()
+                self.gps_table.insertRow(row)
+                key_item = QTableWidgetItem(label)
+                key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
+                self.gps_table.setItem(row, 0, key_item)
+                val_item = QTableWidgetItem(value)
+                val_item.setFlags(val_item.flags() & ~Qt.ItemIsEditable)
+                self.gps_table.setItem(row, 1, val_item)
 
         # Photo preview
         photo_ref = gps_data.get("photo_ref") if gps_data else None
