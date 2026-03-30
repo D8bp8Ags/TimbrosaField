@@ -516,9 +516,10 @@ class WavViewer(QWidget):
             updates for the selected file.
         """
         # File list label and widget
-        file_label = QLabel("WAV Files:")
-        file_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
-        self.left_layout.addWidget(file_label)
+        self.file_list_label = QLabel("WAV Files:")
+        self.file_list_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        self.file_list_label.setToolTip("")
+        self.left_layout.addWidget(self.file_list_label)
 
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -923,6 +924,11 @@ class WavViewer(QWidget):
         except OSError as exc:
             logger.error(f"Cannot read directory {wav_dir}: {exc}")
             wav_files = []
+
+        # Update label with folder name (count is already shown in status bar)
+        folder_name = os.path.basename(os.path.normpath(wav_dir))
+        self.file_list_label.setText(f"{folder_name}:")
+        self.file_list_label.setToolTip(wav_dir)
 
         # Handle empty directory
         if not wav_files:
