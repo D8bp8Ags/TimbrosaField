@@ -40,6 +40,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -1393,8 +1394,8 @@ class TemplateQuickButtons(QWidget):
         #label.setStyleSheet("font-weight: bold; color: #666; font-size: 10pt;")
         layout.addWidget(label)
 
-        # Buttons layout
-        self.buttons_layout = QHBoxLayout()
+        # Buttons layout (2-column grid so names fit in the narrow left panel)
+        self.buttons_layout = QGridLayout()
         self.buttons_layout.setSpacing(2)
 
         # Create initial buttons
@@ -1419,7 +1420,8 @@ class TemplateQuickButtons(QWidget):
         # Shortcut keys mapping (corrected to match actual shortcuts)
         shortcut_keys = ["Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4"]
 
-        # Create buttons for templates
+        # Create buttons in a 2-column grid so names fit in the narrow left panel
+        grid_pos = 0
         for i, name in enumerate(templates):
             template_data = self.template_manager.get_template(name)
             if template_data:
@@ -1428,54 +1430,39 @@ class TemplateQuickButtons(QWidget):
                 btn.setStyleSheet(
                     """QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 #4a4a4a, stop:1 #3a3a3a); border: 1px solid #666666; border-
-                    radius: 6px; padding: 6px 12px; font-size: 9pt; color: #ffffff; }
+                    radius: 6px; padding: 4px 6px; font-size: 9pt; color: #ffffff; }
                     QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0,
                     y2:1, stop:0 #5a5a5a, stop:1 #4a4a4a); border-color: #888888; }
                     QPushButton:pressed { background: qlineargradient(x1:0, y1:0, x2:0,
                     y2:1, stop:0 #2a2a2a, stop:1 #1a1a1a); }
                     """
                 )
-
-                # Connect button click
                 btn.clicked.connect(
-                    lambda checked, data=template_data, n=name: self.apply_template(
-                        data, n
-                    )
+                    lambda checked, data=template_data, n=name: self.apply_template(data, n)
                 )
 
-                # Enhanced tooltip with correct shortcut
                 tags_preview = ", ".join(template_data["tags"][:5])
                 if len(template_data["tags"]) > 5:
                     tags_preview += f" (+{len(template_data['tags']) - 5} more)"
+                shortcut_hint = f" ({shortcut_keys[i]})" if i < len(shortcut_keys) else ""
+                btn.setToolTip(f"Tags: {tags_preview}\nUsed: {template_data.get('usage_count', 0)} times{shortcut_hint}")
 
-                # Use correct Ctrl+1-4 shortcuts
-                shortcut_hint = (
-                    f" ({shortcut_keys[i]})" if i < len(shortcut_keys) else ""
-                )
-                tooltip_text = (
-                    f"Tags: {tags_preview}\n"
-                    f"Used: {template_data.get('usage_count', 0)} "
-                    f"times{shortcut_hint}"
-                )
-                btn.setToolTip(tooltip_text)
+                row, col = divmod(grid_pos, 2)
+                self.buttons_layout.addWidget(btn, row, col)
+                grid_pos += 1
 
-                self.buttons_layout.addWidget(btn)
-
-        # More/Manage button
-        more_btn = QPushButton("⚙️")
-        more_btn.setMaximumWidth(35)
-        more_btn.setMaximumHeight(28)
+        # More/Manage button — spans both columns on the next row
+        more_btn = QPushButton("⚙️ Manage")
+        more_btn.setMaximumHeight(24)
         more_btn.setToolTip("Template Manager (F9)")
         more_btn.setStyleSheet(
             """QPushButton { background-color: #e8f4fd; border: 1px solid #bee5eb;
-            border-radius: 4px; font-weight: bold; } QPushButton:hover { background-
-            color: #d1ecf1; }
+            border-radius: 4px; font-size: 8pt; } QPushButton:hover { background-color: #d1ecf1; }
             """
         )
         more_btn.clicked.connect(self.show_template_manager)
-        self.buttons_layout.addWidget(more_btn)
-
-        self.buttons_layout.addStretch()
+        next_row = (grid_pos + 1) // 2
+        self.buttons_layout.addWidget(more_btn, next_row, 0, 1, 2)
 
     def show_template_manager(self):
         """Show template manager dialog."""

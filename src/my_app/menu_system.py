@@ -565,6 +565,7 @@ class EditMenuHandler(MenuHandlerBase):
         edit_menu.addAction(batch_tag_action)
 
         photo_gps_action = QAction("📸 &Photo GPS Matcher...", self.main_window)
+        photo_gps_action.setShortcut("Ctrl+P")
         photo_gps_action.triggered.connect(
             lambda: self._execute_edit_command("open_photo_gps_matcher")
         )
