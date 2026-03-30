@@ -31,7 +31,7 @@ import os
 from collections import defaultdict
 from datetime import datetime
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -50,6 +50,76 @@ from PyQt5.QtWidgets import (
 from wav_analyzer import wav_analyze
 
 logger = logging.getLogger(__name__)
+
+
+class CueAnalysisWorker(QThread):
+    """Background worker for cue point analysis."""
+
+    progress = pyqtSignal(int, int)  # (current, total)
+    finished = pyqtSignal(list, dict, int)  # (cue_data, stats, total_files)
+
+    def __init__(self, wav_files):
+        super().__init__()
+        self._wav_files = wav_files
+
+    def run(self):
+        from collections import defaultdict  # noqa: PLC0415
+
+        stats = {"files_with_cues": 0, "total_cues": 0, "cue_types": defaultdict(int)}
+        cue_data = []
+        total = len(self._wav_files)
+
+        for i, file_path in enumerate(self._wav_files):
+            if os.path.exists(file_path):
+                try:
+                    result = wav_analyze(file_path)
+                    cue_points = result.get("cue_points", [])
+                    cue_labels = result.get("cue_labels", {})
+                    sample_rate = result.get("fmt", {}).get("Sample rate", 44100)
+
+                    file_cues = []
+                    for cue in cue_points:
+                        offset = cue.get("Sample Offset", 0)
+                        if offset <= 0:
+                            continue
+                        cue_id_raw = cue.get("ID", "")
+                        cue_id = str(cue_id_raw)
+                        label = cue_labels.get(cue_id_raw, "") or cue_labels.get(cue_id, "")
+                        label_upper = label.upper()
+                        if not label.strip():
+                            cue_type = "Unlabeled"
+                        elif label_upper.startswith("MARK_"):
+                            cue_type = "MARK"
+                        elif label_upper.startswith("PEAK_"):
+                            cue_type = "PEAK"
+                        else:
+                            cue_type = "Custom"
+                        time_seconds = offset / sample_rate
+                        time_str = f"{int(time_seconds // 60):02d}:{time_seconds % 60:05.2f}"
+                        file_cues.append({
+                            "file": os.path.basename(file_path),
+                            "file_path": file_path,
+                            "cue_id": cue_id,
+                            "label": label,
+                            "time_seconds": time_seconds,
+                            "time_str": time_str,
+                            "type": cue_type,
+                            "offset": offset,
+                        })
+
+                    if file_cues:
+                        stats["files_with_cues"] += 1
+                        stats["total_cues"] += len(file_cues)
+                        for entry in file_cues:
+                            stats["cue_types"][entry["type"]] += 1
+                        cue_data.extend(file_cues)
+
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Error analyzing cues in %s: %s", file_path, exc)
+
+            self.progress.emit(i + 1, total)
+
+        self.finished.emit(cue_data, stats, total)
 
 
 class CuePointsAnalysisDialog(QDialog):
@@ -88,16 +158,15 @@ class CuePointsAnalysisDialog(QDialog):
         super().__init__(main_window)
 
         self.cue_data = []
+        self._worker = None
 
         self.setWindowTitle("📍 Cue Points Overview & Analysis")
         self.setModal(True)
         self.setMinimumSize(900, 600)
         self.main_window = main_window
-        # wav_viewer holds file_list and audio_player; fall back to main_window
-        # itself when the dialog is launched from a standalone WavViewer instance.
         self.parent_viewer = getattr(main_window, "wav_viewer", main_window)
         self.setup_ui()
-        # self.analyze_cue_points()
+        self._start_analysis()
 
     def setup_ui(self):
         """Setup the user interface components.
@@ -141,8 +210,13 @@ class CuePointsAnalysisDialog(QDialog):
         layout.addLayout(filter_layout)
 
         # Statistics summary
-        self.stats_label = QLabel("Loading statistics...")
+        self.stats_label = QLabel("")
         layout.addWidget(self.stats_label)
+
+        # Loading indicator (hidden once analysis is done)
+        self._loading_label = QLabel("Analysing cue points...")
+        self._loading_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._loading_label)
 
         # Main table
         self.cue_table = QTableWidget(0, 6)
@@ -187,6 +261,29 @@ class CuePointsAnalysisDialog(QDialog):
         button_layout.addWidget(close_button)
 
         layout.addLayout(button_layout)
+
+    def _start_analysis(self):
+        try:
+            wav_files = self.main_window.file_manager.get_all_wav_files()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Error getting WAV files: %s", exc)
+            self._loading_label.setText("Error loading files.")
+            return
+        self._worker = CueAnalysisWorker(wav_files)
+        self._worker.progress.connect(
+            lambda cur, tot: self._loading_label.setText(f"Analysing {cur}/{tot} files...")
+        )
+        self._worker.finished.connect(self._on_analysis_done)
+        self._worker.start()
+
+    def _on_analysis_done(self, cue_data, stats, total_files):
+        self.cue_data = cue_data
+        self._loading_label.setVisible(False)
+        # Stop status bar spinner
+        main_window = self.parent()
+        if main_window and hasattr(main_window, "ui_manager"):
+            main_window.ui_manager.hide_progress()
+        self._update_cue_analysis_display(stats, total_files)
 
     # def analyze_cue_points_old(self):
     #
