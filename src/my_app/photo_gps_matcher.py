@@ -17,23 +17,29 @@ import logging
 import os
 import shutil
 import tempfile
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
     QDoubleSpinBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 from wav_analyzer import inject_ixml_chunk, wav_analyze
 
@@ -127,9 +133,11 @@ def read_photo_exif(photo_path: str) -> dict:
             try:
                 lat = _dms_to_decimal(gps_info[_GPS_LAT], gps_info[_GPS_LAT_REF])
                 lon = _dms_to_decimal(gps_info[_GPS_LON], gps_info[_GPS_LON_REF])
-                alt = _rational_to_float(gps_info.get(_GPS_ALT, 0))
-                if gps_info.get(_GPS_ALT_REF) == b"\x01":
-                    alt = -alt
+                alt = None
+                if _GPS_ALT in gps_info:
+                    alt = _rational_to_float(gps_info[_GPS_ALT])
+                    if gps_info.get(_GPS_ALT_REF) == b"\x01":
+                        alt = -alt
                 result["gps"] = {"latitude": lat, "longitude": lon, "altitude": alt}
             except (KeyError, TypeError, ZeroDivisionError) as exc:
                 logger.debug("GPS parse error in %s: %s", os.path.basename(photo_path), exc)
@@ -175,9 +183,92 @@ def _format_diff(diff: timedelta) -> str:
     return f"+{total // 60}m {total % 60}s"
 
 
+def _propagate_gps(matches: list, max_gap_hours: float) -> list:
+    """Fill GPS for unmatched WAV files from the nearest matched file.
+
+    For each WAV without a GPS match, finds the temporally nearest WAV that
+    does have GPS and copies its coordinates, provided the time gap is within
+    ``max_gap_hours``.  The returned dicts are copies; the originals are not
+    mutated.
+
+    Args:
+        matches:       List of match dicts as returned by :class:`PhotoScanWorker`.
+        max_gap_hours: Maximum allowed time gap (hours) for propagation.
+
+    Returns:
+        New list of match dicts; propagated entries have ``"propagated": True``
+        and ``"propagated_from"`` set to the source WAV basename.
+    """
+    max_gap = timedelta(hours=max_gap_hours)
+    matched = [m for m in matches if m["gps"] and m["datetime"]]
+
+    result = []
+    for m in matches:
+        if m["gps"] or not m["datetime"]:
+            result.append({**m, "propagated": False, "propagated_from": None})
+            continue
+
+        nearest = min(
+            (s for s in matched if abs(m["datetime"] - s["datetime"]) <= max_gap),
+            key=lambda s: abs(m["datetime"] - s["datetime"]),
+            default=None,
+        )
+        if nearest:
+            photo_dt = nearest.get("photo_datetime")
+            diff = abs(m["datetime"] - photo_dt) if photo_dt else None
+            result.append({
+                **m,
+                "gps": nearest["gps"],
+                "photo_path": nearest.get("photo_path"),
+                "photo_datetime": photo_dt,
+                "diff": diff,
+                "propagated": True,
+                "propagated_from": os.path.basename(nearest["path"]),
+            })
+        else:
+            result.append({**m, "propagated": False, "propagated_from": None})
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Background workers
 # ---------------------------------------------------------------------------
+
+class ReverseGeocodeWorker(QThread):
+    """Background thread: reverse-geocode a lat/lon via Nominatim.
+
+    Emits ``finished`` with a human-readable place string or an empty string
+    on failure.  No Qt widgets are accessed in ``run()``.
+    """
+
+    finished = pyqtSignal(str)
+
+    def __init__(self, lat: float, lon: float) -> None:
+        super().__init__()
+        self._lat = lat
+        self._lon = lon
+
+    def run(self) -> None:
+        """Query Nominatim and emit the display_name on success."""
+        try:
+            params = urllib.parse.urlencode({
+                "format": "json",
+                "lat": self._lat,
+                "lon": self._lon,
+                "zoom": 10,
+                "addressdetails": 0,
+            })
+            url = f"https://nominatim.openstreetmap.org/reverse?{params}"
+            req = urllib.request.Request(url, headers={"User-Agent": "FieldRecordingApp/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                import json  # noqa: PLC0415
+                data = json.loads(resp.read())
+                self.finished.emit(data.get("display_name", ""))
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Reverse geocode failed: %s", exc)
+            self.finished.emit("")
+
 
 class PhotoScanWorker(QThread):
     """Background thread: scan a photo folder and build match proposals.
@@ -323,17 +414,19 @@ class PhotoGpsMatcher(QDialog):
         self._matches: list = []
         self._scan_worker: PhotoScanWorker | None = None
         self._apply_worker: GpsApplyWorker | None = None
+        self._geocode_worker: ReverseGeocodeWorker | None = None
+        self._geocode_cache: dict[tuple, str] = {}
 
         self.setWindowTitle("Photo GPS Matcher")
         self.setModal(True)
-        self.setMinimumSize(860, 520)
+        self.setMinimumSize(1200, 680)
 
         self._build_wav_entries()
         self._setup_ui()
 
     def closeEvent(self, event) -> None:
         """Stop background workers before closing."""
-        for worker in (self._scan_worker, self._apply_worker):
+        for worker in (self._scan_worker, self._apply_worker, self._geocode_worker):
             if worker and worker.isRunning():
                 worker.quit()
                 worker.wait()
@@ -357,10 +450,10 @@ class PhotoGpsMatcher(QDialog):
 
     def _setup_ui(self) -> None:
         """Build all UI components."""
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
 
         # Header
-        layout.addWidget(QLabel(f"<h3>📸 Photo GPS Matcher — {len(self.wav_files)} WAV files</h3>"))
+        outer.addWidget(QLabel(f"<h3>📸 Photo GPS Matcher — {len(self.wav_files)} WAV files</h3>"))
 
         # Photo folder selector
         folder_row = QHBoxLayout()
@@ -371,7 +464,7 @@ class PhotoGpsMatcher(QDialog):
         browse_btn = QPushButton("📂 Browse…")
         browse_btn.clicked.connect(self._browse_folder)
         folder_row.addWidget(browse_btn)
-        layout.addLayout(folder_row)
+        outer.addLayout(folder_row)
 
         # Tolerance + scan button
         options_row = QHBoxLayout()
@@ -386,22 +479,72 @@ class PhotoGpsMatcher(QDialog):
         self._scan_btn.setEnabled(False)
         self._scan_btn.clicked.connect(self._start_scan)
         options_row.addWidget(self._scan_btn)
-        layout.addLayout(options_row)
+        outer.addLayout(options_row)
+
+        # GPS propagation option
+        propagate_row = QHBoxLayout()
+        self._propagate_checkbox = QCheckBox("GPS doorgeven aan files zonder match")
+        self._propagate_checkbox.setChecked(True)
+        propagate_row.addWidget(self._propagate_checkbox)
+        propagate_row.addWidget(QLabel("max gap:"))
+        self._max_gap_spin = QDoubleSpinBox()
+        self._max_gap_spin.setRange(0.5, 24.0)
+        self._max_gap_spin.setValue(4.0)
+        self._max_gap_spin.setSuffix(" uur")
+        self._max_gap_spin.setMaximumWidth(100)
+        propagate_row.addWidget(self._max_gap_spin)
+        propagate_row.addStretch()
+        outer.addLayout(propagate_row)
 
         # Progress bar (hidden until needed)
         self._progress = QProgressBar()
         self._progress.setVisible(False)
-        layout.addWidget(self._progress)
+        outer.addWidget(self._progress)
 
-        # Match table
+        # Splitter: table (left) | preview (right)
+        splitter = QSplitter(Qt.Horizontal)
+
         self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels(
             ["WAV", "Opnametijd", "Foto", "Fototijd", "Verschil", "GPS"]
         )
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        hdr = self._table.horizontalHeader()
+        hdr.setSectionResizeMode(QHeaderView.Interactive)
+        hdr.setSectionResizeMode(_COL_WAV, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(_COL_WAV_TIME, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(_COL_PHOTO, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(_COL_PHOTO_TIME, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(_COL_DIFF, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(_COL_GPS, QHeaderView.ResizeToContents)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        layout.addWidget(self._table)
+        self._table.selectionModel().selectionChanged.connect(self._on_row_selected)
+        splitter.addWidget(self._table)
+
+        # Preview panel
+        preview_widget = QWidget()
+        preview_layout = QVBoxLayout(preview_widget)
+        preview_layout.setContentsMargins(8, 0, 0, 0)
+
+        self._preview_image = QLabel()
+        self._preview_image.setAlignment(Qt.AlignCenter)
+        self._preview_image.setMinimumSize(280, 200)
+        self._preview_image.setMaximumHeight(320)
+        self._preview_image.setFrameShape(QFrame.StyledPanel)
+        self._preview_image.setText("Klik op een rij\nvoor een preview")
+        self._preview_image.setStyleSheet("color: grey;")
+        preview_layout.addWidget(self._preview_image)
+
+        self._preview_info = QLabel()
+        self._preview_info.setWordWrap(True)
+        self._preview_info.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self._preview_info.setTextFormat(Qt.RichText)
+        preview_layout.addWidget(self._preview_info)
+        preview_layout.addStretch()
+
+        splitter.addWidget(preview_widget)
+        splitter.setSizes([650, 350])
+        outer.addWidget(splitter, 1)
 
         # Backup + action buttons
         button_row = QHBoxLayout()
@@ -419,7 +562,7 @@ class PhotoGpsMatcher(QDialog):
         self._apply_btn.clicked.connect(self._apply_gps)
         button_row.addWidget(self._apply_btn)
 
-        layout.addLayout(button_row)
+        outer.addLayout(button_row)
 
     # ------------------------------------------------------------------
     # Slots
@@ -432,6 +575,107 @@ class PhotoGpsMatcher(QDialog):
             self._folder_label.setText(folder)
             self._folder_label.setStyleSheet("")
             self._scan_btn.setEnabled(True)
+
+    def _on_row_selected(self) -> None:
+        """Show photo preview and info for the selected row."""
+        rows = self._table.selectionModel().selectedRows()
+        if not rows or not self._matches:
+            return
+        row = rows[0].row()
+        if row >= len(self._matches):
+            return
+        m = self._matches[row]
+
+        # --- Photo thumbnail ---
+        photo_path = m.get("photo_path")
+        if photo_path and os.path.exists(photo_path):
+            pixmap = self._load_pixmap(photo_path, 300)
+            if pixmap:
+                self._preview_image.setPixmap(pixmap)
+            else:
+                self._preview_image.setText("(kan foto niet laden)")
+        else:
+            self._preview_image.clear()
+            self._preview_image.setText("Geen foto gevonden")
+
+        # --- Info text ---
+        wav_name = os.path.basename(m["path"])
+        wav_time = m["datetime"].strftime("%Y-%m-%d %H:%M:%S") if m["datetime"] else "—"
+        photo_name = os.path.basename(photo_path) if photo_path else "—"
+        photo_time = m["photo_datetime"].strftime("%Y-%m-%d %H:%M:%S") if m.get("photo_datetime") else "—"
+        diff_str = _format_diff(m["diff"]) if m.get("diff") is not None else "—"
+        propagated = m.get("propagated", False)
+
+        gps = m.get("gps")
+        if gps:
+            coords_str = f"{gps['latitude']:.6f}, {gps['longitude']:.6f}"
+            alt = gps.get("altitude")
+            alt_str = f"{alt:.1f} m" if alt is not None else "niet beschikbaar"
+        else:
+            coords_str = "—"
+            alt_str = "—"
+
+        source_label = "↑ doorgegeven van" if propagated else "📷 Foto"
+        source_value = m.get("propagated_from", photo_name) if propagated else photo_name
+
+        info = (
+            f"<b>WAV:</b> {wav_name}<br>"
+            f"<b>Opnametijd:</b> {wav_time}<br>"
+            f"<b>{source_label}:</b> {source_value}<br>"
+            f"<b>Fototijd:</b> {photo_time}<br>"
+            f"<b>Tijdsverschil:</b> {diff_str}<br>"
+            f"<b>GPS:</b> {coords_str}<br>"
+            f"<b>Hoogte:</b> {alt_str}<br>"
+        )
+        self._preview_info.setText(info)
+
+        # --- Reverse geocoding (async, cached) ---
+        if gps:
+            cache_key = (round(gps["latitude"], 4), round(gps["longitude"], 4))
+            if cache_key in self._geocode_cache:
+                self._preview_info.setText(info + f"<b>Locatie:</b> {self._geocode_cache[cache_key] or '—'}")
+            else:
+                self._preview_info.setText(info + "<b>Locatie:</b> ophalen…")
+                if self._geocode_worker and self._geocode_worker.isRunning():
+                    self._geocode_worker.quit()
+                self._geocode_worker = ReverseGeocodeWorker(gps["latitude"], gps["longitude"])
+                self._geocode_worker.finished.connect(
+                    lambda place, i=info, k=cache_key: (
+                        self._geocode_cache.update({k: place}),
+                        self._preview_info.setText(i + f"<b>Locatie:</b> {place or '—'}"),
+                    )
+                )
+                self._geocode_worker.start()
+
+    @staticmethod
+    def _load_pixmap(path: str, max_size: int) -> QPixmap | None:
+        """Load a photo as a scaled QPixmap, with Pillow fallback for HEIC.
+
+        Args:
+            path:     Absolute path to the photo file.
+            max_size: Maximum width and height in pixels.
+
+        Returns:
+            Scaled :class:`QPixmap` or ``None`` on failure.
+        """
+        pixmap = QPixmap(path)
+        if pixmap.isNull():
+            # Fallback via Pillow (needed for HEIC and other formats Qt can't read)
+            try:
+                from PIL import Image  # noqa: PLC0415
+                import io  # noqa: PLC0415
+                img = Image.open(path).convert("RGB")
+                img.thumbnail((max_size, max_size))
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                qimg = QImage.fromData(buf.getvalue())
+                pixmap = QPixmap.fromImage(qimg)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Pillow fallback failed for %s: %s", os.path.basename(path), exc)
+                return None
+        if not pixmap.isNull():
+            return pixmap.scaled(max_size, max_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return None
 
     def _start_scan(self) -> None:
         self._table.setRowCount(0)
@@ -454,6 +698,10 @@ class PhotoGpsMatcher(QDialog):
         self._scan_worker.start()
 
     def _on_scan_done(self, matches: list) -> None:
+        if self._propagate_checkbox.isChecked():
+            matches = _propagate_gps(matches, self._max_gap_spin.value())
+        else:
+            matches = [{**m, "propagated": False, "propagated_from": None} for m in matches]
         self._matches = matches
         self._progress.setVisible(False)
         self._scan_btn.setEnabled(True)
@@ -465,10 +713,17 @@ class PhotoGpsMatcher(QDialog):
         for row, m in enumerate(matches):
             wav_name = os.path.basename(m["path"])
             wav_time = m["datetime"].strftime("%H:%M:%S") if m["datetime"] else "—"
-            photo_name = os.path.basename(m["photo_path"]) if m["photo_path"] else "geen match"
-            photo_time = m["photo_datetime"].strftime("%H:%M:%S") if m["photo_datetime"] else "—"
-            diff_str = _format_diff(m["diff"]) if m["diff"] is not None else "—"
-            gps_str = "✓" if m["gps"] else "✗"
+
+            if m.get("propagated"):
+                photo_name = f"← {m['propagated_from']}"
+                photo_time = "—"
+                diff_str = _format_diff(m["diff"]) if m["diff"] is not None else "—"
+                gps_str = "↑"
+            else:
+                photo_name = os.path.basename(m["photo_path"]) if m["photo_path"] else "geen match"
+                photo_time = m["photo_datetime"].strftime("%H:%M:%S") if m["photo_datetime"] else "—"
+                diff_str = _format_diff(m["diff"]) if m["diff"] is not None else "—"
+                gps_str = "✓" if m["gps"] else "✗"
 
             for col, text in enumerate([wav_name, wav_time, photo_name, photo_time, diff_str, gps_str]):
                 self._table.setItem(row, col, QTableWidgetItem(text))
