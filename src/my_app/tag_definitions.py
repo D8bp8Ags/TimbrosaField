@@ -43,116 +43,44 @@ Example tag applications:
 """
 
 tag_categories = {
-    # Location and environment tags for natural settings
-    # Used to describe the primary location or environment where recording was made
-    "🌿 Nature": [
-        "stream",
-        "mountain",
-        "forest",
-        "dune",
+    "🌍 Environment": [
+        "forest", "field", "meadow", "heath",
+        "mountain", "valley",
+        "river", "stream", "lake", "pond", "waterfall",
+        "sea", "beach", "dune", "marsh",
         "cave",
-        "heath",
-        "lake",
-        "marsh",
-        "nature reserve",
-        "river",
-        "beach",
-        "valley",
-        "field",
-        "pond",
-        "waterfall",
-        "meadow",
-        "sea",
-    ],
-    # Urban environments and human-influenced locations
-    # Covers built environments, public spaces, and human activity areas
-    "🏙️ Urban / Human": [
+        "park", "square", "street", "station",
+        "school", "playground", "store",
         "construction site",
-        "park",
-        "square",
-        "school",
-        "playground",
-        "station",
-        "street",
-        "traffic",
-        "store",
     ],
-    # Animal sound sources for wildlife and domestic animals
-    # Identifies specific animals whose sounds are prominent in the recording
-    "🐦 Animals (wild & domestic)": [
-        "hedgehog",
-        "duck",
-        "goat",
-        "dog",
-        "cat",
-        "cow",
-        "frog",
-        "rabbit",
-        "mouse",
-        "horse",
-        "sheep",
-        "woodpecker",
-        "owl",
-        "pig",
-        "bat",
-        "bird",
-        "fox",
-        "swan",
+    "🔊 Sound source": [
+        "bird", "owl", "woodpecker", "duck", "swan",
+        "dog", "cat", "cow", "sheep", "horse", "goat", "pig",
+        "frog", "bat", "fox",
+        "bee", "bumblebee", "cricket", "grasshopper", "mosquito", "fly", "wasp",
+        "voices", "crowd", "footsteps",
+        "traffic", "machinery", "construction work",
+        "waves", "running water", "rustling leaves",
     ],
-    # Insects and small creatures often creating ambient soundscapes
-    # Used for recordings where insect or small animal sounds are significant
-    "🦗 Insects & Small animals": [
-        "bee",
-        "bumblebee",
-        "cricket",
-        "mosquito",
-        "caterpillar",
-        "snail",
-        "grasshopper",
-        "butterfly",
-        "fly",
-        "worm",
-        "wasp",
+    "🌦️ Conditions": [
+        "rain", "wind", "storm", "thunder",
+        "snow", "ice", "fog",
     ],
-    # Weather conditions and natural elements present during recording
-    # Describes environmental conditions affecting the soundscape
-    "🌧️ Weather & Elements": [
-        "dew",
-        "ice",
-        "fog",
-        "thunderstorm",
-        "rain",
-        "snow",
-        "storm",
-        "wind",
-        "sun",
+    "🕒 Time": [
+        "morning", "afternoon", "evening", "night",
     ],
-    # Temporal context indicating when the recording was made
-    # Helps categorize recordings by time period for lighting and activity correlation
-    "⏰ Time of day": ["evening", "afternoon", "night", "morning", "sunset", "sunrise"],
-    # Activity types and sound characteristics in the recording
-    # Describes the nature of activities or sound types present
-    "🛠️ Sound type / Activity": [
-        "construction noise",
-        "nearby",
-        "crowd",
-        "machines",
-        "voices",
-        "silence",
-        "distant",
-        "traffic",
-        "footsteps",
+    "🎚️ Sound character": [
+        "quiet", "loud",
+        "distant", "close",
+        "busy", "sparse",
+        "continuous", "intermittent",
+        "immersive",
     ],
-    # Technical aspects and quality characteristics of the recording
-    # Used to describe audio quality, recording technique, and technical properties
-    "🎧 Recording quality": [
-        "ambient",
-        "close",
-        "clear",
-        "mono",
-        "noise",
-        "stereo",
-        "distant",
-        "distortion",
+    "🎧 Recording": [
+        "mono", "stereo",
+        "clean", "noisy", "distorted",
+    ],
+    "🎭 Mood": [
+        "calm", "tense", "dark", "eerie",
     ],
 }

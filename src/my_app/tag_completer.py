@@ -973,48 +973,145 @@ class TemplateManager:
             while demonstrating effective tag combinations and naming conventions.
         """
         return {
+            # 🌿 NATURE
             "🌲 Forest Morning": {
-                "tags": ["forest", "bird", "wind", "morning", "silence", "clear"],
-                "description": "Early morning in the forest with birdsong",
+                "tags": ["forest", "bird", "rustling leaves", "morning", "quiet", "calm"],
+                "description": "Early morning forest ambience with birds and gentle leaf movement",
                 "usage_count": 0,
             },
-            "🏙️ Busy Street": {
-                "tags": ["street", "traffic", "voices", "busy", "city", "close"],
-                "description": "Busy urban street with traffic",
+            "🌳 Wind Through Trees": {
+                "tags": ["forest", "rustling leaves", "wind", "continuous", "immersive", "calm"],
+                "description": "Wind moving through trees with leaf movement",
                 "usage_count": 0,
             },
-            "🌧️ Rain Shower": {
-                "tags": ["rain", "wind", "storm", "water", "ambient", "distant"],
-                "description": "Rain shower and wind sounds",
+            "🌊 Streamside": {
+                "tags": ["stream", "running water", "forest", "morning", "continuous", "calm"],
+                "description": "Forest stream ambience with flowing water",
                 "usage_count": 0,
             },
-            "🦅 Bird Concert": {
-                "tags": ["bird", "woodpecker", "song", "nature", "morning", "clear"],
-                "description": "Rich birdsong in natural environment",
+            "🌊 Riverbank": {
+                "tags": ["river", "running water", "afternoon", "continuous", "immersive", "calm"],
+                "description": "Riverbank ambience with steady water flow",
+                "usage_count": 0,
+            },
+            "💦 Waterfall": {
+                "tags": ["waterfall", "running water", "forest", "loud", "continuous", "immersive"],
+                "description": "Strong waterfall sound in a natural setting",
                 "usage_count": 0,
             },
             "🌊 Seashore": {
-                "tags": ["sea", "beach", "waves", "wind", "ambient", "distant"],
-                "description": "Peaceful coastal sounds",
+                "tags": ["sea", "beach", "waves", "wind", "continuous", "calm"],
+                "description": "Coastal ambience with waves and sea wind",
                 "usage_count": 0,
             },
-            "🐄 Farm": {
-                "tags": ["cow", "horse", "dog", "field", "close", "clear"],
-                "description": "Lively farm sounds",
+            "🏜️ Dune Wind": {
+                "tags": ["dune", "wind", "evening", "sparse", "distant", "calm"],
+                "description": "Wind across a dune landscape",
                 "usage_count": 0,
             },
-            "🌙 Silent Night": {
-                "tags": ["night", "silence", "owl", "distant", "ambient", "quiet"],
-                "description": "Peaceful nighttime atmosphere",
+            "🌾 Open Meadow": {
+                "tags": ["meadow", "bird", "wind", "afternoon", "immersive", "calm"],
+                "description": "Open meadow ambience with birds and wind",
                 "usage_count": 0,
             },
-            "🦗 Summer Insects": {
-                "tags": ["cricket", "bee", "fly", "summer", "close", "clear"],
-                "description": "Lively summer insect sounds",
+            "🌿 Heath Wind": {
+                "tags": ["heath", "wind", "evening", "continuous", "quiet", "dark"],
+                "description": "Wind moving across heathland",
+                "usage_count": 0,
+            },
+            "🪨 Cave Interior": {
+                "tags": ["cave", "quiet", "distant", "immersive", "dark", "stereo"],
+                "description": "Dark cave interior with spacious ambience",
+                "usage_count": 0,
+            },
+
+            # 🌦️ WEATHER / CONDITIONS
+            "🌧️ Rain Ambience": {
+                "tags": ["rain", "wind", "continuous", "quiet", "dark"],
+                "description": "Steady rain with light wind",
+                "usage_count": 0,
+            },
+            "🌧️ Rain on Leaves": {
+                "tags": ["rain", "rustling leaves", "wind", "continuous", "quiet"],
+                "description": "Rain falling through foliage",
+                "usage_count": 0,
+            },
+            "🌫️ Foggy Field": {
+                "tags": ["field", "fog", "morning", "quiet", "sparse", "eerie"],
+                "description": "Quiet fog-covered field",
+                "usage_count": 0,
+            },
+            "🧊 Winter Pond": {
+                "tags": ["pond", "ice", "quiet", "close", "calm"],
+                "description": "Frozen pond with subtle ice sounds",
+                "usage_count": 0,
+            },
+            "🌩️ Thunderstorm": {
+                "tags": ["rain", "storm", "thunder", "loud", "continuous", "tense"],
+                "description": "Heavy storm with thunder and rain",
+                "usage_count": 0,
+            },
+
+            # 🏙️ URBAN / HUMAN
+            "🏙️ Busy Street": {
+                "tags": ["street", "traffic", "voices", "busy", "close", "loud"],
+                "description": "Busy street with traffic and people",
+                "usage_count": 0,
+            },
+            "🚉 Station Crowd": {
+                "tags": ["station", "crowd", "footsteps", "voices", "busy", "immersive"],
+                "description": "Crowded station with movement and voices",
+                "usage_count": 0,
+            },
+            "🛍️ Store Interior": {
+                "tags": ["store", "voices", "footsteps", "close", "intermittent", "clean"],
+                "description": "Indoor store ambience",
+                "usage_count": 0,
+            },
+            "🏫 Schoolyard": {
+                "tags": ["school", "playground", "voices", "crowd", "afternoon", "busy"],
+                "description": "Schoolyard with active voices and play",
+                "usage_count": 0,
+            },
+            "🚧 Construction": {
+                "tags": ["construction site", "construction work", "machinery", "loud", "busy", "noisy"],
+                "description": "Construction site with heavy machinery",
+                "usage_count": 0,
+            },
+
+            # 🐾 ANIMALS
+            "🐦 Bird Chorus": {
+                "tags": ["forest", "bird", "woodpecker", "morning", "continuous", "immersive"],
+                "description": "Dense bird activity in a forest",
+                "usage_count": 0,
+            },
+            "🦆 Wetland Birds": {
+                "tags": ["marsh", "duck", "bird", "frog", "continuous", "immersive"],
+                "description": "Wetland ambience with birds and frogs",
+                "usage_count": 0,
+            },
+            "🦗 Insect Chorus": {
+                "tags": ["cricket", "grasshopper", "evening", "continuous", "immersive", "calm"],
+                "description": "Evening insect texture",
+                "usage_count": 0,
+            },
+            "🦇 Night Creatures": {
+                "tags": ["night", "bat", "frog", "distant", "sparse", "eerie"],
+                "description": "Night ambience with distant animal activity",
+                "usage_count": 0,
+            },
+            "🐄 Farmyard": {
+                "tags": ["field", "cow", "dog", "voices", "close", "busy"],
+                "description": "Active farm environment with animals and people",
+                "usage_count": 0,
+            },
+            "🐎 Meadow Horses": {
+                "tags": ["meadow", "horse", "afternoon", "quiet", "close", "calm"],
+                "description": "Quiet meadow with nearby horses",
                 "usage_count": 0,
             },
         }
-
+    
     def load_templates(self) -> dict[str, Any]:
         """Load templates from persistent storage with automatic fallback.
 
@@ -1293,7 +1390,7 @@ class TemplateQuickButtons(QWidget):
 
         # Label
         label = QLabel("Quick Templates:")
-        label.setStyleSheet("font-weight: bold; color: #666; font-size: 10pt;")
+        #label.setStyleSheet("font-weight: bold; color: #666; font-size: 10pt;")
         layout.addWidget(label)
 
         # Buttons layout
@@ -1473,7 +1570,7 @@ class TemplateManagerDialog(QDialog):
         left_layout.addWidget(self.template_list)
 
         self.stats_label = QLabel("Loading statistics...")
-        self.stats_label.setStyleSheet("color: #666; font-size: 9pt;")
+        # self.stats_label.setStyleSheet("color: #666; font-size: 9pt;")
         left_layout.addWidget(self.stats_label)
 
         return left_layout
@@ -1603,9 +1700,9 @@ class TemplateManagerDialog(QDialog):
 
             # Color code by popularity
             if usage_count > 5:
-                item.setBackground(QColor(200, 255, 200))  # Green for popular
+                item.setBackground(QColor(46, 125, 50))  # Green for popular
             elif usage_count > 0:
-                item.setBackground(QColor(255, 255, 200))  # Yellow for used
+                item.setBackground(QColor(183, 147, 0))  # Yellow for used
 
             self.template_list.addItem(item)
 

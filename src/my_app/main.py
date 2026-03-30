@@ -728,8 +728,8 @@ class MainWindow(QMainWindow):
             broadcast extension (bext), and info tables and their labels.
         """
         try:
-            tables = ["fmt_table", "bext_table", "info_table"]
-            labels = ["fmt_label", "bext_label", "info_label"]
+            tables = ["fmt_table", "bext_table", "info_table", "gps_table"]
+            labels = ["fmt_label", "bext_label", "info_label", "gps_label"]
             for name in tables:
                 if hasattr(self.wav_viewer, name):
                     getattr(self.wav_viewer, name).setVisible(visible)
