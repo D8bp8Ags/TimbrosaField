@@ -1452,14 +1452,10 @@ class TemplateQuickButtons(QWidget):
                 grid_pos += 1
 
         # More/Manage button — spans both columns on the next row
-        more_btn = QPushButton("⚙️ Manage")
+        more_btn = QPushButton("Manage templates")
         more_btn.setMaximumHeight(24)
         more_btn.setToolTip("Template Manager (F9)")
-        more_btn.setStyleSheet(
-            """QPushButton { background-color: #e8f4fd; border: 1px solid #bee5eb;
-            border-radius: 4px; font-size: 8pt; } QPushButton:hover { background-color: #d1ecf1; }
-            """
-        )
+        more_btn.setStyleSheet("")
         more_btn.clicked.connect(self.show_template_manager)
         next_row = (grid_pos + 1) // 2
         self.buttons_layout.addWidget(more_btn, next_row, 0, 1, 2)

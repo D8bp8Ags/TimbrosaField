@@ -2575,14 +2575,23 @@ class WavViewer(QWidget):
         if gps_data is False:  # validation failed, warning already shown
             return
 
+        # Read existing iXML so we can preserve photo_ref / location_name
+        existing_gps = None
+        try:
+            existing_gps = wav_analyze(self.filename).get("gps") or {}
+        except Exception:
+            existing_gps = {}
+
         if gps_data is None:
             # Check if file currently has GPS — if so, user intentionally cleared it
-            try:
-                if wav_analyze(self.filename).get("gps"):
-                    logger.debug("GPS fields cleared — will remove GPS from file")
-                    gps_data = {}  # signal: remove GPS from file
-            except Exception:
-                pass
+            if existing_gps:
+                logger.debug("GPS fields cleared — will remove GPS from file")
+                gps_data = {}  # signal: remove GPS from file
+        else:
+            # Carry over read-only iXML fields the user cannot edit in the table
+            for key in ("photo_ref", "location_name"):
+                if key in existing_gps:
+                    gps_data[key] = existing_gps[key]
 
         if gps_data is None and not metadata and not new_tags:
             return
