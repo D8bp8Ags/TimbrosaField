@@ -166,7 +166,6 @@ class CuePointsAnalysisDialog(QDialog):
         self.main_window = main_window
         self.parent_viewer = getattr(main_window, "wav_viewer", main_window)
         self.setup_ui()
-        self._start_analysis()
 
     def setup_ui(self):
         """Setup the user interface components.
@@ -261,6 +260,15 @@ class CuePointsAnalysisDialog(QDialog):
         button_layout.addWidget(close_button)
 
         layout.addLayout(button_layout)
+
+    def start_analysis(self):
+        """Reset state and start background analysis. Call before exec_()."""
+        self.cue_data = []
+        self.cue_table.setRowCount(0)
+        self.stats_label.setText("")
+        self._loading_label.setText("Analysing cue points...")
+        self._loading_label.setVisible(True)
+        self._start_analysis()
 
     def _start_analysis(self):
         try:

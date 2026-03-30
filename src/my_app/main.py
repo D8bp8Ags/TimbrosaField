@@ -1112,6 +1112,7 @@ class MainWindow(QMainWindow):
                              Result depends on dialog implementation (typically QDialog.Accepted/Rejected).
         """
         try:
+            self.cuepoints_manager.start_analysis()
             return self.cuepoints_manager.exec_()
         except Exception as exc:  # noqa: BLE001
             self.show_status_message(f"Cue analysis error: {exc}", 3000)
