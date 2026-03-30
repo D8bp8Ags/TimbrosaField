@@ -45,7 +45,9 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from photo_gps_matcher import load_photo_pixmap
+
+
+from ui_components import load_photo_pixmap
 from tag_completer import FileTagAutocomplete
 from ui_components import ApplicationStylist
 from user_config_manager import load_user_config
@@ -2082,6 +2084,7 @@ class WavViewer(QWidget):
             # Track marker for selection highlighting
             self.cue_lines.setdefault(cue_id_str, []).append(line)
 
+
     def _setup_interaction_handlers(self) -> None:
         """Set up comprehensive mouse interaction handlers for all plot widgets.
 
@@ -2296,6 +2299,7 @@ class WavViewer(QWidget):
             table.setRowCount(0)
         self.photo_preview_label.setVisible(False)
         self.photo_preview_image.setVisible(False)
+        self.photo_preview_image.setToolTip("")
 
     def _populate_fmt_table(self, fmt_data: dict[str, Any]) -> None:
         """Populate FMT chunk information table.
@@ -2356,9 +2360,13 @@ class WavViewer(QWidget):
             pixmap = load_photo_pixmap(abs_path, 220) if os.path.exists(abs_path) else None
             if pixmap:
                 self.photo_preview_image.setPixmap(pixmap)
+                self.photo_preview_image.setFixedSize(pixmap.size())
+                self.photo_preview_image.setCursor(Qt.PointingHandCursor)
+                self.photo_preview_image.setToolTip(f'<img src="{abs_path}" width="480">')
                 self.photo_preview_label.setVisible(True)
                 self.photo_preview_image.setVisible(True)
                 return
+        self.photo_preview_image.setToolTip("")
         self.photo_preview_label.setVisible(False)
         self.photo_preview_image.setVisible(False)
 

@@ -46,7 +46,7 @@ import os
 
 import app_config
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QFont, QPainter, QPalette, QPixmap
+from PyQt5.QtGui import QColor, QFont, QImage, QPainter, QPalette, QPixmap
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
     QFrame,
@@ -1167,13 +1167,13 @@ class ApplicationStylist:
     def apply_complete_styling(app):
         """Apply comprehensive professional application styling."""
         # Set application font to modern system font
-        font = QFont("Inter", 10)
+        font = QFont("Inter", 13)
         if not font.exactMatch():
-            font = QFont("Segoe UI", 10)  # Windows fallback
+            font = QFont("Segoe UI", 13)  # Windows fallback
         if not font.exactMatch():
-            font = QFont("SF Pro Display", 10)  # macOS fallback
+            font = QFont("SF Pro Display", 13)  # macOS fallback
         if not font.exactMatch():
-            font = QFont("Ubuntu", 10)  # Linux fallback
+            font = QFont("Ubuntu", 13)  # Linux fallback
 
         app.setFont(font)
 
@@ -1317,7 +1317,6 @@ class ApplicationStylist:
             border: 2px solid {ApplicationStylist.COLORS['border']};
             border-radius: 8px;
             padding: 2px 16px;
-            font-size: 11pt;
             color: {ApplicationStylist.COLORS['text_primary']};
             selection-background-color: {ApplicationStylist.COLORS['primary']};
         }}
@@ -2332,3 +2331,34 @@ class UIComponentManager:
     def hide_progress(self):
         """Delegate to status manager."""
         self.status_manager.hide_progress()
+
+
+def load_photo_pixmap(path: str, max_size: int) -> "QPixmap | None":
+    """Load a photo as a scaled QPixmap, with Pillow fallback for HEIC.
+
+    Args:
+        path:     Absolute path to the photo file.
+        max_size: Maximum width and height in pixels.
+
+    Returns:
+        Scaled :class:`QPixmap` or ``None`` on failure.
+    """
+    pixmap = QPixmap(path)
+    if pixmap.isNull():
+        try:
+            import io  # noqa: PLC0415
+
+            from PIL import Image  # noqa: PLC0415
+
+            img = Image.open(path).convert("RGB")
+            img.thumbnail((max_size, max_size))
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qimg = QImage.fromData(buf.getvalue())
+            pixmap = QPixmap.fromImage(qimg)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Pillow fallback failed for %s: %s", os.path.basename(path), exc)
+            return None
+    if not pixmap.isNull():
+        return pixmap.scaled(max_size, max_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    return None

@@ -368,7 +368,7 @@ class WavSaveOptionsDialog(QDialog):
 
         self.setWindowTitle("Save Options")
         self.setModal(True)
-        self.setFixedSize(520, 380)
+        self.setFixedSize(520, 300)
 
         self._setup_ui()
 
@@ -376,18 +376,16 @@ class WavSaveOptionsDialog(QDialog):
         """Setup the dialog user interface."""
         layout = QVBoxLayout(self)
 
-        # Header information
+        # Header information (hidden for now — re-enable if needed)
         filename_display = os.path.basename(self.filename)
-        layout.addWidget(QLabel(f"<b>File:</b> {filename_display}"))
-        layout.addWidget(QLabel(f"<b>New tags:</b> {self.new_tags}"))
+        # layout.addWidget(QLabel(f"<b>File:</b> {filename_display}"))
+        # layout.addWidget(QLabel(f"<b>New tags:</b> {self.new_tags}"))
+        # if self.gps_info:
+        #     layout.addWidget(QLabel(f"<b>GPS:</b> {self.gps_info}"))
+        # if self.existing_tags:
+        #     layout.addWidget(QLabel(f"<b>Existing tags:</b> {self.existing_tags}"))
 
-        if self.gps_info:
-            layout.addWidget(QLabel(f"<b>GPS:</b> {self.gps_info}"))
-
-        if self.existing_tags:
-            layout.addWidget(QLabel(f"<b>Existing tags:</b> {self.existing_tags}"))
-
-        layout.addWidget(QLabel(""))  # Spacer
+        layout.addWidget(QLabel(f"<b>{filename_display}</b>"))
         layout.addWidget(QLabel("<b>How do you want to save?</b>"))
 
         # Save method options

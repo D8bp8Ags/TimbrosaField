@@ -227,6 +227,7 @@ class FileTagAutocomplete(QWidget):
 
         # Current tags display
         self.tags_display = QLabel("Current tags: ")
+        self.tags_display.setWordWrap(True)
         layout.addWidget(self.tags_display)
 
         self.setLayout(layout)

@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timedelta
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -41,6 +41,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from ui_components import load_photo_pixmap
 from wav_analyzer import inject_ixml_chunk, remove_ixml_chunk, wav_analyze
 
 logger = logging.getLogger(__name__)
@@ -258,34 +259,6 @@ def _reverse_geocode_sync(lat: float, lon: float) -> str:
         logger.debug("Sync reverse geocode failed: %s", exc)
         return ""
 
-
-def load_photo_pixmap(path: str, max_size: int) -> "QPixmap | None":
-    """Load a photo as a scaled QPixmap, with Pillow fallback for HEIC.
-
-    Args:
-        path:     Absolute path to the photo file.
-        max_size: Maximum width and height in pixels.
-
-    Returns:
-        Scaled :class:`QPixmap` or ``None`` on failure.
-    """
-    pixmap = QPixmap(path)
-    if pixmap.isNull():
-        try:
-            from PIL import Image  # noqa: PLC0415
-            import io  # noqa: PLC0415
-            img = Image.open(path).convert("RGB")
-            img.thumbnail((max_size, max_size))
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            qimg = QImage.fromData(buf.getvalue())
-            pixmap = QPixmap.fromImage(qimg)
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("Pillow fallback failed for %s: %s", os.path.basename(path), exc)
-            return None
-    if not pixmap.isNull():
-        return pixmap.scaled(max_size, max_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-    return None
 
 
 # ---------------------------------------------------------------------------
