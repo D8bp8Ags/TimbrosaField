@@ -21,6 +21,7 @@ import time
 import app_config
 from batch_tageditor import BatchTagEditor
 from cuepoints_manager import CuePointsAnalysisDialog
+from photo_gps_matcher import PhotoGpsMatcher
 from dialog_manager import DialogManager
 from export_manager import ExportManagerInterface
 from file_manager import FileManagerInterface
@@ -200,6 +201,7 @@ class MainWindow(QMainWindow):
             "clear_tags": self._clear_tags,
             "reset_defaults": self._reset_to_defaults,
             "open_batch_tagger": self._open_batch_tagger,
+            "open_photo_gps_matcher": self._open_photo_gps_matcher,
             "open_template_manager": self._open_template_manager,
             "open_user_config_manager": self._open_user_config_manager,
         }
@@ -543,6 +545,31 @@ class MainWindow(QMainWindow):
             return False
         except Exception as exc:  # noqa: BLE001
             error_msg = f"Error opening batch tagger: {exc}"
+            self.show_status_message(error_msg, 5000)
+            QMessageBox.critical(self, "Error", error_msg)
+            return False
+
+    def _open_photo_gps_matcher(self) -> bool:
+        """Open the Photo GPS Matcher dialog.
+
+        Returns:
+            bool: True if GPS was applied, False if cancelled or no files available.
+        """
+        try:
+            wav_files = self.file_manager.get_all_wav_files()
+            if not wav_files:
+                QMessageBox.information(self, "No files", "No WAV files found.")
+                return False
+
+            dialog = PhotoGpsMatcher(self, wav_files)
+            result = dialog.exec_()
+            if result == dialog.Accepted:
+                self.show_status_message("Photo GPS matching completed", 3000)
+                return True
+            self.show_status_message("Photo GPS matching cancelled", 2000)
+            return False
+        except Exception as exc:  # noqa: BLE001
+            error_msg = f"Error opening Photo GPS Matcher: {exc}"
             self.show_status_message(error_msg, 5000)
             QMessageBox.critical(self, "Error", error_msg)
             return False
