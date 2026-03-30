@@ -406,9 +406,10 @@ class PhotoGpsMatcher(QDialog):
         wav_files (list, optional):  WAV file paths to process.
     """
 
-    def __init__(self, parent=None, wav_files=None) -> None:
+    def __init__(self, parent=None, wav_files=None, settings=None) -> None:
         super().__init__(parent)
         self.wav_files = wav_files or []
+        self._settings = settings
         self._photo_dir: str | None = None
         self._wav_entries: list = []
         self._matches: list = []
@@ -423,6 +424,15 @@ class PhotoGpsMatcher(QDialog):
 
         self._build_wav_entries()
         self._setup_ui()
+
+        # Restore last used photo folder
+        if self._settings:
+            saved = self._settings.get_photo_folder()
+            if saved and os.path.isdir(saved):
+                self._photo_dir = saved
+                self._folder_label.setText(saved)
+                self._folder_label.setStyleSheet("")
+                self._scan_btn.setEnabled(True)
 
     def closeEvent(self, event) -> None:
         """Stop background workers before closing."""
@@ -575,6 +585,8 @@ class PhotoGpsMatcher(QDialog):
             self._folder_label.setText(folder)
             self._folder_label.setStyleSheet("")
             self._scan_btn.setEnabled(True)
+            if self._settings:
+                self._settings.save_photo_folder(folder)
 
     def _on_row_selected(self) -> None:
         """Show photo preview and info for the selected row."""

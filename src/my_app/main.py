@@ -561,7 +561,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "No files", "No WAV files found.")
                 return False
 
-            dialog = PhotoGpsMatcher(self, wav_files)
+            dialog = PhotoGpsMatcher(self, wav_files, settings=self.settings_manager)
             result = dialog.exec_()
             if result == dialog.Accepted:
                 self.show_status_message("Photo GPS matching completed", 3000)

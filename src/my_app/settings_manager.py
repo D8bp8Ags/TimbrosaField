@@ -279,6 +279,26 @@ class SettingsManager:
         """
         return self.settings.value("ui/theme", default)
 
+    def save_photo_folder(self, folder_path: str) -> None:
+        """Save the last used photo folder for the Photo GPS Matcher.
+
+        Args:
+            folder_path: Absolute path to the photo folder.
+        """
+        self.settings.setValue("photo_matcher/last_folder", folder_path)
+        logger.debug("Photo folder saved: %s", folder_path)
+
+    def get_photo_folder(self, default: str = "") -> str:
+        """Retrieve the last used photo folder for the Photo GPS Matcher.
+
+        Args:
+            default: Fallback value if no folder has been saved.
+
+        Returns:
+            Saved folder path, or ``default`` if not set.
+        """
+        return self.settings.value("photo_matcher/last_folder", default)
+
     # ========== AUDIO SETTINGS ==========
 
     def save_audio_settings(self, volume, auto_play=False, seek_step=10):
