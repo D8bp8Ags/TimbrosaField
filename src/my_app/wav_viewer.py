@@ -2096,18 +2096,22 @@ class WavViewer(QWidget):
             brush = pg.mkBrush(*color)
             text_color = layer.get("text_color", "#aaaaff")
 
-            # One label per unique start_time — highest score wins, min 0.20
-            best: dict[float, tuple] = {}
+            # Top-3 labels per unique start_time — sorted by score, min 0.10
+            _GRAPH_MIN = 0.10
+            _GRAPH_TOP = 3
+            by_window: dict[float, list] = {}
             for det in layer["detections"]:
-                if det["score"] < 0.20:
+                if det["score"] < _GRAPH_MIN:
                     continue
                 s = det["start_time"]
-                if s not in best or det["score"] > best[s][1]:
-                    best[s] = (det["label"], det["score"], det["end_time"])
+                by_window.setdefault(s, []).append(det)
 
-            for start_s, (label, score, end_s) in sorted(best.items()):
+            for start_s, dets in sorted(by_window.items()):
+                top = sorted(dets, key=lambda d: -d["score"])[:_GRAPH_TOP]
+                end_s = top[0]["end_time"]
+                labels = [(d["label"], d["score"]) for d in top]
                 self._add_ai_region(
-                    plots, start_s, end_s, label, score, name, brush, text_color
+                    plots, start_s, end_s, labels, name, brush, text_color
                 )
 
     def _rebuild_ai_toggles(self, layers: list[dict]) -> None:
@@ -2136,20 +2140,18 @@ class WavViewer(QWidget):
         plots: list,
         start_s: float,
         end_s: float,
-        label: str,
-        score: float,
+        labels: list[tuple[str, float]],
         layer_name: str,
         brush,
         text_color: str,
     ) -> None:
-        """Add a semi-transparent region and text label for one detection.
+        """Add a semi-transparent region and stacked text labels for one window.
 
         Args:
             plots: PlotWidget instances to add the region to.
             start_s: Detection start in seconds.
             end_s: Detection end in seconds.
-            label: Human-readable label text.
-            score: Confidence score (0–1).
+            labels: List of (label, score) tuples sorted by descending score.
             layer_name: Source layer name used for toggle lookup.
             brush: PyQtGraph brush for the region fill.
             text_color: Hex colour string for the text label.
@@ -2167,20 +2169,23 @@ class WavViewer(QWidget):
             plot.addItem(region)
             self.ai_overlay_items.append((plot, region, layer_name))
 
-        text = pg.TextItem(
-            text=f"{label} {score:.2f}",
-            color=text_color,
-            anchor=(0, 1),
-        )
         font = QFont()
         font.setPointSize(9)
         font.setBold(True)
-        text.setFont(font)
-        text.setPos(start_s, 0.85)
-        text.setZValue(5)
-        text.setVisible(visible)
-        self.waveform_plot.addItem(text)
-        self.ai_overlay_items.append((self.waveform_plot, text, layer_name))
+
+        for i, (label, score) in enumerate(labels):
+            y = 0.95 - i * 0.15
+            text = pg.TextItem(
+                text=f"{label} {score:.2f}",
+                color=text_color,
+                anchor=(0, 1),
+            )
+            text.setFont(font)
+            text.setPos(start_s, y)
+            text.setZValue(5)
+            text.setVisible(visible)
+            self.waveform_plot.addItem(text)
+            self.ai_overlay_items.append((self.waveform_plot, text, layer_name))
 
     def refresh_ai_overlay(self) -> None:
         """Reload the AI overlay from the sidecar JSON for the current file.
