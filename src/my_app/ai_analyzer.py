@@ -263,18 +263,26 @@ class AiAnalysisWorker(QThread):
 
     def run(self) -> None:
         """Run BirdNET then AST; emit finished with combined results."""
-        results = {"wav_path": self._wav_path, "birdnet": None, "ast": None}
+        import torch  # noqa: PLC0415
 
-        self.status.emit("BirdNET: analysing species...")
+        ast_device = "MPS (GPU)" if torch.backends.mps.is_available() else "CPU"
+        results = {
+            "wav_path": self._wav_path,
+            "birdnet": None,
+            "ast": None,
+            "devices": {"birdnet": "CPU (TFLite)", "ast": ast_device},
+        }
+
+        self.status.emit("BirdNET: analysing species (CPU / TFLite)...")
         try:
             results["birdnet"] = self._run_birdnet()
             count = len(results["birdnet"] or [])
-            self.status.emit(f"BirdNET: {count} detections — starting AST...")
+            self.status.emit(f"BirdNET: {count} detections — starting AST ({ast_device})...")
         except Exception as exc:
             logger.error("BirdNET analysis failed: %s", exc)
-            self.status.emit("BirdNET failed — starting AST...")
+            self.status.emit(f"BirdNET failed — starting AST ({ast_device})...")
 
-        self.status.emit("AST: classifying soundscape (this may take a minute)...")
+        self.status.emit(f"AST: classifying soundscape on {ast_device} (this may take a minute)...")
         try:
             results["ast"] = self._run_ast()
         except Exception as exc:
@@ -487,6 +495,12 @@ class AiAnalysisDialog(QDialog):
         btn_row.addWidget(close_btn)
         root.addLayout(btn_row)
 
+        # Device info label (shown after analysis)
+        self._device_label = QLabel("")
+        self._device_label.setStyleSheet("color: #888888; font-size: 10px;")
+        self._device_label.setAlignment(Qt.AlignRight)
+        root.addWidget(self._device_label)
+
     # ------------------------------------------------------------------
     # Analysis lifecycle
     # ------------------------------------------------------------------
@@ -526,10 +540,18 @@ class AiAnalysisDialog(QDialog):
         self._populate_detections(results)
         self._populate_tags(results)
 
-        # Hide the app-level progress spinner if present
+        devices = results.get("devices") or {}
+        birdnet_dev = devices.get("birdnet", "CPU")
+        ast_dev = devices.get("ast", "CPU")
+        self._device_label.setText(f"BirdNET: {birdnet_dev}  |  AST: {ast_dev}")
+
+        # Refresh waveform overlay and hide progress spinner
         main_window = self.parent()
-        if main_window and hasattr(main_window, "ui_manager"):
-            main_window.ui_manager.hide_progress()
+        if main_window:
+            if hasattr(main_window, "ui_manager"):
+                main_window.ui_manager.hide_progress()
+            if hasattr(main_window, "wav_viewer"):
+                main_window.wav_viewer.refresh_ai_overlay()
 
     def _on_reanalyze(self) -> None:
         """Delete the sidecar and re-run analysis."""

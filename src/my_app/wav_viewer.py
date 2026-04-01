@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QButtonGroup,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -299,6 +300,12 @@ class WavViewer(QWidget):
         self.cue_labels: dict[str, str] = {}
         self.cue_markers: dict[str, Any] = {}
 
+        # AI detection overlay items (loaded from sidecar JSON)
+        # Each entry: (plot, item, source)
+        self.ai_overlay_items: list = []
+        self._ai_show_birdnet: bool = True
+        self._ai_show_ast: bool = True
+
         # UI state flags
         self._sync_connected: bool = False
         self._hover_connected: bool = False
@@ -548,9 +555,25 @@ class WavViewer(QWidget):
             Plot synchronization is handled separately in the interaction
             setup methods to avoid circular dependencies during initialization.
         """
-        # Waveform plots label
+        # Waveform plots label + AI overlay toggles
+        header_row = QHBoxLayout()
         plots_label = QLabel("Waveform Visualization:")
-        self.right_layout.addWidget(plots_label)
+        header_row.addWidget(plots_label)
+        header_row.addStretch()
+
+        self._cb_birdnet = QCheckBox("BirdNET")
+        self._cb_birdnet.setChecked(True)
+        self._cb_birdnet.setStyleSheet("color: #40d060;")
+        self._cb_birdnet.toggled.connect(lambda on: self._toggle_ai_source("birdnet", on))
+        header_row.addWidget(self._cb_birdnet)
+
+        self._cb_ast = QCheckBox("AST")
+        self._cb_ast.setChecked(True)
+        self._cb_ast.setStyleSheet("color: #6aa0e0;")
+        self._cb_ast.toggled.connect(lambda on: self._toggle_ai_source("ast", on))
+        header_row.addWidget(self._cb_ast)
+
+        self.right_layout.addLayout(header_row)
 
         # Create plot widgets with optimized settings
         # plot_config = {
@@ -1173,6 +1196,9 @@ class WavViewer(QWidget):
         self.cue_lines.clear()
         self.selected_cue_line = None
         self.selected_cue_id = None
+
+        # Clear AI overlay
+        self._clear_ai_overlay()
 
         # Configure plot ranges
         self._configure_plot_ranges()
@@ -2024,6 +2050,135 @@ class WavViewer(QWidget):
 
         self._process_cue_markers(analysis_result)
         self.show_metadata(analysis_result)
+        self._load_ai_overlay(filename)
+
+    # ------------------------------------------------------------------
+    # AI detection overlay
+    # ------------------------------------------------------------------
+
+    def _clear_ai_overlay(self) -> None:
+        """Remove all AI detection overlay items from all plots."""
+        for plot, item, _source in self.ai_overlay_items:
+            try:
+                plot.removeItem(item)
+            except Exception:
+                pass
+        self.ai_overlay_items.clear()
+
+    def _load_ai_overlay(self, wav_path: str) -> None:
+        """Load AI detections from sidecar JSON and draw them on the waveform.
+
+        BirdNET detections appear as green semi-transparent regions; high-confidence
+        AST results (>= 0.40) appear as blue regions. A text label is added at the
+        top of the main plot for each region.
+
+        Args:
+            wav_path: Absolute path to the WAV file.
+        """
+        from ai_analyzer import _load_sidecar  # noqa: PLC0415
+
+        self._clear_ai_overlay()
+
+        data = _load_sidecar(wav_path)
+        if not data:
+            return
+
+        plots = [self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom]
+
+        for det in (data.get("birdnet") or []):
+            self._add_ai_region(
+                plots, det["start_time"], det["end_time"],
+                det["common_name"], det["confidence"], "birdnet",
+            )
+
+        # One entry per AST window — only highest-scoring label, min score 0.40
+        best: dict[float, tuple] = {}
+        for det in (data.get("ast") or []):
+            if det["score"] >= 0.40:
+                s = det["start_time"]
+                if s not in best or det["score"] > best[s][1]:
+                    best[s] = (det["label"], det["score"], det["end_time"])
+        for start_s, (label, score, end_s) in sorted(best.items()):
+            self._add_ai_region(plots, start_s, end_s, label, score, "ast")
+
+    def _add_ai_region(
+        self,
+        plots: list,
+        start_s: float,
+        end_s: float,
+        label: str,
+        score: float,
+        source: str,
+    ) -> None:
+        """Add a semi-transparent region and text label for one AI detection.
+
+        Args:
+            plots: List of PlotWidget instances to add the region to.
+            start_s: Detection start in seconds.
+            end_s: Detection end in seconds.
+            label: Human-readable label text.
+            score: Confidence score (0–1).
+            source: ``"birdnet"`` or ``"ast"``.
+        """
+        if source == "birdnet":
+            brush = pg.mkBrush(50, 200, 80, 45)
+            text_color = "#40d060"
+        else:
+            brush = pg.mkBrush(80, 140, 220, 35)
+            text_color = "#6aa0e0"
+
+        source_visible = self._ai_show_birdnet if source == "birdnet" else self._ai_show_ast
+
+        for plot in plots:
+            region = pg.LinearRegionItem(
+                values=(start_s, end_s),
+                movable=False,
+                brush=brush,
+            )
+            region.setZValue(-10)
+            region.setVisible(source_visible)
+            plot.addItem(region)
+            self.ai_overlay_items.append((plot, region, source))
+
+        # Text label on main plot only
+        text = pg.TextItem(
+            text=f"{label} {score:.2f}",
+            color=text_color,
+            anchor=(0, 1),
+        )
+        font = QFont()
+        font.setPointSize(9)
+        font.setBold(True)
+        text.setFont(font)
+        text.setPos(start_s, 0.85)
+        text.setZValue(5)
+        text.setVisible(source_visible)
+        self.waveform_plot.addItem(text)
+        self.ai_overlay_items.append((self.waveform_plot, text, source))
+
+    def refresh_ai_overlay(self) -> None:
+        """Reload the AI overlay from the sidecar JSON for the current file.
+
+        Called by the AI analysis dialog after a new analysis completes.
+        """
+        if self.filename:
+            self._load_ai_overlay(self.filename)
+
+    def _toggle_ai_source(self, source: str, visible: bool) -> None:
+        """Show or hide all AI overlay items for a given source.
+
+        Args:
+            source: ``"birdnet"`` or ``"ast"``.
+            visible: True to show, False to hide.
+        """
+        if source == "birdnet":
+            self._ai_show_birdnet = visible
+        else:
+            self._ai_show_ast = visible
+
+        for _plot, item, item_source in self.ai_overlay_items:
+            if item_source == source:
+                item.setVisible(visible)
 
     def _on_metadata_error(self, filename: str, message: str) -> None:
         """Handle a failed background WAV analysis.
