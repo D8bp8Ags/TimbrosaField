@@ -2096,9 +2096,11 @@ class WavViewer(QWidget):
             brush = pg.mkBrush(*color)
             text_color = layer.get("text_color", "#aaaaff")
 
-            # One label per unique start_time — highest score wins
+            # One label per unique start_time — highest score wins, min 0.30
             best: dict[float, tuple] = {}
             for det in layer["detections"]:
+                if det["score"] < 0.30:
+                    continue
                 s = det["start_time"]
                 if s not in best or det["score"] > best[s][1]:
                     best[s] = (det["label"], det["score"], det["end_time"])

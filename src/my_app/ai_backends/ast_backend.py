@@ -82,7 +82,7 @@ def _label_level(name: str, has_children: set[str], has_parent: set[str]) -> str
 _CHUNK_SECONDS = 10
 _STEP_SECONDS = 5
 _TOP_N = 5
-_MIN_SCORE = 0.05
+_MIN_SCORE = 0.15
 
 
 class AstBackend(AiBackend):
