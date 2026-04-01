@@ -1,14 +1,16 @@
 """AI Analysis Dialog for field recordings.
 
-Provides BirdNET (bird species detection) and AST (soundscape classification)
-analysis for a single WAV file, with a timeline view of detections and
-tag export to WAV metadata via the existing WavSaveManager.
+Copyright (c) TimbrosaField — all rights reserved.
 
-Results are cached in a sidecar JSON file next to the WAV so analysis only
-runs once per file.
+Provides a backend-agnostic dialog and background worker for AI analysis of
+WAV files.  The actual model code lives in :mod:`ai_backends`; this module
+only contains UI, orchestration, and sidecar-cache logic.
+
+Results are cached in a sidecar JSON file (``<name>_ai.json``) next to the
+WAV so analysis only runs once per file.
 
 Classes:
-    AiAnalysisWorker: Background QThread that runs BirdNET and AST.
+    AiAnalysisWorker: Background QThread that drives registered backends.
     AiAnalysisDialog: Dialog showing detections and selectable tags.
 
 Functions:
@@ -40,145 +42,31 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Dutch species names (BirdNET provides English + scientific only)
+# Active backends — add or remove entries here to control which AI models run.
+# Each backend file carries its own licence notice.
 # ---------------------------------------------------------------------------
 
-DUTCH_NAMES = {
-    "Alopochen aegyptiaca": "Nijlgans",
-    "Anas platyrhynchos": "Wilde Eend",
-    "Anas crecca": "Wintertaling",
-    "Anas acuta": "Pijlstaart",
-    "Anas querquedula": "Zomertaling",
-    "Anas clypeata": "Slobeend",
-    "Anas penelope": "Smient",
-    "Anas strepera": "Krakeend",
-    "Aythya fuligula": "Kuifeend",
-    "Aythya ferina": "Tafeleend",
-    "Anser anser": "Grauwe Gans",
-    "Anser albifrons": "Kolgans",
-    "Anser brachyrhynchus": "Kleine Rietgans",
-    "Branta canadensis": "Canadese Gans",
-    "Branta leucopsis": "Brandgans",
-    "Branta bernicla": "Rotgans",
-    "Cygnus olor": "Knobbelzwaan",
-    "Cygnus cygnus": "Wilde Zwaan",
-    "Chroicocephalus ridibundus": "Kokmeeuw",
-    "Larus argentatus": "Zilvermeeuw",
-    "Larus michahellis": "Geelpootmeeuw",
-    "Larus fuscus": "Kleine Mantelmeeuw",
-    "Larus marinus": "Grote Mantelmeeuw",
-    "Larus canus": "Stormmeeuw",
-    "Hydrocoloeus minutus": "Dwergmeeuw",
-    "Sterna hirundo": "Visdief",
-    "Scolopax rusticola": "Houtsnip",
-    "Gallinago gallinago": "Watersnip",
-    "Vanellus vanellus": "Kievit",
-    "Pluvialis apricaria": "Goudplevier",
-    "Charadrius hiaticula": "Bontbekplevier",
-    "Haematopus ostralegus": "Scholekster",
-    "Tringa totanus": "Tureluur",
-    "Tringa nebularia": "Groenpootruiter",
-    "Actitis hypoleucos": "Oeverloper",
-    "Numenius arquata": "Wulp",
-    "Limosa limosa": "Grutto",
-    "Ardea cinerea": "Blauwe Reiger",
-    "Ardea alba": "Grote Zilverreiger",
-    "Egretta garzetta": "Kleine Zilverreiger",
-    "Nycticorax nycticorax": "Kwak",
-    "Ciconia ciconia": "Ooievaar",
-    "Phalacrocorax carbo": "Aalscholver",
-    "Podiceps cristatus": "Fuut",
-    "Fulica atra": "Meerkoet",
-    "Gallinula chloropus": "Waterhoen",
-    "Rallus aquaticus": "Waterral",
-    "Alcedo atthis": "IJsvogel",
-    "Columba palumbus": "Houtduif",
-    "Columba livia": "Stadsduif",
-    "Streptopelia decaocto": "Turkse Tortel",
-    "Streptopelia turtur": "Tortelduif",
-    "Cuculus canorus": "Koekoek",
-    "Apus apus": "Gierzwaluw",
-    "Hirundo rustica": "Boerenzwaluw",
-    "Delichon urbicum": "Huiszwaluw",
-    "Riparia riparia": "Oeverzwaluw",
-    "Picus viridis": "Groene Specht",
-    "Dendrocopos major": "Grote Bonte Specht",
-    "Dendrocopos minor": "Kleine Bonte Specht",
-    "Dryocopus martius": "Zwarte Specht",
-    "Falco tinnunculus": "Torenvalk",
-    "Falco subbuteo": "Boomvalk",
-    "Falco peregrinus": "Slechtvalk",
-    "Accipiter nisus": "Sperwer",
-    "Accipiter gentilis": "Havik",
-    "Buteo buteo": "Buizerd",
-    "Pernis apivorus": "Wespendief",
-    "Milvus milvus": "Rode Wouw",
-    "Circus aeruginosus": "Bruine Kiekendief",
-    "Haliaeetus albicilla": "Zeearend",
-    "Corvus corax": "Raaf",
-    "Corvus corone": "Zwarte Kraai",
-    "Corvus monedula": "Kauw",
-    "Corvus frugilegus": "Roek",
-    "Pica pica": "Ekster",
-    "Garrulus glandarius": "Vlaamse Gaai",
-    "Parus major": "Koolmees",
-    "Cyanistes caeruleus": "Pimpelmees",
-    "Periparus ater": "Zwarte Mees",
-    "Lophophanes cristatus": "Kuifmees",
-    "Poecile palustris": "Glanskop",
-    "Poecile montanus": "Matkop",
-    "Aegithalos caudatus": "Staartmees",
-    "Sitta europaea": "Boomklever",
-    "Certhia familiaris": "Boomkruiper",
-    "Troglodytes troglodytes": "Winterkoning",
-    "Erithacus rubecula": "Roodborst",
-    "Luscinia megarhynchos": "Nachtegaal",
-    "Phoenicurus ochruros": "Zwarte Roodstaart",
-    "Phoenicurus phoenicurus": "Gekraagde Roodstaart",
-    "Saxicola rubetra": "Paapje",
-    "Saxicola torquatus": "Roodborsttapuit",
-    "Turdus merula": "Merel",
-    "Turdus philomelos": "Zanglijster",
-    "Turdus iliacus": "Koperwiek",
-    "Turdus pilaris": "Kramsvogel",
-    "Turdus viscivorus": "Grote Lijster",
-    "Muscicapa striata": "Grauwe Vliegenvanger",
-    "Ficedula hypoleuca": "Bonte Vliegenvanger",
-    "Sylvia atricapilla": "Zwartkop",
-    "Sylvia communis": "Grasmus",
-    "Sylvia borin": "Tuinfluiter",
-    "Curruca curruca": "Braamsluiper",
-    "Acrocephalus scirpaceus": "Kleine Karekiet",
-    "Acrocephalus arundinaceus": "Grote Karekiet",
-    "Acrocephalus palustris": "Bosrietzanger",
-    "Locustella naevia": "Sprinkhaanzanger",
-    "Phylloscopus collybita": "Tjiftjaf",
-    "Phylloscopus trochilus": "Fitis",
-    "Regulus regulus": "Goudhaan",
-    "Regulus ignicapilla": "Vuurgoudhaan",
-    "Fringilla coelebs": "Vink",
-    "Fringilla montifringilla": "Keep",
-    "Chloris chloris": "Groenling",
-    "Carduelis carduelis": "Putter",
-    "Spinus spinus": "Sijs",
-    "Linaria cannabina": "Kneu",
-    "Pyrrhula pyrrhula": "Goudvink",
-    "Coccothraustes coccothraustes": "Appelvink",
-    "Emberiza citrinella": "Geelgors",
-    "Emberiza schoeniclus": "Rietgors",
-    "Passer domesticus": "Huismus",
-    "Passer montanus": "Ringmus",
-    "Sturnus vulgaris": "Spreeuw",
-    "Motacilla alba": "Witte Kwikstaart",
-    "Motacilla flava": "Gele Kwikstaart",
-    "Motacilla cinerea": "Grote Gele Kwikstaart",
-    "Anthus pratensis": "Graspieper",
-    "Anthus trivialis": "Boompieper",
-    "Anthus spinoletta": "Waterpieper",
-    "Lanius collurio": "Grauwe Klauwier",
-    "Lanius excubitor": "Klapekster",
-    "Oriolus oriolus": "Wielewaal",
-}
+def _load_backends() -> list:
+    """Import and instantiate all enabled backends.
+
+    Backends that fail to import (missing optional dependency) are silently
+    skipped so the app still starts without every model installed.
+
+    Returns:
+        List of :class:`~ai_backends.base.AiBackend` instances.
+    """
+    backends = []
+    try:
+        from ai_backends.birdnet_backend import BirdnetBackend  # noqa: PLC0415
+        backends.append(BirdnetBackend())
+    except ImportError:
+        logger.info("BirdNET backend not available (birdnetlib not installed)")
+    try:
+        from ai_backends.ast_backend import AstBackend  # noqa: PLC0415
+        backends.append(AstBackend())
+    except ImportError:
+        logger.info("AST backend not available (transformers not installed)")
+    return backends
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +74,7 @@ DUTCH_NAMES = {
 # ---------------------------------------------------------------------------
 
 def _sidecar_path(wav_path: str) -> str:
-    """Return the path for the AI analysis sidecar JSON next to the WAV.
+    """Return the sidecar JSON path for a WAV file.
 
     Args:
         wav_path: Absolute path to the WAV file.
@@ -199,20 +87,24 @@ def _sidecar_path(wav_path: str) -> str:
 
 
 def _load_sidecar(wav_path: str) -> dict | None:
-    """Load cached AI results from sidecar JSON if it exists.
+    """Load cached AI results from the sidecar JSON if it exists.
 
     Args:
         wav_path: Absolute path to the WAV file.
 
     Returns:
-        Parsed dict or None if not found / unreadable.
+        Parsed dict or ``None`` if not found / unreadable.
     """
     path = _sidecar_path(wav_path)
     if not os.path.exists(path):
         return None
     try:
         with open(path) as f:
-            return json.load(f)
+            data = json.load(f)
+        # Reject old-format sidecars (pre-refactor) that lack the layers key
+        if "layers" not in data:
+            return None
+        return data
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Could not load AI sidecar %s: %s", path, exc)
         return None
@@ -239,16 +131,15 @@ def _save_sidecar(wav_path: str, data: dict) -> None:
 # ---------------------------------------------------------------------------
 
 class AiAnalysisWorker(QThread):
-    """Background thread that runs BirdNET and AST analysis without blocking the UI.
+    """Background thread that drives all registered AI backends.
 
-    Emits ``status`` with a human-readable progress string during analysis and
-    ``finished`` with the complete results dict when done. No Qt widgets are
-    touched inside ``run()``; all UI updates happen in connected slots on the
-    main thread.
+    Emits :attr:`status` with a human-readable progress string and
+    :attr:`finished` with the complete results dict when done.
+    No Qt widgets are touched inside :meth:`run`.
     """
 
-    status = pyqtSignal(str)    # progress message shown in loading label
-    finished = pyqtSignal(dict) # {wav_path, birdnet: [...], ast: [...]}
+    status = pyqtSignal(str)
+    finished = pyqtSignal(dict)  # {"wav_path": ..., "layers": [...]}
 
     def __init__(self, wav_path: str, metadata: dict) -> None:
         """Initialise with the WAV path and its pre-read metadata.
@@ -262,142 +153,30 @@ class AiAnalysisWorker(QThread):
         self._metadata = metadata
 
     def run(self) -> None:
-        """Run BirdNET then AST; emit finished with combined results."""
-        import torch  # noqa: PLC0415
+        """Run each backend in sequence; emit finished with all layers."""
+        backends = _load_backends()
+        layers = []
 
-        ast_device = "MPS (GPU)" if torch.backends.mps.is_available() else "CPU"
-        results = {
-            "wav_path": self._wav_path,
-            "birdnet": None,
-            "ast": None,
-            "devices": {"birdnet": "CPU (TFLite)", "ast": ast_device},
-        }
-
-        self.status.emit("BirdNET: analysing species (CPU / TFLite)...")
-        try:
-            results["birdnet"] = self._run_birdnet()
-            count = len(results["birdnet"] or [])
-            self.status.emit(f"BirdNET: {count} detections — starting AST ({ast_device})...")
-        except Exception as exc:
-            logger.error("BirdNET analysis failed: %s", exc)
-            self.status.emit(f"BirdNET failed — starting AST ({ast_device})...")
-
-        self.status.emit(f"AST: classifying soundscape on {ast_device} (this may take a minute)...")
-        try:
-            results["ast"] = self._run_ast()
-        except Exception as exc:
-            logger.error("AST analysis failed: %s", exc)
-
-        self.finished.emit(results)
-
-    def _run_birdnet(self) -> list:
-        """Run BirdNET with GPS and date filters from WAV metadata.
-
-        Returns:
-            List of detection dicts with common_name, scientific_name,
-            confidence, start_time, end_time.
-        """
-        from birdnetlib import Recording  # noqa: PLC0415
-        from birdnetlib.analyzer import Analyzer  # noqa: PLC0415
-
-        analyzer = Analyzer()
-        kwargs = {"min_conf": 0.25}
-
-        gps = self._metadata.get("gps") or {}
-        lat = gps.get("latitude")
-        lon = gps.get("longitude")
-        if lat and lon:
-            kwargs["lat"] = float(lat)
-            kwargs["lon"] = float(lon)
-
-        bext = self._metadata.get("bext") or {}
-        date_str = bext.get("OriginationDate", "")
-        if date_str and len(date_str) >= 10:
+        for backend in backends:
+            self.status.emit(f"{backend.name}: analysing ({backend.device_label})…")
             try:
-                from datetime import date as dt  # noqa: PLC0415
-                d = dt.fromisoformat(date_str[:10])
-                kwargs["week"] = min(max(round(d.timetuple().tm_yday / 7.25), 1), 48)
-            except ValueError:
-                pass
-
-        recording = Recording(analyzer, self._wav_path, **kwargs)
-        recording.analyze()
-        return [
-            {
-                "common_name": det["common_name"],
-                "scientific_name": det["scientific_name"],
-                "confidence": det["confidence"],
-                "start_time": det["start_time"],
-                "end_time": det["end_time"],
-            }
-            for det in recording.detections
-        ]
-
-    def _run_ast(self) -> list:
-        """Run AST with a 10s sliding window (50% overlap) over the full WAV.
-
-        Returns:
-            List of dicts with label, score, start_time, end_time; sorted by
-            start_time.
-        """
-        import numpy as np  # noqa: PLC0415
-        import soundfile as sf  # noqa: PLC0415
-        import torch  # noqa: PLC0415
-        from transformers import (  # noqa: PLC0415
-            ASTForAudioClassification,
-            AutoFeatureExtractor,
-        )
-
-        model_id = "MIT/ast-finetuned-audioset-10-10-0.448"
-        extractor = AutoFeatureExtractor.from_pretrained(model_id)
-        model = ASTForAudioClassification.from_pretrained(model_id)
-        model.eval()
-        device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-        model = model.to(device)
-
-        audio, sr = sf.read(self._wav_path, dtype="float32", always_2d=False)
-        if audio.ndim > 1:
-            audio = audio.mean(axis=1)
-
-        target_sr = extractor.sampling_rate
-        if sr != target_sr:
-            import librosa  # noqa: PLC0415
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-            sr = target_sr
-
-        chunk_samples = sr * 10
-        step_samples = sr * 5
-        results = []
-
-        for start in range(0, len(audio), step_samples):
-            chunk = audio[start : start + chunk_samples]
-            if len(chunk) < sr * 2:
-                break
-            if len(chunk) < chunk_samples:
-                chunk = np.pad(chunk, (0, chunk_samples - len(chunk)))
-
-            inputs = extractor(chunk, sampling_rate=sr, return_tensors="pt")
-            inputs = {k: v.to(device) for k, v in inputs.items()}
-            with torch.no_grad():
-                logits = model(**inputs).logits[0]
-
-            scores = torch.sigmoid(logits).cpu().numpy()
-            start_s = start / sr
-            end_s = min((start + chunk_samples) / sr, len(audio) / sr)
-
-            top_indices = scores.argsort()[::-1][:5]
-            for idx in top_indices:
-                score = float(scores[idx])
-                if score < 0.05:
-                    continue
-                results.append({
-                    "label": model.config.id2label[idx],
-                    "score": score,
-                    "start_time": start_s,
-                    "end_time": end_s,
+                detections = backend.analyze(self._wav_path, self._metadata)
+                layers.append({
+                    "name": backend.name,
+                    "color": list(backend.color),
+                    "text_color": backend.text_color,
+                    "device": backend.device_label,
+                    "detections": detections,
                 })
+                self.status.emit(
+                    f"{backend.name}: {len(detections)} detections"
+                    f" [{backend.device_label}]"
+                )
+            except Exception as exc:
+                logger.error("%s analysis failed: %s", backend.name, exc)
+                self.status.emit(f"{backend.name} failed")
 
-        return sorted(results, key=lambda x: x["start_time"])
+        self.finished.emit({"wav_path": self._wav_path, "layers": layers})
 
 
 # ---------------------------------------------------------------------------
@@ -405,10 +184,10 @@ class AiAnalysisWorker(QThread):
 # ---------------------------------------------------------------------------
 
 class AiAnalysisDialog(QDialog):
-    """Dialog showing BirdNET and AST results for a single WAV file.
+    """Dialog showing AI detection results for a single WAV file.
 
     Displays a two-tab interface: a chronological detection table and a
-    tag-selection panel. The user can tick tags and apply them to the WAV
+    tag-selection panel.  The user can tick tags and apply them to the WAV
     via the parent's save infrastructure.
     """
 
@@ -425,7 +204,7 @@ class AiAnalysisDialog(QDialog):
         super().__init__(parent)
         self._wav_path = wav_path
         self._metadata = metadata
-        self._results = None
+        self._layers: list[dict] = []
         self._worker = None
         self._tag_checkboxes: list[tuple[QCheckBox, str]] = []
         self._setup_ui()
@@ -456,7 +235,7 @@ class AiAnalysisDialog(QDialog):
         # Tab 1: chronological detections table
         self._detection_table = QTableWidget(0, 5)
         self._detection_table.setHorizontalHeaderLabels(
-            ["Time", "Source", "Label", "Dutch / Scientific", "Conf"]
+            ["Time", "Source", "Label", "Detail", "Conf"]
         )
         self._detection_table.horizontalHeader().setStretchLastSection(False)
         self._detection_table.horizontalHeader().setSectionResizeMode(
@@ -495,7 +274,7 @@ class AiAnalysisDialog(QDialog):
         btn_row.addWidget(close_btn)
         root.addLayout(btn_row)
 
-        # Device info label (shown after analysis)
+        # Device info label (populated after analysis)
         self._device_label = QLabel("")
         self._device_label.setStyleSheet("color: #888888; font-size: 10px;")
         self._device_label.setAlignment(Qt.AlignRight)
@@ -524,12 +303,12 @@ class AiAnalysisDialog(QDialog):
         self._worker.start()
 
     def _on_analysis_done(self, results: dict) -> None:
-        """Slot called on the main thread when the worker finishes.
+        """Handle completed analysis on the main thread.
 
         Args:
-            results: Dict with keys wav_path, birdnet, ast.
+            results: Dict with keys ``wav_path`` and ``layers``.
         """
-        self._results = results
+        self._layers = results.get("layers") or []
         _save_sidecar(self._wav_path, results)
 
         self._loading_label.setVisible(False)
@@ -537,15 +316,15 @@ class AiAnalysisDialog(QDialog):
         self._apply_btn.setEnabled(True)
         self._reanalyze_btn.setEnabled(True)
 
-        self._populate_detections(results)
-        self._populate_tags(results)
+        self._populate_detections()
+        self._populate_tags()
 
-        devices = results.get("devices") or {}
-        birdnet_dev = devices.get("birdnet", "CPU")
-        ast_dev = devices.get("ast", "CPU")
-        self._device_label.setText(f"BirdNET: {birdnet_dev}  |  AST: {ast_dev}")
+        device_parts = [
+            f"{layer['name']}: {layer.get('device', 'CPU')}"
+            for layer in self._layers
+        ]
+        self._device_label.setText("  |  ".join(device_parts))
 
-        # Refresh waveform overlay and hide progress spinner
         main_window = self.parent()
         if main_window:
             if hasattr(main_window, "ui_manager"):
@@ -567,36 +346,27 @@ class AiAnalysisDialog(QDialog):
     # Populate tabs
     # ------------------------------------------------------------------
 
-    def _populate_detections(self, results: dict) -> None:
-        """Fill the detections table with BirdNET and AST rows.
-
-        Args:
-            results: Results dict from the worker.
-        """
-        birdnet = results.get("birdnet") or []
-        ast = results.get("ast") or []
-
+    def _populate_detections(self) -> None:
+        """Fill the detections table from all layers, sorted by start time."""
         rows = []
-        for det in birdnet:
-            dutch = DUTCH_NAMES.get(det["scientific_name"], "–")
-            rows.append((
-                det["start_time"], det["end_time"],
-                "BirdNET", det["common_name"], dutch, det["confidence"],
-            ))
-        for det in ast:
-            rows.append((
-                det["start_time"], det["end_time"],
-                "AST", det["label"], "", det["score"],
-            ))
+        for layer in self._layers:
+            for det in layer["detections"]:
+                rows.append((
+                    det["start_time"],
+                    det["end_time"],
+                    layer["name"],
+                    det["label"],
+                    det.get("detail", ""),
+                    det["score"],
+                    layer.get("color", [40, 40, 60, 255]),
+                ))
         rows.sort(key=lambda r: r[0])
 
         self._detection_table.setRowCount(len(rows))
-        birdnet_color = QColor("#1a3d2b")
-        ast_color = QColor("#1a2540")
-
-        for row_idx, (start_s, end_s, src, label, detail, conf) in enumerate(rows):
+        for row_idx, (start_s, end_s, src, label, detail, conf, color) in enumerate(rows):
             start_fmt = f"{int(start_s) // 60}:{int(start_s) % 60:02d}"
             end_fmt = f"{int(end_s) // 60}:{int(end_s) % 60:02d}"
+            bg = QColor(color[0] // 3, color[1] // 3, color[2] // 3)
             cells = [
                 QTableWidgetItem(f"{start_fmt} – {end_fmt}"),
                 QTableWidgetItem(src),
@@ -604,7 +374,6 @@ class AiAnalysisDialog(QDialog):
                 QTableWidgetItem(detail),
                 QTableWidgetItem(f"{conf:.2f}"),
             ]
-            bg = birdnet_color if src == "BirdNET" else ast_color
             for col, cell in enumerate(cells):
                 cell.setBackground(bg)
                 cell.setForeground(QColor("#e8e8e8"))
@@ -612,58 +381,47 @@ class AiAnalysisDialog(QDialog):
 
         self._detection_table.resizeColumnsToContents()
 
-    def _populate_tags(self, results: dict) -> None:
-        """Fill the Tags tab with deduplicated, checkable tag labels.
-
-        BirdNET species are shown with their Dutch name; AST labels are shown
-        only when their score exceeds 0.20. Tags with high confidence are
-        pre-checked.
-
-        Args:
-            results: Results dict from the worker.
-        """
-        # Clear previous state
+    def _populate_tags(self) -> None:
+        """Fill the Tags tab with deduplicated, checkable tag labels."""
         while self._tag_layout.count():
             child = self._tag_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
         self._tag_checkboxes.clear()
 
-        birdnet = results.get("birdnet") or []
-        ast = results.get("ast") or []
+        # Deduplicate by (layer_name, tag_key); keep highest score
+        seen: dict[tuple, float] = {}
+        ordered: list[tuple] = []  # (layer_name, tag_key, tag, label_text, score)
 
-        def _add_tag(tag: str, label_text: str, checked: bool) -> None:
+        for layer in self._layers:
+            for det in sorted(layer["detections"], key=lambda d: -d["score"]):
+                if det["score"] < 0.20:
+                    continue
+                tag_key = det.get("tag_key") or det["label"]
+                key = (layer["name"], tag_key)
+                if key in seen:
+                    continue
+                seen[key] = det["score"]
+                tag = det.get("tag") or det["label"]
+                label_text = (
+                    f"{tag}  [{det['label']}]  — {layer['name']} {det['score']:.2f}"
+                    if tag != det["label"]
+                    else f"{det['label']}  — {layer['name']} {det['score']:.2f}"
+                )
+                ordered.append((layer["name"], tag_key, tag, label_text, det["score"]))
+
+        for _layer_name, _tag_key, tag, label_text, score in ordered:
             cb = QCheckBox(label_text)
-            cb.setChecked(checked)
+            cb.setChecked(score >= 0.40)
             self._tag_layout.addWidget(cb)
             self._tag_checkboxes.append((cb, tag))
-
-        # BirdNET — one entry per unique species, best confidence
-        seen: dict[str, float] = {}
-        for det in sorted(birdnet, key=lambda d: -d["confidence"]):
-            sci = det["scientific_name"]
-            if sci not in seen:
-                seen[sci] = det["confidence"]
-                dutch = DUTCH_NAMES.get(sci)
-                tag = dutch or det["common_name"]
-                label = f"{tag}  [{det['common_name']}]  — BirdNET {det['confidence']:.2f}"
-                _add_tag(tag, label, checked=True)
-
-        # AST — one entry per unique label above 0.20, best score
-        seen_ast: dict[str, float] = {}
-        for det in sorted(ast, key=lambda d: -d["score"]):
-            lbl = det["label"]
-            if det["score"] >= 0.20 and lbl not in seen_ast:
-                seen_ast[lbl] = det["score"]
-                label = f"{lbl}  — AST {det['score']:.2f}"
-                _add_tag(lbl, label, checked=det["score"] >= 0.40)
 
     # ------------------------------------------------------------------
     # Tag application
     # ------------------------------------------------------------------
 
     def _on_apply_tags(self) -> None:
-        """Collect checked tags and emit ``tags_selected`` signal."""
+        """Collect checked tags and emit :attr:`tags_selected`."""
         selected = [tag for cb, tag in self._tag_checkboxes if cb.isChecked()]
         if not selected:
             QMessageBox.information(self, "No tags selected", "Select at least one tag to apply.")
