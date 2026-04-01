@@ -1014,6 +1014,16 @@ class AnalysisMenuHandler(MenuHandlerBase):
         )
         analysis_menu.addAction(cue_analysis_action)
 
+        analysis_menu.addSeparator()
+
+        # AI analysis
+        ai_action = QAction("🤖 &AI Analysis...", self.main_window)
+        ai_action.setStatusTip("Analyse selected WAV with BirdNET and AST (AI)")
+        ai_action.triggered.connect(
+            lambda: self._execute_analysis_command("show_ai_analysis")
+        )
+        analysis_menu.addAction(ai_action)
+
         logger.debug("Analysis menu setup completed")
 
     def _execute_analysis_command(self, command_name):

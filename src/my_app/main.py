@@ -19,6 +19,7 @@ import sys
 import time
 
 import app_config
+from ai_analyzer import AiAnalysisDialog
 from batch_tageditor import BatchTagEditor
 from cuepoints_manager import CuePointsAnalysisDialog
 from photo_gps_matcher import PhotoGpsMatcher
@@ -244,6 +245,7 @@ class MainWindow(QMainWindow):
             "show_cue_analysis": with_progress(
                 self._show_cue_analysis, "Analyzing cue points…"
             ),
+            "show_ai_analysis": self._show_ai_analysis,
         }
 
         # Help commands
@@ -1117,6 +1119,56 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             self.show_status_message(f"Cue analysis error: {exc}", 3000)
             return False
+
+    def _show_ai_analysis(self) -> bool:
+        """Open the AI analysis dialog for the currently selected WAV file.
+
+        Runs BirdNET and AST analysis in a background thread. Results are
+        cached in a sidecar JSON file so subsequent opens are instant.
+
+        Returns:
+            bool: True if the dialog was opened, False if no file is selected.
+        """
+        from wav_analyzer import wav_analyze  # noqa: PLC0415
+
+        wav_path = self.wav_viewer.filename
+        if not wav_path:
+            self.show_status_message("No WAV file selected.", 2000)
+            return False
+
+        try:
+            metadata = wav_analyze(wav_path)
+            dialog = AiAnalysisDialog(wav_path, metadata, parent=self)
+            dialog.tags_selected.connect(self._on_ai_tags_selected)
+            dialog.start_analysis()
+            dialog.exec_()
+            return True
+        except Exception as exc:  # noqa: BLE001
+            self.show_status_message(f"AI analysis error: {exc}", 3000)
+            return False
+
+    def _on_ai_tags_selected(self, tags: list) -> None:
+        """Append AI-suggested tags to the current file's ICMT field in the info table.
+
+        Args:
+            tags: List of tag strings selected by the user in the AI dialog.
+        """
+        if not tags:
+            return
+        tag_str = ", ".join(tags)
+        table = self.wav_viewer.info_table
+        for row in range(table.rowCount()):
+            key_item = table.item(row, 0)
+            if key_item and key_item.text() == "ICMT":
+                val_item = table.item(row, 1)
+                existing = val_item.text().strip() if val_item else ""
+                merged = f"{existing}, {tag_str}".strip(", ") if existing else tag_str
+                if val_item:
+                    val_item.setText(merged)
+                logger.info("AI tags written to ICMT: %s", merged)
+                self.show_status_message("AI tags applied — save to write to file.", 3000)
+                return
+        logger.warning("ICMT row not found in info table")
 
     def _show_help_and_quickstart(self):
         """Display the help and quickstart guide dialog.
