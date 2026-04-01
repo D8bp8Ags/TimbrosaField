@@ -123,8 +123,14 @@ class AstBackend(AiBackend):
         import torch  # noqa: PLC0415
         from transformers import ASTForAudioClassification, AutoFeatureExtractor  # noqa: PLC0415
 
-        extractor = AutoFeatureExtractor.from_pretrained(_MODEL_ID)
-        model = ASTForAudioClassification.from_pretrained(_MODEL_ID)
+        def _load(cls, **kwargs):
+            try:
+                return cls.from_pretrained(_MODEL_ID, local_files_only=True, **kwargs)
+            except Exception:
+                return cls.from_pretrained(_MODEL_ID, **kwargs)
+
+        extractor = _load(AutoFeatureExtractor)
+        model = _load(ASTForAudioClassification)
         model.eval()
 
         device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
