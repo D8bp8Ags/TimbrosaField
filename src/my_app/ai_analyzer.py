@@ -233,9 +233,9 @@ class AiAnalysisDialog(QDialog):
         root.addWidget(self._tabs)
 
         # Tab 1: chronological detections table
-        self._detection_table = QTableWidget(0, 5)
+        self._detection_table = QTableWidget(0, 6)
         self._detection_table.setHorizontalHeaderLabels(
-            ["Time", "Source", "Label", "Detail", "Conf"]
+            ["Time", "Source", "Label", "Detail", "Level", "Score"]
         )
         self._detection_table.horizontalHeader().setStretchLastSection(False)
         self._detection_table.horizontalHeader().setSectionResizeMode(
@@ -347,32 +347,62 @@ class AiAnalysisDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _populate_detections(self) -> None:
-        """Fill the detections table from all layers, sorted by start time."""
+        """Fill the detections table from all layers.
+
+        Rows are sorted by start_time; rows sharing the same start_time are
+        kept together and shown with an alternating background shade so each
+        time window is visually distinct.  Each row shows a score bar and,
+        for AST detections, the AudioSet hierarchy level.
+        """
         rows = []
         for layer in self._layers:
             for det in layer["detections"]:
-                rows.append((
-                    det["start_time"],
-                    det["end_time"],
-                    layer["name"],
-                    det["label"],
-                    det.get("detail", ""),
-                    det["score"],
-                    layer.get("color", [40, 40, 60, 255]),
-                ))
-        rows.sort(key=lambda r: r[0])
+                rows.append({
+                    "start_time": det["start_time"],
+                    "end_time": det["end_time"],
+                    "source": layer["name"],
+                    "label": det["label"],
+                    "detail": det.get("detail", ""),
+                    "level": det.get("level", ""),
+                    "score": det["score"],
+                    "color": layer.get("color", [40, 40, 60, 255]),
+                })
+        rows.sort(key=lambda r: (r["start_time"], -r["score"]))
 
+        self._detection_table.setColumnCount(6)
+        self._detection_table.setHorizontalHeaderLabels(
+            ["Time", "Source", "Label", "Detail", "Level", "Score"]
+        )
         self._detection_table.setRowCount(len(rows))
-        for row_idx, (start_s, end_s, src, label, detail, conf, color) in enumerate(rows):
+
+        shade = False
+        prev_start = None
+
+        for row_idx, row in enumerate(rows):
+            # Flip shade each time the time window changes
+            if row["start_time"] != prev_start:
+                shade = not shade
+                prev_start = row["start_time"]
+
+            start_s, end_s = row["start_time"], row["end_time"]
             start_fmt = f"{int(start_s) // 60}:{int(start_s) % 60:02d}"
             end_fmt = f"{int(end_s) // 60}:{int(end_s) % 60:02d}"
-            bg = QColor(color[0] // 3, color[1] // 3, color[2] // 3)
+
+            score = row["score"]
+            bar = "█" * int(score * 10)
+            score_str = f"{score:.2f} {bar}"
+
+            c = row["color"]
+            base = (c[0] // 3, c[1] // 3, c[2] // 3)
+            bg = QColor(base[0] + 15, base[1] + 15, base[2] + 15) if shade else QColor(*base)
+
             cells = [
-                QTableWidgetItem(f"{start_fmt} – {end_fmt}"),
-                QTableWidgetItem(src),
-                QTableWidgetItem(label),
-                QTableWidgetItem(detail),
-                QTableWidgetItem(f"{conf:.2f}"),
+                QTableWidgetItem(f"{start_fmt}–{end_fmt}"),
+                QTableWidgetItem(row["source"]),
+                QTableWidgetItem(row["label"]),
+                QTableWidgetItem(row["detail"]),
+                QTableWidgetItem(row["level"]),
+                QTableWidgetItem(score_str),
             ]
             for col, cell in enumerate(cells):
                 cell.setBackground(bg)

@@ -14,9 +14,71 @@ Reference: https://huggingface.co/MIT/ast-finetuned-audioset-10-10-0.448
 Original paper: https://arxiv.org/abs/2104.01778
 """
 
+import json
+import logging
+import urllib.request
+from pathlib import Path
+
 from .base import AiBackend
 
+logger = logging.getLogger(__name__)
+
 _MODEL_ID = "MIT/ast-finetuned-audioset-10-10-0.448"
+_ONTOLOGY_URL = (
+    "https://raw.githubusercontent.com/audioset/ontology/master/ontology.json"
+)
+_ONTOLOGY_CACHE = Path.home() / ".cache" / "audioset_ontology.json"
+
+# Module-level cache so ontology is only parsed once per process
+_ontology_has_children: set[str] | None = None
+_ontology_has_parent: set[str] | None = None
+
+
+def _load_ontology() -> tuple[set[str], set[str]]:
+    """Load AudioSet ontology and return (has_children, has_parent) sets.
+
+    Downloads once to ``~/.cache/audioset_ontology.json``.  Returns empty
+    sets if the download fails.
+    """
+    global _ontology_has_children, _ontology_has_parent
+    if _ontology_has_children is not None:
+        return _ontology_has_children, _ontology_has_parent
+
+    try:
+        if not _ONTOLOGY_CACHE.exists():
+            data = urllib.request.urlopen(_ONTOLOGY_URL, timeout=10).read()
+            _ONTOLOGY_CACHE.write_bytes(data)
+        entries = json.loads(_ONTOLOGY_CACHE.read_text())
+    except Exception as exc:
+        logger.warning("Could not load AudioSet ontology: %s", exc)
+        _ontology_has_children = set()
+        _ontology_has_parent = set()
+        return _ontology_has_children, _ontology_has_parent
+
+    id_to_name = {e["id"]: e["name"] for e in entries}
+    has_children: set[str] = set()
+    has_parent: set[str] = set()
+
+    for entry in entries:
+        parent_name = entry["name"]
+        for child_id in entry.get("child_ids", []):
+            child_name = id_to_name.get(child_id)
+            if child_name:
+                has_children.add(parent_name)
+                has_parent.add(child_name)
+
+    _ontology_has_children = has_children
+    _ontology_has_parent = has_parent
+    return has_children, has_parent
+
+
+def _label_level(name: str, has_children: set[str], has_parent: set[str]) -> str:
+    """Return ``"root"``, ``"mid"``, or ``"leaf"`` for an AudioSet label."""
+    if name not in has_parent:
+        return "root"
+    if name in has_children:
+        return "mid"
+    return "leaf"
 _CHUNK_SECONDS = 10
 _STEP_SECONDS = 5
 _TOP_N = 5
@@ -35,7 +97,11 @@ class AstBackend(AiBackend):
     text_color = "#6aa0e0"
 
     def __init__(self) -> None:
-        self._device_label = "CPU"
+        try:
+            import torch  # noqa: PLC0415
+            self._device_label = "MPS (GPU)" if torch.backends.mps.is_available() else "CPU"
+        except ImportError:
+            self._device_label = "CPU"
 
     @property
     def device_label(self) -> str:
@@ -62,7 +128,6 @@ class AstBackend(AiBackend):
         model.eval()
 
         device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-        self._device_label = "MPS (GPU)" if device.type == "mps" else "CPU"
         model = model.to(device)
 
         audio, sr = sf.read(wav_path, dtype="float32", always_2d=False)
@@ -77,6 +142,7 @@ class AstBackend(AiBackend):
 
         chunk_samples = sr * _CHUNK_SECONDS
         step_samples = sr * _STEP_SECONDS
+        has_children, has_parent = _load_ontology()
         results = []
 
         for start in range(0, len(audio), step_samples):
@@ -99,11 +165,13 @@ class AstBackend(AiBackend):
                 score = float(scores[idx])
                 if score < _MIN_SCORE:
                     break
+                label = model.config.id2label[idx]
                 results.append({
-                    "label": model.config.id2label[idx],
+                    "label": label,
                     "score": score,
                     "start_time": start_s,
                     "end_time": end_s,
+                    "level": _label_level(label, has_children, has_parent),
                 })
 
         return sorted(results, key=lambda x: x["start_time"])
