@@ -22,6 +22,7 @@ class AiBackend(ABC):
     name: str
     color: tuple[int, int, int, int]
     text_color: str
+    options: dict = {}
 
     @abstractmethod
     def analyze(self, wav_path: str, metadata: dict) -> list[dict]:
@@ -41,8 +42,8 @@ class AiBackend(ABC):
 
             Backends may add optional keys recognised by the dialog:
 
-            - ``detail`` (str): secondary info shown in the Detections table
-              (e.g. ``"Roodborst (Erithacus rubecula)"``).
+            - ``detail`` (str): optional backend/context note shown in the
+              Detections table (e.g. ``"Geo filter applied"``).
             - ``tag`` (str): preferred tag value written to ICMT; falls back
               to ``label`` when absent.
             - ``tag_key`` (str): deduplication key for the Tags tab; falls
@@ -60,3 +61,8 @@ class AiBackend(ABC):
         Override in subclasses that support GPU acceleration.
         """
         return "CPU"
+
+    @property
+    def debug_output(self):
+        """Optional JSON-serialisable backend payload for inspection/debugging."""
+        return None

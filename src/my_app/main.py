@@ -1140,7 +1140,7 @@ class MainWindow(QMainWindow):
             metadata = wav_analyze(wav_path)
             dialog = AiAnalysisDialog(wav_path, metadata, parent=self)
             dialog.tags_selected.connect(self._on_ai_tags_selected)
-            dialog.start_analysis()
+            dialog.prepare_analysis()
             dialog.exec_()
             return True
         except Exception as exc:  # noqa: BLE001

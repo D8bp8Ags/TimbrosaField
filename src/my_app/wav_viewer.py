@@ -22,6 +22,7 @@ import soundfile as sf
 # Local imports
 import app_config
 from audio_player import AudioPlayer
+from ai_settings import graph_label_for_detection, load_ai_settings
 from PyQt5 import QtCore
 from PyQt5.QtCore import QEvent, QModelIndex, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QMouseEvent
@@ -2089,6 +2090,7 @@ class WavViewer(QWidget):
         self._rebuild_ai_toggles(layers)
 
         plots = [self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom]
+        graph_mode = load_ai_settings().get("graph_label_mode", "scientific")
 
         for layer in layers:
             name = layer["name"]
@@ -2101,6 +2103,8 @@ class WavViewer(QWidget):
             _GRAPH_TOP = 3
             by_window: dict[float, list] = {}
             for det in layer["detections"]:
+                if not det.get("enabled", True):
+                    continue
                 if det["score"] < _GRAPH_MIN:
                     continue
                 s = det["start_time"]
@@ -2109,7 +2113,10 @@ class WavViewer(QWidget):
             for start_s, dets in sorted(by_window.items()):
                 top = sorted(dets, key=lambda d: -d["score"])[:_GRAPH_TOP]
                 end_s = top[0]["end_time"]
-                labels = [(d["label"], d["score"]) for d in top]
+                labels = [
+                    (graph_label_for_detection(d, graph_mode), d["score"])
+                    for d in top
+                ]
                 self._add_ai_region(
                     plots, start_s, end_s, labels, name, brush, text_color
                 )

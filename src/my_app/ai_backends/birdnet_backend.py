@@ -11,154 +11,15 @@ Docs:      https://birdnet-team.github.io/birdnet/
 
 from __future__ import annotations
 
+import multiprocessing as mp
+import queue as queue_mod
+import time
 from datetime import date as dt_date
 
 from .base import AiBackend
+from species_names import get_dutch_name
 
 _MODEL_VERSION = "2.4"
-
-
-# ---------------------------------------------------------------------------
-# Dutch common names keyed by scientific name.
-# This mapping is original work and is NOT subject to the BirdNET licence.
-# ---------------------------------------------------------------------------
-
-DUTCH_NAMES: dict[str, str] = {
-    "Alopochen aegyptiaca": "Nijlgans",
-    "Anas platyrhynchos": "Wilde Eend",
-    "Anas crecca": "Wintertaling",
-    "Anas acuta": "Pijlstaart",
-    "Anas querquedula": "Zomertaling",
-    "Anas clypeata": "Slobeend",
-    "Anas penelope": "Smient",
-    "Anas strepera": "Krakeend",
-    "Aythya fuligula": "Kuifeend",
-    "Aythya ferina": "Tafeleend",
-    "Anser anser": "Grauwe Gans",
-    "Anser albifrons": "Kolgans",
-    "Anser brachyrhynchus": "Kleine Rietgans",
-    "Branta canadensis": "Canadese Gans",
-    "Branta leucopsis": "Brandgans",
-    "Branta bernicla": "Rotgans",
-    "Cygnus olor": "Knobbelzwaan",
-    "Cygnus cygnus": "Wilde Zwaan",
-    "Chroicocephalus ridibundus": "Kokmeeuw",
-    "Larus argentatus": "Zilvermeeuw",
-    "Larus michahellis": "Geelpootmeeuw",
-    "Larus fuscus": "Kleine Mantelmeeuw",
-    "Larus marinus": "Grote Mantelmeeuw",
-    "Larus canus": "Stormmeeuw",
-    "Hydrocoloeus minutus": "Dwergmeeuw",
-    "Sterna hirundo": "Visdief",
-    "Scolopax rusticola": "Houtsnip",
-    "Gallinago gallinago": "Watersnip",
-    "Vanellus vanellus": "Kievit",
-    "Pluvialis apricaria": "Goudplevier",
-    "Charadrius hiaticula": "Bontbekplevier",
-    "Haematopus ostralegus": "Scholekster",
-    "Tringa totanus": "Tureluur",
-    "Tringa nebularia": "Groenpootruiter",
-    "Actitis hypoleucos": "Oeverloper",
-    "Numenius arquata": "Wulp",
-    "Limosa limosa": "Grutto",
-    "Ardea cinerea": "Blauwe Reiger",
-    "Ardea alba": "Grote Zilverreiger",
-    "Egretta garzetta": "Kleine Zilverreiger",
-    "Nycticorax nycticorax": "Kwak",
-    "Ciconia ciconia": "Ooievaar",
-    "Phalacrocorax carbo": "Aalscholver",
-    "Podiceps cristatus": "Fuut",
-    "Fulica atra": "Meerkoet",
-    "Gallinula chloropus": "Waterhoen",
-    "Rallus aquaticus": "Waterral",
-    "Alcedo atthis": "IJsvogel",
-    "Columba palumbus": "Houtduif",
-    "Columba livia": "Stadsduif",
-    "Streptopelia decaocto": "Turkse Tortel",
-    "Streptopelia turtur": "Tortelduif",
-    "Cuculus canorus": "Koekoek",
-    "Apus apus": "Gierzwaluw",
-    "Hirundo rustica": "Boerenzwaluw",
-    "Delichon urbicum": "Huiszwaluw",
-    "Riparia riparia": "Oeverzwaluw",
-    "Picus viridis": "Groene Specht",
-    "Dendrocopos major": "Grote Bonte Specht",
-    "Dendrocopos minor": "Kleine Bonte Specht",
-    "Dryocopus martius": "Zwarte Specht",
-    "Falco tinnunculus": "Torenvalk",
-    "Falco subbuteo": "Boomvalk",
-    "Falco peregrinus": "Slechtvalk",
-    "Accipiter nisus": "Sperwer",
-    "Accipiter gentilis": "Havik",
-    "Buteo buteo": "Buizerd",
-    "Pernis apivorus": "Wespendief",
-    "Milvus milvus": "Rode Wouw",
-    "Circus aeruginosus": "Bruine Kiekendief",
-    "Haliaeetus albicilla": "Zeearend",
-    "Corvus corax": "Raaf",
-    "Corvus corone": "Zwarte Kraai",
-    "Corvus monedula": "Kauw",
-    "Corvus frugilegus": "Roek",
-    "Pica pica": "Ekster",
-    "Garrulus glandarius": "Vlaamse Gaai",
-    "Parus major": "Koolmees",
-    "Cyanistes caeruleus": "Pimpelmees",
-    "Periparus ater": "Zwarte Mees",
-    "Lophophanes cristatus": "Kuifmees",
-    "Poecile palustris": "Glanskop",
-    "Poecile montanus": "Matkop",
-    "Aegithalos caudatus": "Staartmees",
-    "Sitta europaea": "Boomklever",
-    "Certhia familiaris": "Boomkruiper",
-    "Troglodytes troglodytes": "Winterkoning",
-    "Erithacus rubecula": "Roodborst",
-    "Luscinia megarhynchos": "Nachtegaal",
-    "Phoenicurus ochruros": "Zwarte Roodstaart",
-    "Phoenicurus phoenicurus": "Gekraagde Roodstaart",
-    "Saxicola rubetra": "Paapje",
-    "Saxicola torquatus": "Roodborsttapuit",
-    "Turdus merula": "Merel",
-    "Turdus philomelos": "Zanglijster",
-    "Turdus iliacus": "Koperwiek",
-    "Turdus pilaris": "Kramsvogel",
-    "Turdus viscivorus": "Grote Lijster",
-    "Muscicapa striata": "Grauwe Vliegenvanger",
-    "Ficedula hypoleuca": "Bonte Vliegenvanger",
-    "Sylvia atricapilla": "Zwartkop",
-    "Sylvia communis": "Grasmus",
-    "Sylvia borin": "Tuinfluiter",
-    "Curruca curruca": "Braamsluiper",
-    "Acrocephalus scirpaceus": "Kleine Karekiet",
-    "Acrocephalus arundinaceus": "Grote Karekiet",
-    "Acrocephalus palustris": "Bosrietzanger",
-    "Locustella naevia": "Sprinkhaanzanger",
-    "Phylloscopus collybita": "Tjiftjaf",
-    "Phylloscopus trochilus": "Fitis",
-    "Regulus regulus": "Goudhaan",
-    "Regulus ignicapilla": "Vuurgoudhaan",
-    "Fringilla coelebs": "Vink",
-    "Fringilla montifringilla": "Keep",
-    "Chloris chloris": "Groenling",
-    "Carduelis carduelis": "Putter",
-    "Spinus spinus": "Sijs",
-    "Linaria cannabina": "Kneu",
-    "Pyrrhula pyrrhula": "Goudvink",
-    "Coccothraustes coccothraustes": "Appelvink",
-    "Emberiza citrinella": "Geelgors",
-    "Emberiza schoeniclus": "Rietgors",
-    "Passer domesticus": "Huismus",
-    "Passer montanus": "Ringmus",
-    "Sturnus vulgaris": "Spreeuw",
-    "Motacilla alba": "Witte Kwikstaart",
-    "Motacilla flava": "Gele Kwikstaart",
-    "Motacilla cinerea": "Grote Gele Kwikstaart",
-    "Anthus pratensis": "Graspieper",
-    "Anthus trivialis": "Boompieper",
-    "Anthus spinoletta": "Waterpieper",
-    "Lanius collurio": "Grauwe Klauwier",
-    "Lanius excubitor": "Klapekster",
-    "Oriolus oriolus": "Wielewaal",
-}
 
 
 def _rows_from_predictions(predictions) -> list[dict]:
@@ -252,7 +113,11 @@ def _to_seconds(value) -> float:
 def _get_week(metadata: dict) -> int | None:
     """Extract ISO-like BirdNET week number from WAV metadata."""
     bext = metadata.get("bext") or {}
-    date_str = bext.get("OriginationDate", "")
+    date_str = (
+        bext.get("Origination Date")
+        or bext.get("OriginationDate")
+        or ""
+    )
     if not date_str or len(date_str) < 10:
         return None
     try:
@@ -260,6 +125,20 @@ def _get_week(metadata: dict) -> int | None:
     except ValueError:
         return None
     return min(max(round(recorded.timetuple().tm_yday / 7.25), 1), 48)
+
+
+def _birdnet_detail(metadata: dict, species_filter: list[str] | None) -> str:
+    """Return contextual detail text for BirdNET detections."""
+    gps = metadata.get("gps") or {}
+    lat = gps.get("latitude")
+    lon = gps.get("longitude")
+    week = _get_week(metadata)
+
+    if species_filter:
+        return f"Geo filter applied ({len(species_filter)} species)"
+    if lat is not None and lon is not None and week is not None:
+        return "Geo filter unavailable"
+    return ""
 
 
 def _split_species(row: dict) -> tuple[str, str]:
@@ -294,70 +173,119 @@ class BirdnetBackend(AiBackend):
     text_color = "#40d060"
 
     def __init__(self) -> None:
-        self._model = None
-        self._geo_model = None
+        self.options = {}
+        self._debug_output = None
 
-    def _load_model(self):
-        """Load and cache the official acoustic model."""
-        if self._model is None:
-            import birdnet  # noqa: PLC0415
+    def analyze(self, wav_path: str, metadata: dict) -> list[dict]:
+        """Run BirdNET in an isolated subprocess.
 
-            self._model = birdnet.load("acoustic", _MODEL_VERSION, "tf")
-        return self._model
+        The official ``birdnet`` package loads TensorFlow. On this macOS setup
+        that cannot safely coexist with AST/PyTorch in the GUI process, so
+        BirdNET runs in a spawned child process just like Perch.
+        """
+        ctx = mp.get_context("spawn")
+        result_queue: mp.Queue = ctx.Queue()
+        process = ctx.Process(
+            target=_birdnet_worker,
+            args=(wav_path, metadata, dict(self.options), result_queue),
+        )
+        process.start()
+        try:
+            deadline = time.monotonic() + 600
+            while True:
+                try:
+                    result = result_queue.get(timeout=1)
+                    break
+                except queue_mod.Empty:
+                    if not process.is_alive():
+                        raise RuntimeError(
+                            "BirdNET subprocess exited before returning "
+                            f"results (exit code {process.exitcode})"
+                        )
+                    if time.monotonic() >= deadline:
+                        process.terminate()
+                        raise RuntimeError("BirdNET subprocess timed out")
+        finally:
+            process.join(timeout=30)
 
-    def _load_geo_model(self):
-        """Load and cache the official geo prior model when available."""
-        if self._geo_model is None:
-            import birdnet  # noqa: PLC0415
+        if isinstance(result, Exception):
+            raise result
+        self._debug_output = result.get("raw_output")
+        return result.get("detections", [])
 
-            self._geo_model = birdnet.load("geo", _MODEL_VERSION, "tf")
-        return self._geo_model
+    @property
+    def debug_output(self):
+        """JSON-safe copy of the raw BirdNET prediction payload."""
+        return self._debug_output
 
-    def _species_filter(self, metadata: dict) -> list[str] | None:
-        """Build an optional BirdNET species filter from geo metadata."""
+
+def _birdnet_worker(
+    wav_path: str,
+    metadata: dict,
+    options: dict,
+    result_queue: mp.Queue,
+) -> None:
+    """Run official BirdNET inference inside a fresh subprocess."""
+    try:
+        import birdnet  # noqa: PLC0415
+
+        model = birdnet.load("acoustic", _MODEL_VERSION, "tf")
+        top_k = int(options.get("top_k", 5))
+        min_confidence = float(options.get("min_confidence", 0.10))
+        overlap_duration_s = float(options.get("overlap_duration_s", 0.0))
+        sigmoid_sensitivity = float(options.get("sigmoid_sensitivity", 1.0))
+        bandpass_fmin = int(options.get("bandpass_fmin", 0))
+        bandpass_fmax = int(options.get("bandpass_fmax", 15000))
+        use_geo_filter = bool(options.get("use_geo_filter", True))
+        fallback_note = ""
+
         gps = metadata.get("gps") or {}
         lat = gps.get("latitude")
         lon = gps.get("longitude")
         week = _get_week(metadata)
-        if lat is None or lon is None or week is None:
-            return None
+        species_filter = None
+        if use_geo_filter and lat is not None and lon is not None and week is not None:
+            try:
+                geo_model = birdnet.load("geo", _MODEL_VERSION, "tf")
+                geo_predictions = geo_model.predict(float(lat), float(lon), week=week)
+                species = []
+                for row in _rows_from_predictions(geo_predictions):
+                    scientific, common = _split_species(row)
+                    if scientific and common:
+                        species.append(f"{scientific}_{common}")
+                    elif common:
+                        species.append(common)
+                species_filter = species or None
+            except Exception:
+                species_filter = None
 
         try:
-            predictions = self._load_geo_model().predict(float(lat), float(lon), week=week)
-        except Exception:
-            return None
-
-        species = []
-        for row in _rows_from_predictions(predictions):
-            scientific, common = _split_species(row)
-            if scientific and common:
-                species.append(f"{scientific}_{common}")
-            elif common:
-                species.append(common)
-        return species or None
-
-    def analyze(self, wav_path: str, metadata: dict) -> list[dict]:
-        """Run BirdNET using the official Python package."""
-        model = self._load_model()
-        species_filter = self._species_filter(metadata)
-
-        try:
+            kwargs = {
+                "top_k": top_k,
+                "overlap_duration_s": overlap_duration_s,
+                "bandpass_fmin": bandpass_fmin,
+                "bandpass_fmax": bandpass_fmax,
+                "sigmoid_sensitivity": sigmoid_sensitivity,
+                "default_confidence_threshold": min_confidence,
+            }
             if species_filter:
-                predictions = model.predict(wav_path, custom_species_list=species_filter)
-            else:
-                predictions = model.predict(wav_path)
+                kwargs["custom_species_list"] = species_filter
+            predictions = model.predict(wav_path, **kwargs)
         except TypeError:
-            # Fallback for versions that expose the file API but not species
-            # filtering yet.
+            fallback_note = (
+                "Limited API fallback used; some BirdNET options were not applied"
+            )
             predictions = model.predict(wav_path)
 
-        results = []
-        for row in _rows_from_predictions(predictions):
+        raw_rows = _rows_from_predictions(predictions)
+        detail_text = _birdnet_detail(metadata, species_filter)
+        if fallback_note:
+            detail_text = f"{detail_text}; {fallback_note}" if detail_text else fallback_note
+        detections = []
+        for row in raw_rows:
             scientific, common = _split_species(row)
-            dutch = DUTCH_NAMES.get(scientific)
-            label = common or scientific or str(row.get("label") or "Unknown")
-            tag = dutch or label
-            detail = f"{dutch} ({scientific})" if dutch and scientific else scientific
+            dutch = get_dutch_name(scientific)
+            label = scientific or common or str(row.get("label") or "Unknown")
             score = row.get("confidence")
             if score is None:
                 score = row.get("score", 0.0)
@@ -365,14 +293,28 @@ class BirdnetBackend(AiBackend):
             start = row.get("start_time", row.get("start"))
             end = row.get("end_time", row.get("end"))
 
-            results.append({
+            detections.append({
                 "label": label,
+                "scientific_name": scientific,
+                "english_name": common,
+                "dutch_name": dutch,
                 "score": float(score),
                 "start_time": _to_seconds(start),
                 "end_time": _to_seconds(end),
-                "detail": detail,
-                "tag": tag,
+                "detail": detail_text,
+                "tag": scientific or label,
                 "tag_key": scientific or label,
             })
 
-        return results
+        result_queue.put({
+            "detections": detections,
+            "raw_output": {
+                "model_version": _MODEL_VERSION,
+                "options": options,
+                "species_filter": species_filter,
+                "fallback_note": fallback_note,
+                "prediction_rows": raw_rows,
+            },
+        })
+    except Exception as exc:
+        result_queue.put(exc)

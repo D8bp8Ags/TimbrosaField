@@ -105,6 +105,7 @@ class AstBackend(AiBackend):
     text_color = "#6aa0e0"
 
     def __init__(self) -> None:
+        self.options = {}
         try:
             import torch  # noqa: PLC0415
             self._device_label = "MPS (GPU)" if torch.backends.mps.is_available() else "CPU"
@@ -143,6 +144,9 @@ class AstBackend(AiBackend):
 
         device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
         model = model.to(device)
+        step_seconds = max(1, int(self.options.get("step_seconds", _STEP_SECONDS)))
+        top_n = max(1, int(self.options.get("top_n", _TOP_N)))
+        min_score = float(self.options.get("min_score", _MIN_SCORE))
 
         audio, sr = sf.read(wav_path, dtype="float32", always_2d=False)
         if audio.ndim > 1:
@@ -155,13 +159,13 @@ class AstBackend(AiBackend):
             sr = target_sr
 
         chunk_samples = sr * _CHUNK_SECONDS
-        step_samples = sr * _STEP_SECONDS
+        step_samples = sr * step_seconds
         has_children, has_parent = _load_ontology()
         results = []
 
         for start in range(0, len(audio), step_samples):
             chunk = audio[start: start + chunk_samples]
-            if len(chunk) < sr * 2:
+            if len(chunk) == 0:
                 break
             if len(chunk) < chunk_samples:
                 chunk = np.pad(chunk, (0, chunk_samples - len(chunk)))
@@ -175,9 +179,9 @@ class AstBackend(AiBackend):
             start_s = start / sr
             end_s = min((start + chunk_samples) / sr, len(audio) / sr)
 
-            for idx in scores.argsort()[::-1][:_TOP_N]:
+            for idx in scores.argsort()[::-1][:top_n]:
                 score = float(scores[idx])
-                if score < _MIN_SCORE:
+                if score < min_score:
                     break
                 label = model.config.id2label[idx]
                 results.append({
