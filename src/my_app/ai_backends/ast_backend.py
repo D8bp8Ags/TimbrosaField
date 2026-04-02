@@ -16,6 +16,7 @@ Original paper: https://arxiv.org/abs/2104.01778
 
 import json
 import logging
+import os
 import urllib.request
 from pathlib import Path
 
@@ -83,6 +84,13 @@ _CHUNK_SECONDS = 10
 _STEP_SECONDS = 5
 _TOP_N = 5
 _MIN_SCORE = 0.05
+
+# AST uses the PyTorch implementation from transformers. If TensorFlow is
+# installed in the same environment, transformers may still probe/import TF
+# modules during startup, which is a bad fit on macOS when torch is also used.
+os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_FLAX", "0")
 
 
 class AstBackend(AiBackend):
