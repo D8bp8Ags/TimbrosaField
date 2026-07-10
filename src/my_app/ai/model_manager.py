@@ -159,17 +159,53 @@ MODEL_DEFINITIONS: tuple[ModelDefinition, ...] = (
 _MODEL_BY_ID = {definition.model_id: definition for definition in MODEL_DEFINITIONS}
 
 
+def _legacy_models_root() -> Path:
+    """Old, in-source-tree model root (src/my_app/models), pre-Fase-8.
+
+    Kept as a read-only fallback location: some local dev checkouts still
+    have real, already-downloaded models here.
+    """
+    return Path(__file__).resolve().parent.parent / "models"
+
+
 def get_models_root() -> Path:
     """Return the central model root.
 
-    Kept pointing at src/my_app/models (unchanged on-disk location) even
-    though this module now lives one package level deeper at
-    ai/model_manager.py (Fase 7) — hence .parent.parent, not .parent.
+    Priority order:
+        1. TIMBROSA_MODELS_ROOT environment override (unchanged, highest
+           priority — existing installs/CI that set this keep working
+           exactly as before).
+        2. The new platform-appropriate cache directory
+           (app_config.get_cache_dir() / "models"), if it already contains
+           model data.
+        3. The legacy src/my_app/models location, if it contains model
+           data (pre-Fase-8 local installs) — used in place, not copied,
+           since models can be tens to hundreds of MB and a blind copy on
+           every import would risk partial copies and duplicated disk
+           usage.
+        4. Otherwise, the new cache directory (empty; models will be
+           downloaded there going forward).
+
+    This function never copies or deletes anything — it only decides which
+    existing directory to point at, so staging/validation/rollback in the
+    rest of this module keep working unchanged against whichever root is
+    returned.
     """
     override = os.environ.get("TIMBROSA_MODELS_ROOT")
     if override:
         return Path(override).expanduser().resolve()
-    return Path(__file__).resolve().parent.parent / "models"
+
+    from my_app.app_config import get_cache_dir  # noqa: PLC0415
+
+    new_root = get_cache_dir() / "models"
+    if new_root.is_dir() and any(new_root.iterdir()):
+        return new_root
+
+    legacy_root = _legacy_models_root()
+    if legacy_root.is_dir() and any(legacy_root.iterdir()):
+        return legacy_root
+
+    return new_root
 
 
 def get_downloads_dir() -> Path:
