@@ -26,7 +26,9 @@ import multiprocessing as mp
 import os
 import queue as queue_mod
 import time
+from math import gcd
 
+from ai_model_manager import PERCH_MODEL, ensure_model_installed
 from .base import AiBackend
 from species_names import get_dutch_name
 
@@ -41,17 +43,25 @@ _TOP_K = 5
 # Runs in a fresh Python process with no torch present.
 # ---------------------------------------------------------------------------
 
-def _perch_worker(wav_path: str, min_score: float, top_k: int,
+def _perch_worker(model_path: str, wav_path: str, min_score: float, top_k: int,
                   overlap_ratio: float,
                   result_queue: mp.Queue) -> None:
     """Executed inside a spawned subprocess; TF is safe to import here."""
     try:
         import csv  # noqa: PLC0415
         import numpy as np  # noqa: PLC0415
-        import librosa  # noqa: PLC0415
-        from perch_hoplite.zoo import model_configs  # noqa: PLC0415
+        import soundfile as sf  # noqa: PLC0415
+        from ml_collections import config_dict  # noqa: PLC0415
+        from perch_hoplite.zoo.taxonomy_model_tf import TaxonomyModelTF  # noqa: PLC0415
+        from scipy.signal import resample_poly  # noqa: PLC0415
 
-        model = model_configs.load_model_by_name("perch_v2")
+        config = config_dict.ConfigDict()
+        config.model_path = model_path
+        config.tfhub_version = None
+        config.window_size_s = 5.0
+        config.hop_size_s = 5.0
+        config.sample_rate = 32000
+        model = TaxonomyModelTF.from_config(config)
         sample_rate: int = model.sample_rate
         window_samples = int(model.window_size_s * sample_rate)
         step_samples = max(1, int(window_samples * max(0.1, 1.0 - overlap_ratio)))
@@ -72,7 +82,16 @@ def _perch_worker(wav_path: str, min_score: float, top_k: int,
             except Exception:
                 pass
 
-        audio, _ = librosa.load(wav_path, sr=sample_rate, mono=True)
+        audio, source_sr = sf.read(wav_path, dtype="float32", always_2d=False)
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+        if source_sr != sample_rate:
+            divisor = gcd(int(source_sr), int(sample_rate))
+            audio = resample_poly(
+                audio,
+                int(sample_rate) // divisor,
+                int(source_sr) // divisor,
+            ).astype(np.float32)
         total_samples = len(audio)
         results: list[dict] = []
         debug_windows: list[dict] = []
@@ -87,9 +106,16 @@ def _perch_worker(wav_path: str, min_score: float, top_k: int,
             end_s = min((start + window_samples) / sample_rate,
                         total_samples / sample_rate)
 
-            batch = chunk[np.newaxis, :]
-            out = model.batch_embed(batch)
-            logits = np.array(out.logits["label"]).flatten()
+            batch = _frame_perch_audio(
+                chunk[np.newaxis, :],
+                sample_rate,
+                float(model.window_size_s),
+                float(model.hop_size_s),
+            )
+            batch = _normalize_perch_audio(batch, 0.25)
+            rebatched = batch.reshape([-1, batch.shape[-1]])
+            outputs = model.model.signatures["serving_default"](inputs=rebatched)
+            logits = np.array(outputs["label"]).reshape(-1)
             shifted = logits - logits.max()
             exp = np.exp(shifted)
             probs = exp / exp.sum()
@@ -145,6 +171,40 @@ def _perch_worker(wav_path: str, min_score: float, top_k: int,
         result_queue.put(exc)
 
 
+def _frame_perch_audio(
+    audio_batch,
+    sample_rate: int,
+    window_size_s: float,
+    hop_size_s: float,
+):
+    """Frame audio like Perch's helper without importing librosa."""
+    import numpy as np  # noqa: PLC0415
+
+    frame_length = int(window_size_s * sample_rate)
+    hop_length = int(hop_size_s * sample_rate)
+    if audio_batch.shape[-1] < frame_length:
+        total_pad = frame_length - audio_batch.shape[-1]
+        left = total_pad // 2
+        right = total_pad - left
+        audio_batch = np.pad(audio_batch, [(0, 0), (left, right)])
+    frames = []
+    for audio in audio_batch:
+        starts = range(0, max(1, audio.shape[-1] - frame_length + 1), hop_length)
+        frames.append(np.stack([audio[start: start + frame_length] for start in starts]))
+    return np.stack(frames)
+
+
+def _normalize_perch_audio(framed_audio, target_peak: float):
+    """Normalize framed audio like Perch's helper."""
+    import numpy as np  # noqa: PLC0415
+
+    framed_audio = framed_audio.copy()
+    framed_audio -= np.mean(framed_audio, axis=-1, keepdims=True)
+    peak_norm = np.max(np.abs(framed_audio), axis=-1, keepdims=True)
+    framed_audio = np.divide(framed_audio, peak_norm, where=(peak_norm > 0.0))
+    return framed_audio * target_peak
+
+
 # ---------------------------------------------------------------------------
 # Backend class
 # ---------------------------------------------------------------------------
@@ -176,12 +236,13 @@ class PerchBackend(AiBackend):
         """
         ctx = mp.get_context("spawn")
         result_queue: mp.Queue = ctx.Queue()
+        model_path = str(ensure_model_installed(PERCH_MODEL.model_id))
         min_score = float(self.options.get("min_score", _MIN_SCORE))
         top_k = int(self.options.get("top_k", _TOP_K))
         overlap_ratio = float(self.options.get("overlap_ratio", 0.5))
         process = ctx.Process(
             target=_perch_worker,
-            args=(wav_path, min_score, top_k, overlap_ratio, result_queue),
+            args=(model_path, wav_path, min_score, top_k, overlap_ratio, result_queue),
         )
         process.start()
         try:

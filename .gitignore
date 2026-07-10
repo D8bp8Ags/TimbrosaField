@@ -1,4 +1,5 @@
 TASKS.md
+/src/my_app/models/
 /backups/
 /ableton/
 /fieldrecordings/
@@ -16,6 +17,7 @@ backup/
 .DS_Store
 config/
 *.bin
+*.jpeg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

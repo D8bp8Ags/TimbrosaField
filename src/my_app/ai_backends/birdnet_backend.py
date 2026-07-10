@@ -16,6 +16,13 @@ import queue as queue_mod
 import time
 from datetime import date as dt_date
 
+from ai_model_manager import (
+    BIRDNET_ACOUSTIC_MODEL,
+    BIRDNET_GEO_MODEL,
+    ensure_model_installed,
+    get_birdnet_acoustic_paths,
+    get_birdnet_geo_paths,
+)
 from .base import AiBackend
 from species_names import get_dutch_name
 
@@ -185,9 +192,33 @@ class BirdnetBackend(AiBackend):
         """
         ctx = mp.get_context("spawn")
         result_queue: mp.Queue = ctx.Queue()
+        ensure_model_installed(BIRDNET_ACOUSTIC_MODEL.model_id)
+        acoustic_model_path, acoustic_labels_path = get_birdnet_acoustic_paths()
+        use_geo_filter = bool(self.options.get("use_geo_filter", True))
+        gps = metadata.get("gps") or {}
+        needs_geo = (
+            use_geo_filter
+            and gps.get("latitude") is not None
+            and gps.get("longitude") is not None
+            and _get_week(metadata) is not None
+        )
+        if needs_geo:
+            ensure_model_installed(BIRDNET_GEO_MODEL.model_id)
+            geo_model_path, geo_labels_path = get_birdnet_geo_paths()
+        else:
+            geo_model_path, geo_labels_path = None, None
         process = ctx.Process(
             target=_birdnet_worker,
-            args=(wav_path, metadata, dict(self.options), result_queue),
+            args=(
+                wav_path,
+                metadata,
+                dict(self.options),
+                str(acoustic_model_path),
+                str(acoustic_labels_path),
+                str(geo_model_path) if geo_model_path else "",
+                str(geo_labels_path) if geo_labels_path else "",
+                result_queue,
+            ),
         )
         process.start()
         try:
@@ -223,13 +254,25 @@ def _birdnet_worker(
     wav_path: str,
     metadata: dict,
     options: dict,
+    acoustic_model_path: str,
+    acoustic_labels_path: str,
+    geo_model_path: str,
+    geo_labels_path: str,
     result_queue: mp.Queue,
 ) -> None:
     """Run official BirdNET inference inside a fresh subprocess."""
     try:
         import birdnet  # noqa: PLC0415
 
-        model = birdnet.load("acoustic", _MODEL_VERSION, "tf")
+        model = birdnet.load_custom(
+            "acoustic",
+            _MODEL_VERSION,
+            "tf",
+            acoustic_model_path,
+            acoustic_labels_path,
+            precision="fp32",
+            check_validity=True,
+        )
         top_k = int(options.get("top_k", 5))
         min_confidence = float(options.get("min_confidence", 0.10))
         overlap_duration_s = float(options.get("overlap_duration_s", 0.0))
@@ -244,9 +287,24 @@ def _birdnet_worker(
         lon = gps.get("longitude")
         week = _get_week(metadata)
         species_filter = None
-        if use_geo_filter and lat is not None and lon is not None and week is not None:
+        if (
+            use_geo_filter
+            and lat is not None
+            and lon is not None
+            and week is not None
+            and geo_model_path
+            and geo_labels_path
+        ):
             try:
-                geo_model = birdnet.load("geo", _MODEL_VERSION, "tf")
+                geo_model = birdnet.load_custom(
+                    "geo",
+                    _MODEL_VERSION,
+                    "tf",
+                    geo_model_path,
+                    geo_labels_path,
+                    precision="fp32",
+                    check_validity=True,
+                )
                 geo_predictions = geo_model.predict(float(lat), float(lon), week=week)
                 species = []
                 for row in _rows_from_predictions(geo_predictions):

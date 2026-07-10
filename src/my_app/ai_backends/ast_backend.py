@@ -17,17 +17,14 @@ Original paper: https://arxiv.org/abs/2104.01778
 import json
 import logging
 import os
-import urllib.request
 from pathlib import Path
+
+from ai_model_manager import AST_MODEL, ensure_model_installed
 
 from .base import AiBackend
 
 logger = logging.getLogger(__name__)
 
-_MODEL_ID = "MIT/ast-finetuned-audioset-10-10-0.448"
-_ONTOLOGY_URL = (
-    "https://raw.githubusercontent.com/audioset/ontology/master/ontology.json"
-)
 _ONTOLOGY_CACHE = Path.home() / ".cache" / "audioset_ontology.json"
 
 # Module-level cache so ontology is only parsed once per process
@@ -38,8 +35,8 @@ _ontology_has_parent: set[str] | None = None
 def _load_ontology() -> tuple[set[str], set[str]]:
     """Load AudioSet ontology and return (has_children, has_parent) sets.
 
-    Downloads once to ``~/.cache/audioset_ontology.json``.  Returns empty
-    sets if the download fails.
+    Uses only the local ``~/.cache/audioset_ontology.json`` if it exists.
+    Returns empty sets if the file is unavailable.
     """
     global _ontology_has_children, _ontology_has_parent
     if _ontology_has_children is not None:
@@ -47,8 +44,7 @@ def _load_ontology() -> tuple[set[str], set[str]]:
 
     try:
         if not _ONTOLOGY_CACHE.exists():
-            data = urllib.request.urlopen(_ONTOLOGY_URL, timeout=10).read()
-            _ONTOLOGY_CACHE.write_bytes(data)
+            raise FileNotFoundError(_ONTOLOGY_CACHE)
         entries = json.loads(_ONTOLOGY_CACHE.read_text())
     except Exception as exc:
         logger.warning("Could not load AudioSet ontology: %s", exc)
@@ -132,14 +128,16 @@ class AstBackend(AiBackend):
         import torch  # noqa: PLC0415
         from transformers import ASTForAudioClassification, AutoFeatureExtractor  # noqa: PLC0415
 
-        def _load(cls, **kwargs):
-            try:
-                return cls.from_pretrained(_MODEL_ID, local_files_only=True, **kwargs)
-            except Exception:
-                return cls.from_pretrained(_MODEL_ID, **kwargs)
-
-        extractor = _load(AutoFeatureExtractor)
-        model = _load(ASTForAudioClassification)
+        local_ast_dir = ensure_model_installed(AST_MODEL.model_id)
+        extractor = AutoFeatureExtractor.from_pretrained(
+            local_ast_dir,
+            local_files_only=True,
+        )
+        model = ASTForAudioClassification.from_pretrained(
+            local_ast_dir,
+            local_files_only=True,
+            use_safetensors=True,
+        )
         model.eval()
 
         device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")

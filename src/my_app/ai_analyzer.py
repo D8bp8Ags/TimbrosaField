@@ -47,6 +47,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ai_model_manager import (
+    ModelStatus,
+    get_model_definition,
+    get_model_status,
+    required_model_ids_for_backends,
+)
 from ai_settings import load_ai_settings, save_ai_settings
 
 logger = logging.getLogger(__name__)
@@ -603,6 +609,7 @@ class AiAnalysisDialog(QDialog):
         for backend_name, _module_name, _class_name in _BACKEND_SPECS:
             cb = QCheckBox(backend_name)
             cb.setChecked(backend_name in cached_backend_names if cached_backend_names else True)
+            cb.toggled.connect(self._refresh_model_status)
             module_row.addWidget(cb)
             self._backend_checkboxes.append((cb, backend_name))
         module_row.addStretch()
@@ -618,6 +625,9 @@ class AiAnalysisDialog(QDialog):
         self._reanalyze_btn.setToolTip("Delete cache and run analysis again")
         self._reanalyze_btn.clicked.connect(self._on_reanalyze)
         module_row.addWidget(self._reanalyze_btn)
+        self._manage_models_btn = QPushButton("Modellen beheren")
+        self._manage_models_btn.clicked.connect(self._open_model_manager)
+        module_row.addWidget(self._manage_models_btn)
         header_layout.addLayout(module_row)
 
         settings_row = QHBoxLayout()
@@ -643,6 +653,11 @@ class AiAnalysisDialog(QDialog):
         settings_row.addWidget(self._toggle_settings_btn)
         settings_row.addStretch()
         header_layout.addLayout(settings_row)
+
+        self._model_status_label = QLabel("")
+        self._model_status_label.setStyleSheet("color: #aab4be;")
+        self._model_status_label.setWordWrap(True)
+        header_layout.addWidget(self._model_status_label)
 
         self._advanced_settings_widget = QWidget()
         advanced_layout = QVBoxLayout(self._advanced_settings_widget)
@@ -681,6 +696,7 @@ class AiAnalysisDialog(QDialog):
         self._advanced_settings_widget.setVisible(False)
         header_layout.addWidget(self._advanced_settings_widget)
         self._update_settings_summary()
+        self._refresh_model_status()
 
         root.addWidget(header_card)
 
@@ -1198,6 +1214,7 @@ class AiAnalysisDialog(QDialog):
         }
         save_ai_settings(self._ai_settings)
         self._update_settings_summary()
+        self._refresh_model_status()
 
     def _selected_backend_options(self) -> dict:
         """Return persisted options limited to the currently selected backends."""
@@ -1207,6 +1224,79 @@ class AiAnalysisDialog(QDialog):
             for name, options in self._current_backend_options.items()
             if name in selected
         }
+
+    def _required_model_ids(self) -> list[str]:
+        """Return model IDs required by the selected AI modules."""
+        model_ids = required_model_ids_for_backends(
+            self._selected_backend_names(),
+            self._collect_ai_settings(),
+        )
+        if "birdnet_geo" in model_ids and not self._birdnet_geo_context_available():
+            model_ids = [model_id for model_id in model_ids if model_id != "birdnet_geo"]
+        return model_ids
+
+    def _birdnet_geo_context_available(self) -> bool:
+        """Return whether BirdNET can use geo filtering for this recording."""
+        gps = self._metadata.get("gps") or {}
+        if gps.get("latitude") is None or gps.get("longitude") is None:
+            return False
+        bext = self._metadata.get("bext") or {}
+        date_str = (
+            bext.get("Origination Date")
+            or bext.get("OriginationDate")
+            or ""
+        )
+        return bool(date_str and len(date_str) >= 10)
+
+    def _refresh_model_status(self) -> None:
+        """Show compact model status for selected AI modules."""
+        if not hasattr(self, "_model_status_label"):
+            return
+        parts = []
+        for model_id in self._required_model_ids():
+            definition = get_model_definition(model_id)
+            status = get_model_status(model_id)
+            parts.append(
+                f"{definition.display_name}: {status.value.replace('_', ' ')}"
+            )
+        self._model_status_label.setText(
+            "  |  ".join(parts) if parts else "Geen AI-modellen geselecteerd."
+        )
+
+    def _open_model_manager(self) -> None:
+        """Open the model manager and refresh status when it closes."""
+        from ai_model_dialog import AiModelDialog  # noqa: PLC0415
+
+        dialog = AiModelDialog(self)
+        dialog.exec_()
+        self._refresh_model_status()
+
+    def _preflight_models(self) -> bool:
+        """Block analysis if any required model is absent or invalid."""
+        problems = []
+        for model_id in self._required_model_ids():
+            status = get_model_status(model_id)
+            if status != ModelStatus.INSTALLED:
+                definition = get_model_definition(model_id)
+                problems.append(
+                    f"{definition.display_name}: {status.value.replace('_', ' ')}"
+                )
+        if not problems:
+            return True
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("AI-modellen ontbreken")
+        box.setText(
+            "Installeer of importeer de vereiste modellen voordat analyse start."
+        )
+        box.setDetailedText("\n".join(problems))
+        manage_btn = box.addButton("Modellen beheren", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Cancel)
+        box.exec_()
+        if box.clickedButton() == manage_btn:
+            self._open_model_manager()
+        return False
 
     def _on_graph_label_mode_changed(self) -> None:
         """Persist graph label preference and refresh overlay immediately."""
@@ -1268,6 +1358,9 @@ class AiAnalysisDialog(QDialog):
             self._status_badge.setText("Cached")
             self._loading_label.setText("Loaded from cache.")
             self._on_analysis_done(cached)
+            return
+
+        if not self._preflight_models():
             return
 
         self._loading_label.setVisible(True)
