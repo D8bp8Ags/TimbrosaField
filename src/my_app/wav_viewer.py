@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QButtonGroup,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -50,10 +51,12 @@ from tag_completer import FileTagAutocomplete
 from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
+from wav_save_strategies import SaveResult
 from analysis import clipping as clipping_analysis
 from analysis import waveform_inspector
 from ui.waveform.ai_overlay import AiOverlayController
 from ui.waveform.metadata_presenter import MetadataPresenter
+from ui.dialogs.wav_save_dialog import WavSaveOptionsDialog
 
 
 class WavAnalysisWorker(QThread):
@@ -2457,7 +2460,13 @@ class WavViewer(QWidget):
         return gps_data
 
     def save_info_from_info_table_to_file(self) -> None:
-        """Save INFO metadata and GPS coordinates in one operation."""
+        """Save INFO metadata and GPS coordinates in one operation.
+
+        UI orchestration only: opens the save dialog, collects the user's
+        choice, calls WavSaveManager (UI-free), and shows the resulting
+        success/error message. All save orchestration lives in
+        WavSaveManager/WavSaveStrategies.
+        """
         if not self.filename:
             QMessageBox.warning(self, "No File", "No WAV file loaded.")
             return
@@ -2493,21 +2502,129 @@ class WavViewer(QWidget):
         if gps_data is None and not metadata and not new_tags:
             return
 
-        manager = WavSaveManager(parent=self)
+        if gps_data:
+            gps_info = f"Lat: {gps_data['latitude']}, Lon: {gps_data['longitude']}, Alt: {gps_data.get('altitude', 0.0)}"
+        elif gps_data is not None:  # {} → removal
+            gps_info = "GPS location will be removed"
+        else:
+            gps_info = ""
 
-        result = manager.show_save_dialog_and_execute(
+        if not metadata and not gps_info:
+            QMessageBox.critical(self, "No metadata", "No metadata to save")
+            return
+
+        manager = WavSaveManager()
+        new_tags_string = ", ".join(new_tags) if new_tags else ""
+
+        if not manager.has_anything_to_save(self.filename, metadata, new_tags, gps_info):
+            logger.debug("Nothing to save: no tag changes, no metadata changes, no GPS changes")
+            QMessageBox.information(
+                self,
+                "Nothing to Save",
+                "No new tags entered and no metadata changes detected.",
+            )
+            return
+
+        dialog = WavSaveOptionsDialog(
+            parent=self,
             filename=self.filename,
-            metadata=metadata,
-            new_tags=new_tags,
+            new_tags=(
+                new_tags_string
+                if new_tags_string
+                else "No new tags (metadata changes only)"
+            ),
             existing_tags=existing_tags,
-            user_config=self.user_config,
-            gps_data=gps_data,
+            gps_info=gps_info,
         )
 
-        if result:
+        if dialog.exec_() != QDialog.Accepted:
+            logger.debug("Save cancelled by user")
+            return
+
+        save_method = dialog.get_save_method()
+        custom_name = dialog.get_custom_name()
+        merge_tags = dialog.should_merge_tags()
+
+        logger.debug(
+            f"Save options: method={save_method}, custom='{custom_name}', merge={merge_tags}"
+        )
+
+        has_metadata_changes = manager.check_metadata_changes(self.filename, metadata)
+
+        try:
+            result = manager.execute_save(
+                save_method=save_method,
+                filename=self.filename,
+                metadata=metadata,
+                new_tags=new_tags,
+                existing_tags=existing_tags,
+                merge_tags=merge_tags,
+                custom_name=custom_name,
+                user_config=self.user_config,
+                gps_data=gps_data,
+                confirm_overwrite=lambda: self._confirm_overwrite_original(),
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Unexpected Error", f"An unexpected error occurred:\n{str(e)}"
+            )
+            logger.error(f"Unexpected error in save workflow: {e}")
+            return
+
+        if result and result.success:
+            self._show_save_success_message(result, new_tags_string, has_metadata_changes)
+            logger.info(f"Save successful: {result.operation_type}")
             self.load_wav_files(select_path=result.output_path)
             if hasattr(self, "tagger_widget"):
                 self.tagger_widget.clear_tags()
+        else:
+            error_msg = result.error_message if result else "Unknown error"
+            QMessageBox.critical(self, "Save Error", f"Error saving file:\n{error_msg}")
+            logger.error(f"Save failed: {error_msg}")
+
+    def _confirm_overwrite_original(self) -> bool:
+        """Show confirmation dialog for in-place overwrite operations.
+
+        Returns:     True if user confirms, False otherwise
+        """
+        reply = QMessageBox.question(
+            self,
+            "Overwrite Original?",
+            "Are you sure you want to overwrite the original file?\n\n"
+            "This CANNOT be undone!",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,  # Default to No for safety
+        )
+        confirmed = reply == QMessageBox.Yes
+        logger.debug(f"Overwrite confirmation: {confirmed}")
+        return confirmed
+
+    def _show_save_success_message(
+        self, result: "SaveResult", new_tags_string: str, has_metadata_changes: bool
+    ) -> None:
+        """Show success message based on save result.
+
+        Args:     result: SaveResult from save operation     new_tags_string: New tags
+        that were saved     has_metadata_changes: Whether metadata was changed
+        """
+        if new_tags_string and has_metadata_changes:
+            save_type = "Tags and metadata"
+        elif new_tags_string:
+            save_type = "Tags"
+        else:
+            save_type = "Metadata"
+
+        messages = {
+            "edit_copy": f"{save_type} successfully saved!\n\nFile saved as:\n{os.path.basename(result.output_path)}",
+            "in_place": f"{save_type} successfully saved!\n\nOriginal file has been updated.",
+            "with_backup": f"{save_type} successfully saved!\n\nOriginal file updated.\nBackup saved as: {os.path.basename(result.backup_path)}",
+            "custom_name": f"{save_type} successfully saved!\n\nFile saved as:\n{os.path.basename(result.output_path)}",
+        }
+
+        message = messages.get(
+            result.operation_type, f"{save_type} successfully saved!"
+        )
+        QMessageBox.information(self, "Save Successful", message)
 
     def _populate_cue_table(self, cue_points: list[dict[str, Any]]) -> None:
         """Populate cue points table.

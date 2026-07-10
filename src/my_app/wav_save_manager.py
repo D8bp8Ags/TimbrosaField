@@ -1,45 +1,39 @@
 """WAV Save Manager Module.
 
-Centralizes all save-related UI logic including dialogs, user confirmations,
-and success/error feedback. Removes ~170 lines from WavViewer while providing
-reusable save functionality across the application.
+Pure save orchestration: no dialogs, no message boxes, no user interaction.
+Takes explicit save choices (already collected by UI code) and executes the
+chosen save strategy via wav_save_strategies.py, returning a SaveResult.
+
+UI code (e.g. WavViewer) is responsible for:
+    1. Opening ui.dialogs.wav_save_dialog.WavSaveOptionsDialog to collect
+       the user's save method / custom name / tag-merge choice.
+    2. Confirming destructive operations (e.g. in-place overwrite) via its
+       own QMessageBox before calling this manager.
+    3. Interpreting the returned SaveResult and showing success/error
+       messages.
 
 Usage:
     from wav_save_manager import WavSaveManager
 
-    # In WavViewer.save_tags():
-    manager = WavSaveManager(parent=self)
-    result = manager.show_save_dialog_and_execute(
+    manager = WavSaveManager()
+    result = manager.execute_save(
+        save_method=1,
         filename=self.filename,
         metadata=metadata,
         new_tags=['nature', 'birds'],
         existing_tags='forest, morning',
-        user_config=self.user_config
+        merge_tags=True,
+        user_config=self.user_config,
     )
 
-    if result:
+    if result and result.success:
         self.load_wav_files(select_path=result.output_path)
-        if hasattr(self, 'tagger_widget'):
-            self.tagger_widget.clear_tags()
 """
 
 import logging
-import os
 import struct
 from typing import Any, Optional
 
-from PyQt5.QtWidgets import (
-    QButtonGroup,
-    QCheckBox,
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QRadioButton,
-    QVBoxLayout,
-)
 from wav_analyzer import wav_analyze
 from wav_save_strategies import SaveError, SaveResult, WavSaveStrategies
 
@@ -47,135 +41,105 @@ logger = logging.getLogger(__name__)
 
 
 class WavSaveManager:
-    """Centralized manager for WAV file save operations with UI.
+    """Pure save orchestration for WAV file save operations.
 
-    This class handles the complete save workflow: 1. Shows save options dialog 2.
-    Handles user confirmations 3. Executes save via WavSaveStrategies 4. Shows
-    success/error feedback 5. Returns result for further processing
-
-    Eliminates ~170 lines from WavViewer while providing reusable save functionality for
-    other parts of the application.
+    Given an already-chosen save method (and any UI-collected inputs like
+    custom filename, tag-merge preference, and an overwrite-confirmation
+    callback), executes the corresponding WavSaveStrategies operation.
+    Contains no Qt widget classes and shows no dialogs itself.
     """
 
-    def __init__(self, parent=None):
-        """Initialize the save manager.
-
-        Args:     parent: Parent widget for dialogs (usually WavViewer instance)
-        """
-        self.parent = parent
-
-    def show_save_dialog_and_execute(
+    def execute_save(
         self,
+        save_method: int,
         filename: str,
         metadata: dict[str, str],
         new_tags: list[str] = None,
         existing_tags: str = "",
+        merge_tags: bool = False,
+        custom_name: str = "",
         user_config: dict[str, Any] = None,
         gps_data: dict[str, float] | None = None,
+        confirm_overwrite: Optional[callable] = None,
     ) -> Optional["SaveResult"]:
-        """Show save dialog and execute chosen save operation.
+        """Execute the chosen save operation with already-collected user input.
 
-        This is the main entry point that handles the complete save workflow.
+        Args:
+            save_method: Chosen save method (1=edit copy, 2=in-place,
+                3=backup, 4=custom name), as returned by
+                WavSaveOptionsDialog.get_save_method().
+            filename: Path to current WAV file.
+            metadata: Metadata dictionary to save.
+            new_tags: List of new tags to add.
+            existing_tags: String of existing tags.
+            merge_tags: Whether to merge new tags with existing_tags
+                (True) or replace them (False), as chosen by the user.
+            custom_name: Custom filename, used only when save_method == 4.
+            user_config: User configuration dictionary (used to resolve
+                the output directory).
+            gps_data: GPS data to inject (non-empty dict), remove (empty
+                dict {}), or leave unchanged (None).
+            confirm_overwrite: Optional callable returning True/False,
+                used only for save_method == 2 (in-place). UI code should
+                supply this to show its own confirmation dialog; if
+                omitted, in-place overwrite proceeds without confirmation.
 
-        Args:     filename: Path to current WAV file     metadata: Metadata dictionary
-        to save     new_tags: List of new tags to add     existing_tags: String of
-        existing tags     user_config: User configuration dictionary
-
-        Returns:     SaveResult object if successful, None if cancelled or failed
+        Returns:
+            SaveResult describing success/failure, or None if inputs were
+            invalid (missing file, no metadata to save) or the save method
+            is unrecognized. On success or failure the underlying
+            SaveResult always carries the outcome; None is only returned
+            for validation failures that occur before a strategy is even
+            attempted.
         """
-        try:
-            # Import here to avoid circular imports
-
-            # Validate inputs
-            if not filename or not os.path.exists(filename):
-                self._show_error("Invalid file", f"File does not exist: {filename}")
-                return None
-
-            if gps_data:
-                gps_info = f"Lat: {gps_data['latitude']}, Lon: {gps_data['longitude']}, Alt: {gps_data.get('altitude', 0.0)}"
-            elif gps_data is not None:  # {} → removal
-                gps_info = "GPS location will be removed"
-            else:
-                gps_info = ""
-
-            if not metadata and not gps_info:
-                self._show_error("No metadata", "No metadata to save")
-                return None
-
-            # Prepare new tags string
-            new_tags_string = ", ".join(new_tags) if new_tags else ""
-
-            # Check if there's anything to save
-            has_metadata_changes = self._check_metadata_changes(filename, metadata)
-
-            if not new_tags_string and not has_metadata_changes and not gps_info:
-                logger.debug("Nothing to save: no tag changes, no metadata changes, no GPS changes")
-                self._show_info(
-                    "Nothing to Save",
-                    "No new tags entered and no metadata changes detected.",
-                )
-                return None
-
-            # Show save options dialog
-            dialog = WavSaveOptionsDialog(
-                parent=self.parent,
-                filename=filename,
-                new_tags=(
-                    new_tags_string
-                    if new_tags_string
-                    else "No new tags (metadata changes only)"
-                ),
-                existing_tags=existing_tags,
-                gps_info=gps_info,
-            )
-
-            if dialog.exec_() != QDialog.Accepted:
-                logger.debug("Save cancelled by user")
-                return None
-
-            # Get user choices
-            save_method = dialog.get_save_method()
-            custom_name = dialog.get_custom_name()
-            merge_tags = dialog.should_merge_tags()
-
-            logger.debug(
-                f"Save options: method={save_method}, custom='{custom_name}', merge={merge_tags}"
-            )
-
-            # Process tags if there are new ones
-            if new_tags_string:
-                metadata = self._merge_tags_if_needed(
-                    metadata, new_tags_string, existing_tags, merge_tags
-                )
-
-            # Execute save operation
-            result = self._execute_save_strategy(
-                save_method=save_method,
-                filename=filename,
-                metadata=metadata,
-                custom_name=custom_name,
-                user_config=user_config,
-                gps_data=gps_data,
-            )
-
-            # Show result to user
-            if result and result.success:
-                self._show_save_success(result, new_tags_string, has_metadata_changes)
-                logger.info(f"Save successful: {result.operation_type}")
-            else:
-                error_msg = result.error_message if result else "Unknown error"
-                self._show_error("Save Error", f"Error saving file:\n{error_msg}")
-                logger.error(f"Save failed: {error_msg}")
-                result = None
-
-            return result
-
-        except Exception as e:
-            self._show_error(
-                "Unexpected Error", f"An unexpected error occurred:\n{str(e)}"
-            )
-            logger.error(f"Unexpected error in save workflow: {e}")
+        if not filename:
+            logger.warning("execute_save called without a filename")
             return None
+
+        new_tags_string = ", ".join(new_tags) if new_tags else ""
+
+        if new_tags_string:
+            metadata = self._merge_tags_if_needed(
+                metadata, new_tags_string, existing_tags, merge_tags
+            )
+
+        return self._execute_save_strategy(
+            save_method=save_method,
+            filename=filename,
+            metadata=metadata,
+            custom_name=custom_name,
+            user_config=user_config,
+            gps_data=gps_data,
+            confirm_overwrite=confirm_overwrite,
+        )
+
+    def has_anything_to_save(
+        self,
+        filename: str,
+        metadata: dict[str, str],
+        new_tags: list[str],
+        gps_info: str,
+    ) -> bool:
+        """Check whether there is anything meaningful to save.
+
+        Args:
+            filename: Path to current WAV file.
+            metadata: Metadata dictionary to save.
+            new_tags: List of new tags to add.
+            gps_info: Non-empty string when GPS data will be
+                added/changed/removed.
+
+        Returns:
+            True if there are tag changes, metadata changes, or GPS
+            changes; False otherwise.
+        """
+        new_tags_string = ", ".join(new_tags) if new_tags else ""
+        has_metadata_changes = self._check_metadata_changes(filename, metadata)
+        return bool(new_tags_string or has_metadata_changes or gps_info)
+
+    def check_metadata_changes(self, filename: str, metadata: dict[str, str]) -> bool:
+        """Public wrapper for _check_metadata_changes (used by UI success messages)."""
+        return self._check_metadata_changes(filename, metadata)
 
     def _check_metadata_changes(self, filename: str, metadata: dict[str, str]) -> bool:
         """Check if metadata has changes compared to original file.
@@ -244,6 +208,7 @@ class WavSaveManager:
         custom_name: str,
         user_config: dict[str, Any],
         gps_data: dict[str, float] | None = None,
+        confirm_overwrite: Optional[callable] = None,
     ) -> Optional["SaveResult"]:
         """Execute the chosen save strategy.
 
@@ -266,7 +231,7 @@ class WavSaveManager:
                     filename, metadata, gps_data, output_dir
                 ),
                 2: lambda: WavSaveStrategies.save_in_place(
-                    filename, metadata, gps_data, self._confirm_overwrite
+                    filename, metadata, gps_data, confirm_overwrite
                 ),
                 3: lambda: WavSaveStrategies.save_with_backup(filename, metadata, gps_data),
                 4: lambda: WavSaveStrategies.save_with_custom_name(
@@ -283,227 +248,3 @@ class WavSaveManager:
         except (OSError, struct.error, SaveError) as e:
             logger.error(f"Error executing save strategy: {e}")
             return None
-
-    def _confirm_overwrite(self) -> bool:
-        """Show confirmation dialog for overwrite operations.
-
-        Returns:     True if user confirms, False otherwise
-        """
-        reply = QMessageBox.question(
-            self.parent,
-            "Overwrite Original?",
-            "Are you sure you want to overwrite the original file?\n\n"
-            "This CANNOT be undone!",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,  # Default to No for safety
-        )
-
-        confirmed = reply == QMessageBox.Yes
-        logger.debug(f"Overwrite confirmation: {confirmed}")
-        return confirmed
-
-    def _show_save_success(
-        self, result: "SaveResult", new_tags_string: str, has_metadata_changes: bool
-    ) -> None:
-        """Show success message based on save result.
-
-        Args:     result: SaveResult from save operation     new_tags_string: New tags
-        that were saved     has_metadata_changes: Whether metadata was changed
-        """
-        # Determine what was saved
-        if new_tags_string and has_metadata_changes:
-            save_type = "Tags and metadata"
-        elif new_tags_string:
-            save_type = "Tags"
-        else:
-            save_type = "Metadata"
-
-        # Create message based on operation type
-        messages = {
-            "edit_copy": f"{save_type} successfully saved!\n\nFile saved as:\n{os.path.basename(result.output_path)}",
-            "in_place": f"{save_type} successfully saved!\n\nOriginal file has been updated.",
-            "with_backup": f"{save_type} successfully saved!\n\nOriginal file updated.\nBackup saved as: {os.path.basename(result.backup_path)}",
-            "custom_name": f"{save_type} successfully saved!\n\nFile saved as:\n{os.path.basename(result.output_path)}",
-        }
-
-        message = messages.get(
-            result.operation_type, f"{save_type} successfully saved!"
-        )
-        self._show_info("Save Successful", message)
-
-    def _show_error(self, title: str, message: str) -> None:
-        """Show error message dialog."""
-        QMessageBox.critical(self.parent, title, message)
-
-    def _show_info(self, title: str, message: str) -> None:
-        """Show information message dialog."""
-        QMessageBox.information(self.parent, title, message)
-
-
-class WavSaveOptionsDialog(QDialog):
-    """Enhanced save options dialog.
-
-    Replaces SimpleSaveDialog with better integration and cleaner code. This dialog
-    handles all user choices for save operations.
-    """
-
-    def __init__(
-        self,
-        parent=None,
-        filename: str = "",
-        new_tags: str = "",
-        existing_tags: str = "",
-        gps_info: str = "",
-    ):
-        """Initialize the save options dialog.
-
-        Args:     parent: Parent widget     filename: Current filename     new_tags: New
-        tags to display     existing_tags: Existing tags to display
-        """
-        super().__init__(parent)
-        self.filename = filename
-        self.new_tags = new_tags
-        self.existing_tags = existing_tags
-        self.gps_info = gps_info
-
-        self.setWindowTitle("Save Options")
-        self.setModal(True)
-        self.setFixedSize(520, 300)
-
-        self._setup_ui()
-
-    def _setup_ui(self) -> None:
-        """Setup the dialog user interface."""
-        layout = QVBoxLayout(self)
-
-        # Header information (hidden for now — re-enable if needed)
-        filename_display = os.path.basename(self.filename)
-        # layout.addWidget(QLabel(f"<b>File:</b> {filename_display}"))
-        # layout.addWidget(QLabel(f"<b>New tags:</b> {self.new_tags}"))
-        # if self.gps_info:
-        #     layout.addWidget(QLabel(f"<b>GPS:</b> {self.gps_info}"))
-        # if self.existing_tags:
-        #     layout.addWidget(QLabel(f"<b>Existing tags:</b> {self.existing_tags}"))
-
-        layout.addWidget(QLabel(f"<b>{filename_display}</b>"))
-        layout.addWidget(QLabel("<b>How do you want to save?</b>"))
-
-        # Save method options
-        self.button_group = QButtonGroup()
-
-        # Option 1: Edit copy (default, safest)
-        self.edit_radio = QRadioButton("As copy with _edit suffix (safest)")
-        self.edit_radio.setChecked(True)
-        self.button_group.addButton(self.edit_radio, 1)
-        layout.addWidget(self.edit_radio)
-
-        # Option 2: In-place overwrite
-        self.inplace_radio = QRadioButton("Overwrite original file (PERMANENT)")
-        self.button_group.addButton(self.inplace_radio, 2)
-        layout.addWidget(self.inplace_radio)
-
-        # Option 3: Backup and replace
-        self.backup_radio = QRadioButton("Create backup (.bak) then replace original")
-        self.button_group.addButton(self.backup_radio, 3)
-        layout.addWidget(self.backup_radio)
-
-        # Option 4: Custom name
-        custom_layout = QHBoxLayout()
-        self.custom_radio = QRadioButton("Custom name:")
-        self.custom_input = QLineEdit()
-        self.custom_input.setPlaceholderText("e.g., forest_recording_final")
-        custom_layout.addWidget(self.custom_radio)
-        custom_layout.addWidget(self.custom_input)
-        self.button_group.addButton(self.custom_radio, 4)
-        layout.addLayout(custom_layout)
-
-        layout.addWidget(QLabel(""))  # Spacer
-
-        # Tag handling options
-        self.merge_tags_checkbox = QCheckBox("Add to existing tags (don't replace)")
-        if self.existing_tags:
-            self.merge_tags_checkbox.setChecked(True)
-        layout.addWidget(self.merge_tags_checkbox)
-
-        # Info and tips
-        info_label = QLabel(
-            "<i>💡 Tip: Backup option is safest for important files</i>"
-        )
-        layout.addWidget(info_label)
-
-        # Dialog buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_btn)
-
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self.accept)
-        save_btn.setDefault(True)
-        button_layout.addWidget(save_btn)
-
-        layout.addLayout(button_layout)
-
-    def get_save_method(self) -> int:
-        """Get the chosen save method (1-4)."""
-        return self.button_group.checkedId()
-
-    def get_custom_name(self) -> str:
-        """Get the custom filename if chosen."""
-        return self.custom_input.text().strip()
-
-    def should_merge_tags(self) -> bool:
-        """Check if tags should be merged with existing."""
-        return self.merge_tags_checkbox.isChecked()
-
-
-# ===== CONVENIENCE FUNCTION FOR EASY INTEGRATION =====
-
-
-# def quick_save_with_dialog(
-#     parent,
-#     filename: str,
-#     metadata: dict[str, str],
-#     new_tags: list[str] = None,
-#     existing_tags: str = "",
-#     user_config: dict[str, Any] = None,
-# ) -> Optional["SaveResult"]:
-#     """Quick save with dialog (convenience function).
-#
-#     Args:
-#         parent: Parent widget
-#         filename: WAV file path
-#         metadata: Metadata to save
-#         new_tags: List of new tags
-#         existing_tags: Existing tags string
-#         user_config: User configuration
-#
-#     Returns:
-#         SaveResult if successful, None if cancelled/failed
-#     """
-#     manager = WavSaveManager(parent)
-#     return manager.show_save_dialog_and_execute(
-#         filename=filename,
-#         metadata=metadata,
-#         new_tags=new_tags or [],
-#         existing_tags=existing_tags,
-#         user_config=user_config,
-#     )
-
-
-# ===== TESTING HELPER =====
-
-
-def test_wav_save_manager():
-    """Test function for WavSaveManager."""
-    logger.debug("Testing WavSaveManager...")
-    logger.info("WavSaveManager class loaded")
-    logger.info("WavSaveOptionsDialog class loaded")
-    logger.info("Convenience functions available")
-    logger.info("Ready for integration into WavViewer")
-
-
-if __name__ == "__main__":
-    test_wav_save_manager()
