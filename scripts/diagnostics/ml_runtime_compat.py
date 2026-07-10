@@ -1,8 +1,25 @@
 #!/usr/bin/env python3
-"""Minimal runtime compatibility checks for torch and tensorflow.
+"""Manual diagnostic: runtime compatibility checks for torch and tensorflow.
 
-Run this inside the target conda environment to see whether importing the two
-ML runtimes in one Python process is stable on this machine.
+Purpose:
+    Checks whether importing torch and tensorflow (and optionally loading
+    cached AST/Perch models) together in one Python process is stable on
+    this machine, in various import orders. Useful for diagnosing
+    Metal/MPS GPU context conflicts between PyTorch and TensorFlow on
+    Apple Silicon.
+
+Requirements:
+    - torch and/or tensorflow installed in the active environment.
+    - Optional (--load-models): transformers and perch_hoplite installed,
+      plus the AST/Perch models already cached locally. This script does
+      not download models.
+
+Start command:
+    python3 scripts/diagnostics/ml_runtime_compat.py --order torch-tf
+    python3 scripts/diagnostics/ml_runtime_compat.py --order tf-torch --load-models
+
+Not collected by pytest: this is a manual, interactive/CLI diagnostic tool,
+not an automated regression test.
 """
 
 from __future__ import annotations

@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
-"""Run the real modal AI dialog flow with BirdNET-only selection."""
+"""Manual diagnostic: run the real modal AI dialog flow with BirdNET-only selection.
+
+Purpose:
+    Opens the actual modal ``AiAnalysisDialog`` (as shown to users) with only
+    the BirdNET backend selected, auto-closing after a timeout. Useful for
+    visually/manually verifying the modal dialog flow end-to-end.
+
+Requirements:
+    - A working PyQt5 installation with a display (or QT_QPA_PLATFORM=offscreen).
+    - The BirdNET model already installed locally (this script does not
+      download models).
+    - A real WAV file to analyze.
+
+Start command:
+    python3 scripts/diagnostics/ai_dialog_modal_birdnet.py /path/to/file.wav
+
+Not collected by pytest: this is a manual, interactive/CLI diagnostic tool,
+not an automated regression test.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +26,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src" / "my_app"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))

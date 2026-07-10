@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
-"""Reproduce the app's BirdNET analysis path with minimal UI setup."""
+"""Manual diagnostic: reproduce the app's BirdNET analysis path with minimal UI setup.
+
+Purpose:
+    Exercises the real ``AiAnalysisDialog`` BirdNET-only analysis flow against
+    a given WAV file, printing step-by-step progress. Useful for reproducing
+    BirdNET-specific analysis issues without running the full application.
+
+Requirements:
+    - A working PyQt5 installation.
+    - The BirdNET model already installed locally (this script does not
+      download models).
+    - A real WAV file to analyze.
+
+Start command:
+    python3 scripts/diagnostics/ai_dialog_birdnet_path.py /path/to/file.wav
+
+Not collected by pytest: this is a manual, interactive/CLI diagnostic tool,
+not an automated regression test.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +26,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "src" / "my_app"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))

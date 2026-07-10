@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
-"""Minimal runtime test for the official BirdNET Python package."""
+"""Manual diagnostic: minimal runtime test for the official BirdNET Python package.
+
+Purpose:
+    Verifies that the ``birdnet`` package can be imported and that its
+    acoustic (and optionally geo) models load and run a prediction, outside
+    of the full application.
+
+Requirements:
+    - The ``birdnet`` package installed in the active environment.
+    - The BirdNET model already installed/cached locally (this script does
+      not download models).
+    - Optional: a real WAV file to run a prediction on (``--wav``).
+
+Start command:
+    python3 scripts/diagnostics/birdnet_runtime.py --wav /path/to/file.wav
+    python3 scripts/diagnostics/birdnet_runtime.py --geo
+
+Not collected by pytest: this is a manual, interactive/CLI diagnostic tool,
+not an automated regression test.
+"""
 
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 

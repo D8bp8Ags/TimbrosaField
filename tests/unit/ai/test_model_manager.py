@@ -12,12 +12,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import sys
+import ai_model_manager as manager
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src/my_app"))
-
-import ai_model_manager as manager  # noqa: E402
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _sleep_worker(result_queue) -> None:
@@ -53,7 +50,7 @@ class ModelManagerTests(unittest.TestCase):
         self.assertEqual(manager.get_staging_dir(), self.root.resolve() / ".staging")
 
     def test_gitignore_contains_model_root(self) -> None:
-        text = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/src/my_app/models/", text)
 
     def test_ast_validation_and_wrong_sha256(self) -> None:
@@ -194,9 +191,15 @@ class ModelManagerTests(unittest.TestCase):
         self.assertIn("timed out", str(ctx.exception))
 
     def test_backends_do_not_call_download_loaders_during_analysis(self) -> None:
-        ast_source = (ROOT / "src/my_app/ai_backends/ast_backend.py").read_text(encoding="utf-8")
-        perch_source = (ROOT / "src/my_app/ai_backends/perch_backend.py").read_text(encoding="utf-8")
-        birdnet_source = (ROOT / "src/my_app/ai_backends/birdnet_backend.py").read_text(encoding="utf-8")
+        ast_source = (
+            REPO_ROOT / "src/my_app/ai_backends/ast_backend.py"
+        ).read_text(encoding="utf-8")
+        perch_source = (
+            REPO_ROOT / "src/my_app/ai_backends/perch_backend.py"
+        ).read_text(encoding="utf-8")
+        birdnet_source = (
+            REPO_ROOT / "src/my_app/ai_backends/birdnet_backend.py"
+        ).read_text(encoding="utf-8")
 
         self.assertNotIn("from_pretrained(_MODEL_ID", ast_source)
         self.assertNotIn("load_model_by_name", perch_source)

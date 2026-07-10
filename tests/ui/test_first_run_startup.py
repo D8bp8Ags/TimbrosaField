@@ -63,24 +63,30 @@ def test_get_view_mode_falls_back_on_unknown_value(isolated_qsettings):
     [
         pytest.param(None, id="fresh_profile"),
         pytest.param("per-kanaal", id="legacy_hyphen_value"),
+        pytest.param("per_kanaal", id="canonical_value"),
+        pytest.param("mono", id="mono_value"),
+        pytest.param("overlay", id="overlay_value"),
+        pytest.param("garbage", id="unknown_value"),
     ],
 )
 def test_main_window_restores_settings_without_raising(
-    qapp, isolated_qsettings, stored_value
+    qapp, isolated_qsettings, qt_widget_cleanup, stored_value
 ):
     """MainWindow construction must never raise while restoring view settings.
 
     This is the actual regression scenario: on the pre-fix code, the
     fresh-profile case (nothing ever saved, ``stored_value=None``) raised an
     uncaught ValueError from deep inside
-    ``SettingsManager.restore_all_settings()``, crashing app startup.
-    The legacy-value case covers a profile saved by a pre-fix build.
+    ``SettingsManager.restore_all_settings()``, crashing app startup. The
+    other cases cover a profile saved by a pre-fix build (legacy hyphen
+    value), an already-canonical value, each other valid mode, and a
+    corrupted/unknown stored value.
 
-    Kept to two cases (rather than parametrizing every view mode) because
-    constructing several real ``MainWindow``/``WavViewer`` instances with
-    live pyqtgraph plots in a single offscreen process is heavy; the
-    remaining value permutations are covered without widget construction
-    by the ``SettingsManager``-only tests above.
+    Each MainWindow is registered with the ``qt_widget_cleanup`` fixture,
+    which closes and schedules deletion of widgets after every test; without
+    this, repeated MainWindow construction within a single offscreen Qt
+    process caused a segmentation fault in pyqtgraph after a few iterations
+    (see architecture notes, Fase 1 section).
     """
     if stored_value is not None:
         settings = SettingsManager()
@@ -89,9 +95,5 @@ def test_main_window_restores_settings_without_raising(
 
     import main as main_mod
 
-    window = main_mod.MainWindow()
-    try:
-        assert window.wav_viewer.view_mode in VALID_VIEW_MODES
-    finally:
-        window.close()
-        window.deleteLater()
+    window = qt_widget_cleanup(main_mod.MainWindow())
+    assert window.wav_viewer.view_mode in VALID_VIEW_MODES
