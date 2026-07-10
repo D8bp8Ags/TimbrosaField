@@ -642,34 +642,34 @@ def main():
     # detections = analyze_with_birdnet(wav_path, metadata)
     # ...
 
-    # --- AST ---
-    print()
-    print("=== AST — AudioSet soundscape classification (527 labels) ===")
-    ast_results = analyze_with_ast(wav_path)
-    if ast_results is None:
-        pass  # error already printed
-    elif ast_results:
-        _print_ast_tree(ast_results)
-    else:
-        print("  No labels detected above threshold.")
+    # # --- AST ---
+    # print()
+    # print("=== AST — AudioSet soundscape classification (527 labels) ===")
+    # ast_results = analyze_with_ast(wav_path)
+    # if ast_results is None:
+    #     pass  # error already printed
+    # elif ast_results:
+    #     _print_ast_tree(ast_results)
+    # else:
+    #     print("  No labels detected above threshold.")
 
-    # --- CLAP ---
-    print()
-    print("=== CLAP — soundscape classification (custom labels) ===")
-    clap_results = analyze_with_clap(wav_path)
-    if clap_results is None:
-        pass  # error already printed
-    elif clap_results:
-        for label, score, start_s, end_s in clap_results:
-            start_fmt = f"{int(start_s)//60}:{int(start_s)%60:02d}"
-            end_fmt   = f"{int(end_s)//60}:{int(end_s)%60:02d}"
-            bar = "█" * int(score * 20)
-            print(
-                f"  {label:<40s}  {score:.2f}  "
-                f"{start_fmt} – {end_fmt}  ({start_s:.0f}s – {end_s:.0f}s)  {bar}"
-            )
-    else:
-        print("  No labels above threshold.")
+    # # --- CLAP ---
+    # print()
+    # print("=== CLAP — soundscape classification (custom labels) ===")
+    # clap_results = analyze_with_clap(wav_path)
+    # if clap_results is None:
+    #     pass  # error already printed
+    # elif clap_results:
+    #     for label, score, start_s, end_s in clap_results:
+    #         start_fmt = f"{int(start_s)//60}:{int(start_s)%60:02d}"
+    #         end_fmt   = f"{int(end_s)//60}:{int(end_s)%60:02d}"
+    #         bar = "█" * int(score * 20)
+    #         print(
+    #             f"  {label:<40s}  {score:.2f}  "
+    #             f"{start_fmt} – {end_fmt}  ({start_s:.0f}s – {end_s:.0f}s)  {bar}"
+    #         )
+    # else:
+    #     print("  No labels above threshold.")
 
 
 if __name__ == "__main__":

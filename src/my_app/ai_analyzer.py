@@ -21,9 +21,11 @@ import json
 import logging
 import os
 
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, QTimer, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -39,8 +41,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -55,6 +56,202 @@ _BACKEND_SPECS: tuple[tuple[str, str, str], ...] = (
     ("AST", "ai_backends.ast_backend", "AstBackend"),
     ("Perch", "ai_backends.perch_backend", "PerchBackend"),
 )
+
+
+_DETECTION_HEADERS = [
+    "On",
+    "Time",
+    "Source",
+    "Scientific",
+    "English",
+    "Dutch",
+    "Detail",
+    "Level",
+    "Score",
+]
+
+
+class DetectionTableModel(QAbstractTableModel):
+    """Table model for AI detections."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._rows: list[dict] = []
+
+    def set_rows(self, rows: list[dict]) -> None:
+        self.beginResetModel()
+        self._rows = rows
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._rows)
+
+    def columnCount(self, parent=QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(_DETECTION_HEADERS)
+
+    def headerData(self, section: int, orientation, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return _DETECTION_HEADERS[section]
+        return None
+
+    def flags(self, index: QModelIndex):
+        if not index.isValid():
+            return Qt.NoItemFlags
+        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        if index.column() == 0:
+            flags |= Qt.ItemIsUserCheckable
+        return flags
+
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        row = self._rows[index.row()]
+        col = index.column()
+        if role == Qt.UserRole:
+            return row
+        if role == Qt.CheckStateRole and col == 0:
+            return Qt.Checked if row.get("enabled", True) else Qt.Unchecked
+        if role == Qt.DisplayRole:
+            if col == 1:
+                start_s = row["start_time"]
+                end_s = row["end_time"]
+                return f"{int(start_s) // 60}:{int(start_s) % 60:02d}–{int(end_s) // 60}:{int(end_s) % 60:02d}"
+            if col == 2:
+                return row["source"]
+            if col == 3:
+                return row["scientific_name"]
+            if col == 4:
+                return row["english_name"]
+            if col == 5:
+                return row["dutch_name"]
+            if col == 6:
+                return row["detail"]
+            if col == 7:
+                return row["level"]
+            if col == 8:
+                score = row["score"]
+                return f"{score:.2f} {'█' * int(score * 10)}"
+            return ""
+        if role == Qt.BackgroundRole:
+            c = row.get("color", [40, 40, 60, 255])
+            base = (c[0] // 3, c[1] // 3, c[2] // 3)
+            return QColor(*base)
+        if role == Qt.ForegroundRole:
+            return QColor("#e8e8e8")
+        return None
+
+    def setData(self, index: QModelIndex, value, role=Qt.EditRole):
+        if not index.isValid():
+            return False
+        row = self._rows[index.row()]
+        if index.column() == 0 and role == Qt.CheckStateRole:
+            enabled = value == Qt.Checked
+            if row.get("enabled", True) == enabled:
+                return False
+            row["enabled"] = enabled
+            row["detection"]["enabled"] = enabled
+            self.dataChanged.emit(index, index, [Qt.CheckStateRole, Qt.DisplayRole, Qt.UserRole])
+            return True
+        return False
+
+    def row_data(self, row: int) -> dict | None:
+        if 0 <= row < len(self._rows):
+            return self._rows[row]
+        return None
+
+    def set_enabled_rows(self, rows: list[int], enabled: bool) -> None:
+        if not rows:
+            return
+        changed = []
+        for row_idx in rows:
+            row = self.row_data(row_idx)
+            if row is None:
+                continue
+            row["enabled"] = enabled
+            row["detection"]["enabled"] = enabled
+            changed.append(row_idx)
+        for row_idx in changed:
+            idx = self.index(row_idx, 0)
+            self.dataChanged.emit(idx, idx, [Qt.CheckStateRole, Qt.DisplayRole, Qt.UserRole])
+
+
+class DetectionFilterProxyModel(QSortFilterProxyModel):
+    """Proxy model for source/score/enabled filters and custom sorting."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._source_filter = ""
+        self._min_score = 0.0
+        self._enabled_only = False
+        self._sort_mode = "time"
+        self.setDynamicSortFilter(True)
+
+    def set_source_filter(self, source: str) -> None:
+        self._source_filter = source
+        self.invalidateFilter()
+
+    def set_min_score(self, score: float) -> None:
+        self._min_score = score
+        self.invalidateFilter()
+
+    def set_enabled_only(self, enabled_only: bool) -> None:
+        self._enabled_only = enabled_only
+        self.invalidateFilter()
+
+    def set_sort_mode(self, sort_mode: str) -> None:
+        self._sort_mode = sort_mode
+
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        model = self.sourceModel()
+        row = model.row_data(source_row) if model is not None else None
+        if not row:
+            return False
+        if self._source_filter and row.get("source", "") != self._source_filter:
+            return False
+        if row.get("score", 0.0) < self._min_score:
+            return False
+        if self._enabled_only and not row.get("enabled", True):
+            return False
+        return True
+
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        model = self.sourceModel()
+        left_row = model.row_data(left.row()) if model is not None else None
+        right_row = model.row_data(right.row()) if model is not None else None
+        if not left_row or not right_row:
+            return super().lessThan(left, right)
+
+        if self._sort_mode == "score":
+            return (-left_row["score"], left_row["start_time"]) < (
+                -right_row["score"], right_row["start_time"]
+            )
+        if self._sort_mode == "scientific":
+            left_key = (
+                left_row["scientific_name"]
+                or left_row["english_name"]
+                or left_row["dutch_name"]
+                or left_row["source"]
+            ).lower()
+            right_key = (
+                right_row["scientific_name"]
+                or right_row["english_name"]
+                or right_row["dutch_name"]
+                or right_row["source"]
+            ).lower()
+            return (left_key, left_row["start_time"]) < (right_key, right_row["start_time"])
+        if self._sort_mode == "source":
+            return (
+                left_row["source"].lower(),
+                left_row["start_time"],
+                -left_row["score"],
+            ) < (
+                right_row["source"].lower(),
+                right_row["start_time"],
+                -right_row["score"],
+            )
+        return (left_row["start_time"], -left_row["score"]) < (
+            right_row["start_time"], -right_row["score"]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -300,10 +497,21 @@ class AiAnalysisDialog(QDialog):
         self._worker = None
         self._tag_checkboxes: list[tuple[QCheckBox, str]] = []
         self._backend_checkboxes: list[tuple[QCheckBox, str]] = []
-        self._table_row_map: list[dict] = []
         self._updating_detection_table = False
+        self._all_detection_rows: list[dict] = []
+        self._current_sort_mode = "time"
         self._ai_settings = load_ai_settings()
         self._current_backend_options: dict = {}
+        self._filter_timer = QTimer(self)
+        self._filter_timer.setSingleShot(True)
+        self._filter_timer.timeout.connect(self._apply_detection_filters)
+        self._overlay_timer = QTimer(self)
+        self._overlay_timer.setSingleShot(True)
+        self._overlay_timer.timeout.connect(self._flush_ai_overlay)
+        self._persist_timer = QTimer(self)
+        self._persist_timer.setSingleShot(True)
+        self._persist_timer.timeout.connect(self._flush_persist_current_results)
+        self._pending_refresh_raw_output = False
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -323,7 +531,7 @@ class AiAnalysisDialog(QDialog):
             QDialog {
                 background: #181c20;
             }
-            QTableWidget {
+            QTableView {
                 background: #14181c;
                 alternate-background-color: #171b20;
                 gridline-color: #2b3138;
@@ -533,36 +741,117 @@ class AiAnalysisDialog(QDialog):
         detection_toolbar.addStretch()
         detections_layout.addLayout(detection_toolbar)
 
-        self._detection_table = QTableWidget(0, 9)
-        self._detection_table.setHorizontalHeaderLabels(
-            ["On", "Time", "Source", "Scientific", "English", "Dutch", "Detail", "Level", "Score"]
-        )
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(12)
+
+        filter_group = QHBoxLayout()
+        filter_group.setSpacing(8)
+        filter_group.addWidget(QLabel("Filter:"))
+        self._source_filter = QComboBox()
+        self._source_filter.addItem("All", "")
+        self._source_filter.currentIndexChanged.connect(self._apply_detection_filters)
+        filter_group.addWidget(QLabel("Source"))
+        filter_group.addWidget(self._source_filter)
+
+        filter_group.addWidget(QLabel("Min score"))
+        self._score_filter = QDoubleSpinBox()
+        self._score_filter.setRange(0.0, 1.0)
+        self._score_filter.setDecimals(2)
+        self._score_filter.setSingleStep(0.05)
+        self._score_filter.setValue(0.0)
+        self._score_filter.valueChanged.connect(self._schedule_detection_filter_update)
+        filter_group.addWidget(self._score_filter)
+
+        self._enabled_only_filter = QCheckBox("Enabled only")
+        self._enabled_only_filter.toggled.connect(self._apply_detection_filters)
+        filter_group.addWidget(self._enabled_only_filter)
+        filter_row.addLayout(filter_group)
+
+        sort_group = QHBoxLayout()
+        sort_group.setSpacing(8)
+        sort_group.addWidget(QLabel("Sort:"))
+        self._sort_mode = QComboBox()
+        self._sort_mode.addItem("Time", "time")
+        self._sort_mode.addItem("Score", "score")
+        self._sort_mode.addItem("Scientific", "scientific")
+        self._sort_mode.addItem("Source", "source")
+        self._sort_mode.currentIndexChanged.connect(self._apply_detection_filters)
+        sort_group.addWidget(self._sort_mode)
+        filter_row.addLayout(sort_group)
+        filter_row.addStretch()
+        detections_layout.addLayout(filter_row)
+
+        detections_body = QHBoxLayout()
+        detections_body.setSpacing(10)
+
+        self._detection_model = DetectionTableModel(self)
+        self._detection_proxy = DetectionFilterProxyModel(self)
+        self._detection_proxy.setSourceModel(self._detection_model)
+
+        self._detection_table = QTableView()
+        self._detection_table.setModel(self._detection_proxy)
         header = self._detection_table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setMinimumSectionSize(40)
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.Interactive)
-        header.setSectionResizeMode(4, QHeaderView.Interactive)
-        header.setSectionResizeMode(5, QHeaderView.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
         header.setSectionResizeMode(6, QHeaderView.Interactive)
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(8, QHeaderView.ResizeToContents)
-        self._detection_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._detection_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._detection_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._detection_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._detection_table.setAlternatingRowColors(False)
-        self._detection_table.itemChanged.connect(self._on_detection_item_changed)
+        self._detection_table.setWordWrap(False)
+        self._detection_table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self._detection_table.verticalHeader().setDefaultSectionSize(24)
         self._detection_table.setColumnWidth(0, 44)
         self._detection_table.setColumnWidth(1, 88)
         self._detection_table.setColumnWidth(2, 110)
-        self._detection_table.setColumnWidth(3, 260)
+        self._detection_table.setColumnWidth(3, 300)
         self._detection_table.setColumnWidth(4, 240)
-        self._detection_table.setColumnWidth(5, 210)
-        self._detection_table.setColumnWidth(6, 220)
+        self._detection_table.setColumnWidth(5, 220)
+        self._detection_table.setColumnWidth(6, 160)
         self._detection_table.setColumnWidth(7, 80)
         self._detection_table.setColumnWidth(8, 120)
-        detections_layout.addWidget(self._detection_table)
+        self._detection_table.selectionModel().selectionChanged.connect(
+            self._update_detection_detail
+        )
+        self._detection_model.dataChanged.connect(self._on_detection_model_changed)
+        detections_body.addWidget(self._detection_table, 5)
+
+        self._detection_detail = QPlainTextEdit()
+        self._detection_detail.setReadOnly(True)
+        self._detection_detail.setPlaceholderText("Select a detection to inspect its details.")
+        self._detection_detail.setMinimumWidth(200)
+        self._detection_detail.setMaximumWidth(260)
+        self._detection_detail.setStyleSheet(
+            "QPlainTextEdit { background: #111418; border: 1px solid #2e353d; border-radius: 8px; color: #dbe2ea; }"
+        )
+        detail_column = QVBoxLayout()
+        detail_column.setSpacing(8)
+        detail_actions = QHBoxLayout()
+        detail_actions.setSpacing(6)
+        self._disable_detail_btn = QPushButton("Disable")
+        self._disable_detail_btn.setEnabled(False)
+        self._disable_detail_btn.clicked.connect(self._disable_current_detection)
+        detail_actions.addWidget(self._disable_detail_btn)
+        self._enable_detail_btn = QPushButton("Enable")
+        self._enable_detail_btn.setEnabled(False)
+        self._enable_detail_btn.clicked.connect(self._enable_current_detection)
+        detail_actions.addWidget(self._enable_detail_btn)
+        self._copy_label_btn = QPushButton("Copy Label")
+        self._copy_label_btn.setEnabled(False)
+        self._copy_label_btn.clicked.connect(self._copy_current_detection_label)
+        detail_actions.addWidget(self._copy_label_btn)
+        detail_actions.addStretch()
+        detail_column.addLayout(detail_actions)
+        detail_column.addWidget(self._detection_detail, 1)
+        detections_body.addLayout(detail_column, 1)
+        detections_layout.addLayout(detections_body)
         self._tabs.addTab(detections_tab, "Detections")
 
         # Tab 2: tag checkboxes
@@ -924,7 +1213,9 @@ class AiAnalysisDialog(QDialog):
         self._save_runtime_settings()
         main_window = self.parent()
         if main_window and hasattr(main_window, "wav_viewer"):
-            main_window.wav_viewer.refresh_ai_overlay()
+            main_window.wav_viewer.refresh_ai_overlay(
+                self._layers if self._layers else None
+            )
 
     def prepare_analysis(self) -> None:
         """Initialise the dialog state before it is shown."""
@@ -1064,7 +1355,7 @@ class AiAnalysisDialog(QDialog):
             logger.warning("Could not delete sidecar %s: %s", path, exc)
         self.start_analysis()
 
-    def _persist_current_results(self, refresh_raw_output: bool = False) -> None:
+    def _flush_persist_current_results(self) -> None:
         """Persist current in-memory layers and refresh dependent UI."""
         _save_sidecar(
             self._wav_path,
@@ -1076,26 +1367,34 @@ class AiAnalysisDialog(QDialog):
             },
         )
         self._populate_tags()
-        if refresh_raw_output:
+        if self._pending_refresh_raw_output:
             self._populate_raw_output()
+            self._pending_refresh_raw_output = False
+
+    def _flush_ai_overlay(self) -> None:
+        """Push current in-memory layers into the waveform overlay."""
         main_window = self.parent()
         if main_window and hasattr(main_window, "wav_viewer"):
-            main_window.wav_viewer.refresh_ai_overlay()
+            main_window.wav_viewer.refresh_ai_overlay(self._layers)
+
+    def _refresh_ai_overlay(self) -> None:
+        """Schedule a lightweight overlay refresh with current in-memory layers."""
+        self._overlay_timer.start(40)
+
+    def _persist_current_results(self, refresh_raw_output: bool = False) -> None:
+        """Schedule persistence so the table UI stays responsive."""
+        self._pending_refresh_raw_output = (
+            self._pending_refresh_raw_output or refresh_raw_output
+        )
+        self._persist_timer.start(120)
 
     # ------------------------------------------------------------------
     # Populate tabs
     # ------------------------------------------------------------------
 
     def _populate_detections(self) -> None:
-        """Fill the detections table from all layers.
-
-        Rows are sorted by start_time; rows sharing the same start_time are
-        kept together and shown with an alternating background shade so each
-        time window is visually distinct.  Each row shows a score bar and,
-        for AST detections, the AudioSet hierarchy level.
-        """
+        """Fill the detections model from all layers."""
         rows = []
-        self._table_row_map = []
         for layer in self._layers:
             for det in layer["detections"]:
                 rows.append({
@@ -1115,62 +1414,73 @@ class AiAnalysisDialog(QDialog):
                     "color": layer.get("color", [40, 40, 60, 255]),
                     "detection": det,
                 })
-        rows.sort(key=lambda r: (r["start_time"], -r["score"]))
+        self._all_detection_rows = rows
+        self._detection_model.set_rows(rows)
+        self._refresh_source_filter()
+        self._apply_detection_filters()
+        self._autosize_detection_columns()
 
-        self._updating_detection_table = True
-        self._detection_table.setColumnCount(9)
-        self._detection_table.setHorizontalHeaderLabels(
-            ["On", "Time", "Source", "Scientific", "English", "Dutch", "Detail", "Level", "Score"]
+    def _autosize_detection_columns(self) -> None:
+        """Resize detection columns to fit current content without doing it on every filter."""
+        header = self._detection_table.horizontalHeader()
+        autosize_cols = (0, 1, 2, 3, 4, 5, 6, 7, 8)
+        previous_modes = {
+            col: header.sectionResizeMode(col)
+            for col in autosize_cols
+        }
+        for col in autosize_cols:
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        self._detection_table.resizeColumnsToContents()
+        for col in autosize_cols:
+            width = self._detection_table.columnWidth(col)
+            self._detection_table.setColumnWidth(col, width + 16)
+
+        # Keep name columns flexible after autosize so the table can use extra width.
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        header.setSectionResizeMode(6, QHeaderView.Interactive)
+        for col in (0, 1, 2, 7, 8):
+            header.setSectionResizeMode(col, previous_modes[col])
+
+    def _refresh_source_filter(self) -> None:
+        """Refresh source filter choices from current layers."""
+        current = self._source_filter.currentData()
+        sources = sorted({layer["name"] for layer in self._layers})
+        self._source_filter.blockSignals(True)
+        self._source_filter.clear()
+        self._source_filter.addItem("All", "")
+        for source in sources:
+            self._source_filter.addItem(source, source)
+        index = self._source_filter.findData(current)
+        self._source_filter.setCurrentIndex(index if index >= 0 else 0)
+        self._source_filter.blockSignals(False)
+
+    def _schedule_detection_filter_update(self, *_args) -> None:
+        """Debounce filter updates while the score spinbox changes."""
+        self._filter_timer.start(120)
+
+    def _apply_detection_filters(self, *_args) -> None:
+        """Apply source/score/enabled filters and sort order to the proxy."""
+        sort_mode = self._sort_mode.currentData() or "time"
+        self._current_sort_mode = sort_mode
+        self._detection_proxy.set_source_filter(self._source_filter.currentData() or "")
+        self._detection_proxy.set_min_score(float(self._score_filter.value()))
+        self._detection_proxy.set_enabled_only(self._enabled_only_filter.isChecked())
+        self._detection_proxy.set_sort_mode(sort_mode)
+        self._detection_proxy.invalidate()
+        column_map = {
+            "time": 1,
+            "score": 8,
+            "scientific": 3,
+            "source": 2,
+        }
+        self._detection_proxy.sort(
+            column_map.get(sort_mode, 1),
+            Qt.AscendingOrder,
         )
-        self._detection_table.setRowCount(len(rows))
-
-        shade = False
-        prev_start = None
-
-        for row_idx, row in enumerate(rows):
-            # Flip shade each time the time window changes
-            if row["start_time"] != prev_start:
-                shade = not shade
-                prev_start = row["start_time"]
-
-            start_s, end_s = row["start_time"], row["end_time"]
-            start_fmt = f"{int(start_s) // 60}:{int(start_s) % 60:02d}"
-            end_fmt = f"{int(end_s) // 60}:{int(end_s) % 60:02d}"
-
-            score = row["score"]
-            bar = "█" * int(score * 10)
-            score_str = f"{score:.2f} {bar}"
-
-            c = row["color"]
-            base = (c[0] // 3, c[1] // 3, c[2] // 3)
-            bg = QColor(base[0] + 15, base[1] + 15, base[2] + 15) if shade else QColor(*base)
-
-            enabled_item = QTableWidgetItem()
-            enabled_item.setFlags(
-                Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
-            )
-            enabled_item.setCheckState(Qt.Checked if row["enabled"] else Qt.Unchecked)
-
-            cells = [
-                enabled_item,
-                QTableWidgetItem(f"{start_fmt}–{end_fmt}"),
-                QTableWidgetItem(row["source"]),
-                QTableWidgetItem(row["scientific_name"]),
-                QTableWidgetItem(row["english_name"]),
-                QTableWidgetItem(row["dutch_name"]),
-                QTableWidgetItem(row["detail"]),
-                QTableWidgetItem(row["level"]),
-                QTableWidgetItem(score_str),
-            ]
-            for col, cell in enumerate(cells):
-                cell.setBackground(bg)
-                cell.setForeground(QColor("#e8e8e8"))
-                self._detection_table.setItem(row_idx, col, cell)
-            self._table_row_map.append(row["detection"])
-
-        self._detection_table.resizeRowsToContents()
-        self._updating_detection_table = False
-        self._tabs.setTabText(0, f"Detections ({len(rows)})")
+        self._tabs.setTabText(0, f"Detections ({self._detection_proxy.rowCount()})")
+        self._update_detection_detail()
 
     def _populate_tags(self) -> None:
         """Fill the Tags tab with deduplicated, checkable tag labels."""
@@ -1230,72 +1540,196 @@ class AiAnalysisDialog(QDialog):
         )
         self._tabs.setTabText(2, "Debug")
 
-    def _set_detection_enabled(self, row: int, enabled: bool) -> None:
-        """Update one detection enable-state in memory and in the table."""
-        if row < 0 or row >= len(self._table_row_map):
-            return
-        self._table_row_map[row]["enabled"] = enabled
-        item = self._detection_table.item(row, 0)
-        if item is not None:
-            item.setCheckState(Qt.Checked if enabled else Qt.Unchecked)
+    def _set_detection_enabled(self, source_row: int, enabled: bool) -> None:
+        """Update one detection enable-state in the source model."""
+        index = self._detection_model.index(source_row, 0)
+        if index.isValid():
+            self._detection_model.setData(
+                index,
+                Qt.Checked if enabled else Qt.Unchecked,
+                Qt.CheckStateRole,
+            )
 
-    def _apply_enabled_to_rows(self, rows: list[int], enabled: bool) -> None:
-        """Bulk-update detection checkboxes without rebuilding the whole table."""
+    def _apply_enabled_to_rows(self, source_rows: list[int], enabled: bool) -> None:
+        """Bulk-update detection checkboxes in the source model."""
         self._updating_detection_table = True
-        self.setUpdatesEnabled(False)
         try:
-            for row in rows:
-                self._set_detection_enabled(row, enabled)
+            self._detection_model.set_enabled_rows(source_rows, enabled)
         finally:
-            self.setUpdatesEnabled(True)
             self._updating_detection_table = False
 
-    def _on_detection_item_changed(self, item: QTableWidgetItem) -> None:
-        """Persist per-detection enable state toggles from the table."""
-        if self._updating_detection_table or item.column() != 0:
+    def _on_detection_model_changed(self, top_left, bottom_right, roles) -> None:
+        """React to checkbox state changes from the detection model."""
+        if self._updating_detection_table:
             return
-        row = item.row()
-        if row < 0 or row >= len(self._table_row_map):
+        if top_left.column() > 0 or bottom_right.column() < 0:
             return
-        detection = self._table_row_map[row]
-        detection["enabled"] = item.checkState() == Qt.Checked
+        if roles and Qt.CheckStateRole not in roles and Qt.DisplayRole not in roles:
+            return
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._update_detection_detail()
+        self._refresh_ai_overlay()
         self._persist_current_results()
 
     def _on_enable_all(self) -> None:
         """Enable every detection for the current file."""
-        self._apply_enabled_to_rows(list(range(len(self._table_row_map))), True)
+        self._apply_enabled_to_rows(list(range(self._detection_model.rowCount())), True)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
         self._persist_current_results()
 
     def _on_disable_all(self) -> None:
         """Disable every detection for the current file."""
-        self._apply_enabled_to_rows(list(range(len(self._table_row_map))), False)
+        self._apply_enabled_to_rows(list(range(self._detection_model.rowCount())), False)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
         self._persist_current_results()
 
     def _on_enable_selected(self) -> None:
         """Enable the currently selected detections."""
-        rows = sorted({index.row() for index in self._detection_table.selectedIndexes()})
-        if not rows:
+        source_rows = sorted(
+            {
+                self._detection_proxy.mapToSource(index).row()
+                for index in self._detection_table.selectionModel().selectedRows()
+                if self._detection_proxy.mapToSource(index).isValid()
+            }
+        )
+        if not source_rows:
             QMessageBox.information(
                 self,
                 "No detections selected",
                 "Select one or more detection rows to enable.",
             )
             return
-        self._apply_enabled_to_rows(rows, True)
+        self._apply_enabled_to_rows(source_rows, True)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
         self._persist_current_results()
 
     def _on_disable_selected(self) -> None:
         """Disable the currently selected detections."""
-        rows = sorted({index.row() for index in self._detection_table.selectedIndexes()})
-        if not rows:
+        source_rows = sorted(
+            {
+                self._detection_proxy.mapToSource(index).row()
+                for index in self._detection_table.selectionModel().selectedRows()
+                if self._detection_proxy.mapToSource(index).isValid()
+            }
+        )
+        if not source_rows:
             QMessageBox.information(
                 self,
                 "No detections selected",
                 "Select one or more detection rows to disable.",
             )
             return
-        self._apply_enabled_to_rows(rows, False)
+        self._apply_enabled_to_rows(source_rows, False)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
         self._persist_current_results()
+
+    def _update_detection_detail(self, *_args) -> None:
+        """Show a readable summary of the currently selected detection."""
+        rows = self._detection_table.selectionModel().selectedRows()
+        if not rows:
+            self._detection_detail.setPlainText(
+                "Select a detection to inspect its details."
+            )
+            self._disable_detail_btn.setEnabled(False)
+            self._enable_detail_btn.setEnabled(False)
+            self._copy_label_btn.setEnabled(False)
+            return
+        source_index = self._detection_proxy.mapToSource(rows[0])
+        row_data = self._detection_model.row_data(source_index.row())
+        if not row_data:
+            self._detection_detail.setPlainText(
+                "Select a detection to inspect its details."
+            )
+            self._disable_detail_btn.setEnabled(False)
+            self._enable_detail_btn.setEnabled(False)
+            self._copy_label_btn.setEnabled(False)
+            return
+
+        det = row_data["detection"]
+        lines = [
+            f"Label: {det.get('label', '')}",
+            f"Scientific: {det.get('scientific_name', '') or '-'}",
+            f"English: {det.get('english_name', '') or '-'}",
+            f"Dutch: {det.get('dutch_name', '') or '-'}",
+            f"Score: {det.get('score', 0.0):.3f}",
+            f"Start: {det.get('start_time', 0.0):.2f} s",
+            f"End: {det.get('end_time', 0.0):.2f} s",
+            f"Enabled: {'Yes' if det.get('enabled', True) else 'No'}",
+            f"Detail: {det.get('detail', '') or '-'}",
+        ]
+        if det.get("level"):
+            lines.append(f"Level: {det.get('level')}")
+        if det.get("tag"):
+            lines.append(f"Tag: {det.get('tag')}")
+        self._detection_detail.setPlainText("\n".join(lines))
+        enabled = det.get("enabled", True)
+        self._disable_detail_btn.setEnabled(enabled)
+        self._enable_detail_btn.setEnabled(not enabled)
+        self._copy_label_btn.setEnabled(True)
+
+    def _current_detection(self) -> dict | None:
+        """Return the currently selected detection dict, if any."""
+        row_data = self._current_detection_row()
+        if not row_data:
+            return None
+        return row_data["detection"]
+
+    def _current_detection_row(self) -> dict | None:
+        """Return the currently selected detection row wrapper, if any."""
+        rows = self._detection_table.selectionModel().selectedRows()
+        if not rows:
+            return None
+        source_index = self._detection_proxy.mapToSource(rows[0])
+        return self._detection_model.row_data(source_index.row())
+
+    def _disable_current_detection(self) -> None:
+        """Disable the currently selected detection from the detail pane."""
+        rows = self._detection_table.selectionModel().selectedRows()
+        if not rows:
+            return
+        source_index = self._detection_proxy.mapToSource(rows[0])
+        self._set_detection_enabled(source_index.row(), False)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
+        self._persist_current_results()
+        self._update_detection_detail()
+
+    def _enable_current_detection(self) -> None:
+        """Enable the currently selected detection from the detail pane."""
+        rows = self._detection_table.selectionModel().selectedRows()
+        if not rows:
+            return
+        source_index = self._detection_proxy.mapToSource(rows[0])
+        self._set_detection_enabled(source_index.row(), True)
+        if self._enabled_only_filter.isChecked():
+            self._apply_detection_filters()
+        self._refresh_ai_overlay()
+        self._persist_current_results()
+        self._update_detection_detail()
+
+    def _copy_current_detection_label(self) -> None:
+        """Copy the best available label for the selected detection."""
+        det = self._current_detection()
+        if not det:
+            return
+        text = (
+            det.get("scientific_name")
+            or det.get("english_name")
+            or det.get("dutch_name")
+            or det.get("label")
+            or ""
+        )
+        QApplication.clipboard().setText(text)
 
     # ------------------------------------------------------------------
     # Tag application

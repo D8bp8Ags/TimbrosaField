@@ -2194,11 +2194,16 @@ class WavViewer(QWidget):
             self.waveform_plot.addItem(text)
             self.ai_overlay_items.append((self.waveform_plot, text, layer_name))
 
-    def refresh_ai_overlay(self) -> None:
-        """Reload the AI overlay from the sidecar JSON for the current file.
+    def refresh_ai_overlay(self, layers: list[dict] | None = None) -> None:
+        """Refresh the AI overlay for the current file.
 
-        Called by the AI analysis dialog after a new analysis completes.
+        Args:
+            layers: Optional in-memory analysis layers. When provided, these are
+                drawn directly without reloading the sidecar from disk.
         """
+        if layers is not None:
+            self.load_ai_overlay(layers)
+            return
         if self.filename:
             self._load_ai_overlay(self.filename)
 
