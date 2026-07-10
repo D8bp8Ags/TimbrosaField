@@ -442,16 +442,9 @@ class SettingsManager:
         # Apply view settings
         view_mode = self.get_view_mode()
         if hasattr(main_window, "wav_viewer"):
-            # todo
             try:
                 main_window.wav_viewer.set_view_mode(view_mode)
-                if view_mode == "mono":
-                    main_window.wav_viewer.mono_radio.setChecked(True)
-                elif view_mode == "per_kanaal":
-                    main_window.wav_viewer.stereo_radio.setChecked(True)
-                elif view_mode == "overlay":
-                    main_window.wav_viewer.overlay_radio.setChecked(True)
-
+                main_window.wav_viewer.sync_view_mode_controls(view_mode)
             except AttributeError as e:
                 logger.warning(f"Could not restore view mode: {e}")
 
@@ -488,11 +481,9 @@ class SettingsManager:
 
         # Apply audio settings
         volume = self.get_volume()
-        if hasattr(main_window, "wav_viewer") and hasattr(
-            main_window.wav_viewer, "audio_player"
-        ):
+        if hasattr(main_window, "wav_viewer"):
             try:
-                main_window.wav_viewer.audio_player.set_volume(volume)
+                main_window.wav_viewer.set_volume(volume)
             except AttributeError as e:
                 logger.warning(f"Could not restore audio settings: {e}")
 
@@ -515,9 +506,9 @@ class SettingsManager:
             main_window: The main application window to save settings from.
                         Settings are extracted from various window attributes:
                         - Window geometry via saveGeometry()
-                        - wav_viewer for view mode and audio settings
+                        - wav_viewer's public API for view mode, mouse label
+                          preset, and audio settings
                         - current_theme for theme preference
-                        - _current_mouse_mode for mouse label preset
 
         Settings saved:
         - Window size, position, and state
@@ -538,26 +529,20 @@ class SettingsManager:
 
         # View settings
         if hasattr(main_window, "wav_viewer"):
-            view_mode = getattr(main_window.wav_viewer, "view_mode", DEFAULT_VIEW_MODE)
+            view_mode = main_window.wav_viewer.get_view_mode()
             self.save_view_settings(view_mode)
 
         current_theme = getattr(main_window, 'current_theme', 'light')
         self.save_theme_settings(current_theme)
 
-        # current_mouse_preset = getattr(main_window.wav_viewer, "_current_mouse_mode", "performance")
-        # self.settings.setValue("view/mouse_labels_preset", current_mouse_preset)
-        current_preset = getattr(
-            main_window.wav_viewer, "_current_mouse_mode", "performance"
-        )
+        current_preset = main_window.wav_viewer.get_current_mouse_mode()
         current_config = main_window.wav_viewer.get_mouse_label_config()
         self.save_mouse_labels_preset(current_preset, current_config)
 
         # Audio settings
-        if hasattr(main_window, "wav_viewer") and hasattr(
-            main_window.wav_viewer, "audio_player"
-        ):
+        if hasattr(main_window, "wav_viewer"):
             try:
-                volume = main_window.wav_viewer.audio_player.get_volume()
+                volume = main_window.wav_viewer.get_volume()
                 self.save_audio_settings(volume)
             except AttributeError as e:
                 logger.warning(f"Could not save audio settings: {e}")

@@ -162,6 +162,21 @@ class FileManager:
         """
         return self.directory_loader.validate_wav_directory(directory)
 
+    def load_directory(self, directory: str) -> bool:
+        """Load a specific directory into the application.
+
+        Public entry point for loading an explicit directory path (e.g. from
+        the recent-directories list), as opposed to open_directory() which
+        prompts the user via a file dialog.
+
+        Args:
+            directory (str): Directory path to load.
+
+        Returns:
+            bool: True if directory was successfully loaded, False otherwise.
+        """
+        return self.directory_loader._load_directory(directory)  # noqa: SLF001
+
 
 class RecentDirectoriesManager:
     """Manages recent directory list with persistent storage and automatic cleanup.
@@ -919,6 +934,17 @@ class FileManagerInterface:
             bool: True if directory was successfully reloaded
         """
         return self.file_manager.reload_current_directory()
+
+    def load_directory(self, directory: str) -> bool:
+        """Load a specific directory path (e.g. from recent directories).
+
+        Args:
+            directory (str): Directory path to load.
+
+        Returns:
+            bool: True if directory was successfully loaded, False otherwise.
+        """
+        return self.file_manager.load_directory(directory)
 
     def get_current_directory_info(self) -> dict[str, Any]:
         """Get comprehensive information about the current directory.

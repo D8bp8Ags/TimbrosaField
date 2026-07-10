@@ -389,8 +389,7 @@ class MainWindow(QMainWindow):
             Updates the user configuration and refreshes the file list after
             successful loading.
         """
-        loader = self.file_manager.file_manager.directory_loader
-        success = loader._load_directory(directory)  # noqa: SLF001
+        success = self.file_manager.load_directory(directory)
         if success:
             new_dir = self.user_config_manager.get_updated_config()["paths"][
                 "fieldrecording_dir"
@@ -509,8 +508,8 @@ class MainWindow(QMainWindow):
                   not available or operation failed.
         """
         try:
-            if hasattr(self.wav_viewer, "_reset_info_table_to_defaults"):
-                self.wav_viewer._reset_info_table_to_defaults()  # noqa: SLF001
+            if hasattr(self.wav_viewer, "reset_info_table_to_defaults"):
+                self.wav_viewer.reset_info_table_to_defaults()
                 self.show_status_message("Reset to defaults", 2000)
                 return True
             self.show_status_message("Reset function not available", 3000)
@@ -953,8 +952,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.toggle_playback()
+            if hasattr(self.wav_viewer, "toggle_playback"):
+                self.wav_viewer.toggle_playback()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -973,8 +972,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.stop_playback()
+            if hasattr(self.wav_viewer, "stop_playback"):
+                self.wav_viewer.stop_playback()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -993,8 +992,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.volume_up()
+            if hasattr(self.wav_viewer, "volume_up"):
+                self.wav_viewer.volume_up()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -1013,8 +1012,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.volume_down()
+            if hasattr(self.wav_viewer, "volume_down"):
+                self.wav_viewer.volume_down()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -1033,8 +1032,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.toggle_mute()
+            if hasattr(self.wav_viewer, "toggle_mute"):
+                self.wav_viewer.toggle_mute()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -1053,8 +1052,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.seek_forward()
+            if hasattr(self.wav_viewer, "seek_forward"):
+                self.wav_viewer.seek_forward()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False
@@ -1073,8 +1072,8 @@ class MainWindow(QMainWindow):
                   False if audio player not available.
         """
         try:
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.seek_backward()
+            if hasattr(self.wav_viewer, "seek_backward"):
+                self.wav_viewer.seek_backward()
                 return True
             self.show_status_message("Audio player not available", 3000)
             return False

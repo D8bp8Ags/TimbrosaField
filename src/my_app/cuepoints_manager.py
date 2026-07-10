@@ -833,20 +833,11 @@ class CuePointsAnalysisDialog(QDialog):
         """
         try:
             # Find and select the file in parent's file list
-            for i in range(self.parent_viewer.file_list.count()):
-                item = self.parent_viewer.file_list.item(i)
-                if item and item.data(Qt.UserRole) == file_path:
-                    self.parent_viewer.file_list.setCurrentRow(i)
-                    break
+            self.parent_viewer.select_file_by_path(file_path)
 
-            # Seek to the cue point time
-            if hasattr(self.parent_viewer, "audio_player"):
-                position_ms = int(time_seconds * 1000)
-                self.parent_viewer.audio_player.seek_to_position(position_ms)
-
-                # Start playback
-                if self.parent_viewer.audio_player.is_stopped():
-                    self.parent_viewer.audio_player.play()
+            # Seek to the cue point time and start playback if stopped
+            if hasattr(self.parent_viewer, "seek_and_play"):
+                self.parent_viewer.seek_and_play(time_seconds)
 
             # Close this dialog and bring main window to front
             self.accept()

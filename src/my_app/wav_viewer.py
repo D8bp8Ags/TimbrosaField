@@ -3940,6 +3940,167 @@ class WavViewer(QWidget):
 
         logger.debug(f"View mode changed to: {mode}")
 
+    def get_view_mode(self) -> str:
+        """Get the current waveform visualization display mode.
+
+        Returns:
+            Current view mode identifier: 'mono', 'per_kanaal', or 'overlay'.
+        """
+        return self.view_mode
+
+    def sync_view_mode_controls(self, mode: str) -> None:
+        """Check the radio button matching the given view mode, if any.
+
+        Public entry point for callers (e.g. SettingsManager restoring a
+        saved view mode) that need to keep the view-mode radio buttons in
+        sync without reaching into WavViewer's internal widgets directly.
+
+        Args:
+            mode: View mode identifier: 'mono', 'per_kanaal', or 'overlay'.
+                 Unrecognized values are ignored (no control is checked).
+        """
+        if mode == "mono":
+            self.mono_radio.setChecked(True)
+        elif mode == "per_kanaal":
+            self.stereo_radio.setChecked(True)
+        elif mode == "overlay":
+            self.overlay_radio.setChecked(True)
+
+    def get_current_mouse_mode(self) -> str:
+        """Get the identifier of the currently active mouse label preset.
+
+        Returns:
+            Preset identifier: 'minimal', 'performance', 'professional', or
+            'professional_advanced'. Defaults to 'performance' if no preset
+            has been explicitly applied yet (matches the pre-existing
+            fallback used by callers before this method existed).
+        """
+        return getattr(self, "_current_mouse_mode", "performance")
+
+    def set_volume(self, volume: int) -> None:
+        """Set the audio playback volume.
+
+        Args:
+            volume: Volume level, typically 0-100.
+        """
+        self.audio_player.set_volume(volume)
+
+    def get_volume(self) -> int:
+        """Get the current audio playback volume.
+
+        Returns:
+            Current volume level, typically 0-100.
+        """
+        return self.audio_player.get_volume()
+
+    def toggle_playback(self) -> None:
+        """Toggle audio playback between play and pause states."""
+        self.audio_player.toggle_playback()
+
+    def stop_playback(self) -> None:
+        """Stop audio playback and reset position to the start."""
+        self.audio_player.stop_playback()
+
+    def volume_up(self) -> None:
+        """Increase the audio output volume by one increment."""
+        self.audio_player.volume_up()
+
+    def volume_down(self) -> None:
+        """Decrease the audio output volume by one decrement."""
+        self.audio_player.volume_down()
+
+    def toggle_mute(self) -> None:
+        """Toggle audio mute state between muted and unmuted."""
+        self.audio_player.toggle_mute()
+
+    def seek_forward(self) -> None:
+        """Seek forward in the audio by the player's default increment."""
+        self.audio_player.seek_forward()
+
+    def seek_backward(self) -> None:
+        """Seek backward in the audio by the player's default increment."""
+        self.audio_player.seek_backward()
+
+    def reset_info_table_to_defaults(self) -> None:
+        """Reset the INFO metadata table to default values (public entry point).
+
+        Prompts the user for confirmation, then clears the INFO table to
+        show only default values. Delegates to the existing internal
+        implementation.
+        """
+        self._reset_info_table_to_defaults()
+
+    def get_audio_duration(self) -> float | None:
+        """Get the duration of the currently loaded audio file.
+
+        Returns:
+            Duration in seconds, or None if no audio is loaded.
+        """
+        return self.audio_duration
+
+    def connect_audio_state_changed(self, slot) -> None:
+        """Connect a slot to the audio player's stateChanged signal.
+
+        Public entry point so callers do not need to reach into the
+        internal ``audio_player`` widget directly just to observe playback
+        state changes.
+
+        Args:
+            slot: Callable to invoke when the audio player's playback state
+                 changes (receives a QMediaPlayer.State value).
+        """
+        self.audio_player.stateChanged.connect(slot)
+
+    def get_selected_file_list_item_path(self, row: int) -> str | None:
+        """Get the file path stored on the file list item at the given row.
+
+        Args:
+            row: Row index in the file list.
+
+        Returns:
+            The file path (Qt.UserRole data) for the item at ``row``, or
+            None if there is no item at that row.
+        """
+        item = self.file_list.item(row)
+        if not item:
+            return None
+        return item.data(Qt.UserRole)
+
+    def connect_file_list_selection_changed(self, slot) -> None:
+        """Connect a slot to the file list's currentRowChanged signal.
+
+        Args:
+            slot: Callable to invoke when the file list selection changes
+                 (receives the new row index).
+        """
+        self.file_list.currentRowChanged.connect(slot)
+
+    def select_file_by_path(self, target_path: str) -> bool:
+        """Select a specific file in the file list by matching its full path.
+
+        Public entry point delegating to the existing internal
+        _select_file_by_path() implementation.
+
+        Args:
+            target_path: Complete file path to search for and select.
+
+        Returns:
+            True if the file was found and successfully selected, False
+            otherwise.
+        """
+        return self._select_file_by_path(target_path)
+
+    def seek_and_play(self, time_seconds: float) -> None:
+        """Seek to a timestamp and start playback if not already playing.
+
+        Args:
+            time_seconds: Timestamp in seconds to seek to.
+        """
+        position_ms = int(time_seconds * 1000)
+        self.audio_player.seek_to_position(position_ms)
+        if self.audio_player.is_stopped():
+            self.audio_player.play()
+
     # ========== UTILITY AND HELPER METHODS ==========
 
     def get_color(self, color_name: str) -> QColor:

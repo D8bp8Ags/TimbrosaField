@@ -777,15 +777,15 @@ class StatusBarManager:
         """
         try:
             # Connect audio player state changes
-            if hasattr(self.wav_viewer, "audio_player"):
-                self.wav_viewer.audio_player.stateChanged.connect(
+            if hasattr(self.wav_viewer, "connect_audio_state_changed"):
+                self.wav_viewer.connect_audio_state_changed(
                     self._on_audio_state_changed
                 )
                 logger.info("Audio player status connected to status bar")
 
             # Connect file list changes
-            if hasattr(self.wav_viewer, "file_list"):
-                self.wav_viewer.file_list.currentRowChanged.connect(
+            if hasattr(self.wav_viewer, "connect_file_list_selection_changed"):
+                self.wav_viewer.connect_file_list_selection_changed(
                     self._on_file_selection_changed
                 )
                 logger.info("File list status connected to status bar")
@@ -874,11 +874,7 @@ class StatusBarManager:
             self.status_bar.update_file_info()
             return
 
-        item = self.wav_viewer.file_list.item(row)
-        if not item:
-            return
-
-        file_path = item.data(Qt.UserRole)
+        file_path = self.wav_viewer.get_selected_file_list_item_path(row)
         if not file_path or not os.path.exists(file_path):
             return
 
@@ -888,8 +884,8 @@ class StatusBarManager:
 
             # Get duration if available
             duration = None
-            if hasattr(self.wav_viewer, "audio_duration"):
-                duration = self.wav_viewer.audio_duration
+            if hasattr(self.wav_viewer, "get_audio_duration"):
+                duration = self.wav_viewer.get_audio_duration()
 
             self.status_bar.update_file_info(file_path, duration, file_size)
 
