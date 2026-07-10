@@ -53,6 +53,8 @@ from tag_completer import FileTagAutocomplete
 from user_config_manager import load_user_config
 from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
+from analysis import clipping as clipping_analysis
+from analysis import waveform_inspector
 
 
 class WavAnalysisWorker(QThread):
@@ -1863,37 +1865,13 @@ class WavViewer(QWidget):
     ) -> list[tuple[int, int]]:
         """Find all raw clipping regions without merging.
 
+        Thin wrapper delegating to the Qt-free analysis.clipping module.
+
         Args:     clipped_samples: Boolean array of clipped samples
 
         Returns: list of (start_sample, end_sample) tuples for raw clipping regions
         """
-        regions = []
-
-        if len(clipped_samples.shape) > 1:
-            # If multi-channel, combine all channels
-            clipped_any_channel = np.any(clipped_samples, axis=1)
-        else:
-            # Single channel
-            clipped_any_channel = clipped_samples
-
-        # Find where clipping starts and stops
-        clip_changes = np.diff(clipped_any_channel.astype(int))
-
-        clip_starts = np.where(clip_changes == 1)[0] + 1
-        clip_ends = np.where(clip_changes == -1)[0] + 1
-
-        # Handle edge cases
-        if clipped_any_channel[0]:
-            clip_starts = np.concatenate([[0], clip_starts])
-        if clipped_any_channel[-1]:
-            clip_ends = np.concatenate([clip_ends, [len(clipped_any_channel)]])
-
-        # Pair starts and ends
-        for start, end in zip(clip_starts, clip_ends, strict=False):
-            if end > start:  # Valid region
-                regions.append((start, end))
-
-        return regions
+        return clipping_analysis.find_raw_clipping_regions(clipped_samples)
 
     def _merge_nearby_clipping_regions(
         self,
@@ -1903,48 +1881,23 @@ class WavViewer(QWidget):
     ) -> list[tuple[int, int]]:
         """Merge clipping regions that are close together.
 
+        Thin wrapper delegating to the Qt-free analysis.clipping module.
+
         Args:     regions: list of (start_sample, end_sample) tuples gap_tolerance_ms:
         Maximum gap in milliseconds to bridge     min_duration_ms: Minimum duration in
         milliseconds to keep region
 
         Returns: list of merged clipping regions
         """
-        if not regions:
-            return []
-
-        # Convert tolerances to samples
-        gap_tolerance_samples = int(gap_tolerance_ms * self.current_sr / 1000.0)
-        min_duration_samples = int(min_duration_ms * self.current_sr / 1000.0)
-
-        # Sort regions by start time
-        regions = sorted(regions, key=lambda x: x[0])
-
-        # Merge nearby regions
-        merged = [regions[0]]
-
-        for start, end in regions[1:]:
-            last_start, last_end = merged[-1]
-
-            # If gap between regions is small enough, merge them
-            gap_size = start - last_end
-            if gap_size <= gap_tolerance_samples:
-                # Extend the previous region to include this one
-                merged[-1] = (last_start, end)
-            else:
-                # Keep as separate region
-                merged.append((start, end))
-
-        # Filter out regions that are too short (likely noise)
-        filtered_regions = []
-        for start, end in merged:
-            duration_samples = end - start
-            if duration_samples >= min_duration_samples:
-                filtered_regions.append((start, end))
-
-        return filtered_regions
+        return clipping_analysis.merge_nearby_clipping_regions(
+            regions, self.current_sr, gap_tolerance_ms, min_duration_ms
+        )
 
     def get_clipping_summary(self) -> dict:
         """Get a summary of clipping detection results.
+
+        Collects the current audio state and delegates the pure
+        calculation to the Qt-free analysis.clipping module.
 
         Returns:     Dictionary with clipping statistics per channel using merged
         regions
@@ -1952,56 +1905,15 @@ class WavViewer(QWidget):
         if self.current_data is None:
             return {}
 
-        # Use same threshold logic as clipping detection
         is_float = getattr(self, "is_float_format", True)
-        clip_threshold = 0.99 if is_float else 0.95
 
-        left_channel = self.current_data[:, 0]
-        right_channel = self.current_data[:, 1]
-        mono_mix = self.cached_mean_signal
-
-        left_clipped = np.abs(left_channel) >= clip_threshold
-        right_clipped = np.abs(right_channel) >= clip_threshold
-        mono_clipped = np.abs(mono_mix) >= clip_threshold
-
-        # Get merged regions for each channel
-        left_regions = self._merge_nearby_clipping_regions(
-            self._find_raw_clipping_regions(left_clipped), gap_tolerance_ms=5.0
+        return clipping_analysis.get_clipping_summary(
+            left_channel=self.current_data[:, 0],
+            right_channel=self.current_data[:, 1],
+            mono_mix=self.cached_mean_signal,
+            sample_rate=self.current_sr,
+            is_float_format=is_float,
         )
-        right_regions = self._merge_nearby_clipping_regions(
-            self._find_raw_clipping_regions(right_clipped), gap_tolerance_ms=5.0
-        )
-        mono_regions = self._merge_nearby_clipping_regions(
-            self._find_raw_clipping_regions(mono_clipped), gap_tolerance_ms=5.0
-        )
-
-        def calculate_region_stats(regions, clipped_array):
-            total_duration_ms = sum(
-                (end - start) / self.current_sr * 1000 for start, end in regions
-            )
-            return {
-                "samples_clipped": int(np.sum(clipped_array)),
-                "regions_count": len(regions),
-                "total_duration_ms": round(total_duration_ms, 1),
-                "regions_detail": [
-                    {
-                        "start_time": start / self.current_sr,
-                        "end_time": end / self.current_sr,
-                        "duration_ms": (end - start) / self.current_sr * 1000,
-                    }
-                    for start, end in regions
-                ],
-            }
-
-        return {
-            "left_channel": calculate_region_stats(left_regions, left_clipped),
-            "right_channel": calculate_region_stats(right_regions, right_clipped),
-            "mono_mix": calculate_region_stats(mono_regions, mono_clipped),
-            "threshold_used": clip_threshold,
-            "format_type": "float" if is_float else "integer",
-            "gap_tolerance_ms": 5.0,
-            "min_duration_ms": 1.0,
-        }
 
     #######
     def _process_file_metadata(self, filename: str) -> None:
@@ -3150,6 +3062,9 @@ class WavViewer(QWidget):
     def _analyze_local_peak(self, sample_idx: int, current_amplitude: float) -> str:
         """Analyze if current position is near a local peak.
 
+        Thin wrapper delegating to the Qt-free analysis.waveform_inspector
+        module.
+
         Args:     sample_idx: Current sample index     current_amplitude: Current
         amplitude value
 
@@ -3158,147 +3073,44 @@ class WavViewer(QWidget):
         if not hasattr(self, "current_data") or self.current_data is None:
             return ""
 
-        try:
-            # Check 10ms window around current position
-            window_size = int(self.current_sr * 0.01)
-            start_idx = max(0, sample_idx - window_size)
-            end_idx = min(len(self.current_data), sample_idx + window_size)
-
-            # Use appropriate data based on current plot
-            if (
-                hasattr(self, "cached_mean_signal")
-                and len(self.cached_mean_signal) > end_idx
-            ):
-                window_data = self.cached_mean_signal[start_idx:end_idx]
-            else:
-                return ""
-
-            if len(window_data) == 0:
-                return ""
-
-            # Find local maximum in window
-            local_max = np.max(np.abs(window_data))
-
-            # Check if current position is near the peak (within 90%)
-            if current_amplitude >= local_max * 0.9:
-                peak_db = 20 * np.log10(local_max) if local_max > 1e-12 else -120
-                return f"Local Peak: {peak_db:.1f} dB"
-
-            return ""
-
-        except (
-            AttributeError,
-            IndexError,
-            KeyError,
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ):
-            return ""
+        cached_mean_signal = getattr(self, "cached_mean_signal", None)
+        return waveform_inspector.analyze_local_peak(
+            sample_idx, current_amplitude, cached_mean_signal, self.current_sr
+        )
 
     def _get_channel_context_info(self, label_attr: str, sample_idx: int) -> str:
         """Get channel-specific context information.
+
+        Thin wrapper delegating to the Qt-free analysis.waveform_inspector
+        module.
 
         Args:     label_attr: Label attribute name to determine channel     sample_idx:
         Current sample index
 
         Returns:     Channel context string
         """
-        if (
-            not hasattr(self, "current_data")
-            or self.current_data is None
-            or sample_idx >= len(self.current_data)
-        ):
-            return ""
-
-        text = ""
-        try:
-            if label_attr == "mouse_label_main":
-                # Mono/Main plot - show L/R comparison
-                left_val = self.current_data[sample_idx, 0]
-                right_val = self.current_data[sample_idx, 1]
-
-                # Stereo width analysis
-                width = abs(left_val - right_val)
-                if width > 0.1:
-                    text = f"L:{left_val:+.3f} R:{right_val:+.3f} Wide: {width:.3f}"
-                elif width < 0.01:
-                    text = f"L:{left_val:+.3f} R:{right_val:+.3f} Centered"
-                else:
-                    text = f"L:{left_val:+.3f} R:{right_val:+.3f}"
-
-            elif label_attr == "mouse_label_top":
-                # Left channel - show correlation with right
-                right_val = self.current_data[sample_idx, 1]
-                text = f"Left Ch (R:{right_val:+.3f})"
-
-            elif label_attr == "mouse_label_bottom":
-                # Right channel - show correlation with left
-                left_val = self.current_data[sample_idx, 0]
-                text = f"Right Ch (L:{left_val:+.3f})"
-
-        except (
-            AttributeError,
-            IndexError,
-            KeyError,
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ) as exc:
-            logger.debug("Channel context info error: %s", exc)
-            text = ""
-
-        return text
+        return waveform_inspector.get_channel_context_info(
+            label_attr, sample_idx, self.current_data
+        )
 
     def _get_frequency_info_at_position(self, sample_idx: int) -> str:
         """Get frequency analysis at current position (CPU intensive - optional).
+
+        Thin wrapper delegating to the Qt-free analysis.waveform_inspector
+        module.
 
         Args:     sample_idx: Current sample index
 
         Returns:     Frequency information string
         """
-        if (
-            not hasattr(self, "current_data")
-            or self.current_data is None
-            or not hasattr(self, "cached_mean_signal")
-        ):
+        if not hasattr(self, "current_data") or self.current_data is None:
+            return ""
+        if not hasattr(self, "cached_mean_signal"):
             return ""
 
-        try:
-            # Small FFT window for responsiveness
-            window_size = 1024
-            start_idx = max(0, sample_idx - window_size // 2)
-            end_idx = min(len(self.cached_mean_signal), start_idx + window_size)
-
-            window_data = self.cached_mean_signal[start_idx:end_idx]
-
-            if len(window_data) < 256:
-                return ""
-
-            # Apply window function and FFT
-            windowed = window_data * np.hanning(len(window_data))
-            fft = np.fft.rfft(windowed)
-            magnitude = np.abs(fft)
-
-            # Find dominant frequency
-            freqs = np.fft.rfftfreq(len(windowed), 1 / self.current_sr)
-            dominant_idx = np.argmax(magnitude[1:]) + 1  # Skip DC
-            dominant_freq = freqs[dominant_idx]
-
-            if dominant_freq > 20:  # Above human hearing threshold
-                return f"~{dominant_freq:.0f}Hz"
-
-            return ""
-
-        except (
-            AttributeError,
-            IndexError,
-            KeyError,
-            ValueError,
-            TypeError,
-            RuntimeError,
-        ):
-            return ""
+        return waveform_inspector.get_frequency_info_at_position(
+            sample_idx, self.cached_mean_signal, self.current_sr
+        )
 
     def _get_recording_context_info(self, time_pos: float) -> str:
         """Get recording context information (cue points, clipping regions, etc).
@@ -4074,6 +3886,25 @@ class WavViewer(QWidget):
                  (receives the new row index).
         """
         self.file_list.currentRowChanged.connect(slot)
+
+    def get_all_file_list_paths(self) -> list[str]:
+        """Get the file paths of all items currently shown in the file list.
+
+        Only paths that still exist on disk are included, matching the
+        existing filtering behavior of callers that read the file list
+        directly.
+
+        Returns:
+            List of existing file paths, in file list order.
+        """
+        paths = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            if item:
+                file_path = item.data(Qt.UserRole)
+                if file_path and os.path.exists(file_path):
+                    paths.append(file_path)
+        return paths
 
     def select_file_by_path(self, target_path: str) -> bool:
         """Select a specific file in the file list by matching its full path.

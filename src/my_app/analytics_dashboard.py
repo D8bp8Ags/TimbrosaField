@@ -1104,15 +1104,7 @@ def show_analytics_dashboard(wav_viewer):
         wav_viewer (WavViewer): WavViewer instance containing file list
             in its file_list widget. Files are stored in Qt.UserRole data.
     """
-    wav_files = []
-
-    # Collect all WAV file paths
-    for i in range(wav_viewer.file_list.count()):
-        item = wav_viewer.file_list.item(i)
-        if item:
-            file_path = item.data(Qt.UserRole)
-            if file_path and os.path.exists(file_path):
-                wav_files.append(file_path)
+    wav_files = wav_viewer.get_all_file_list_paths()
 
     if not wav_files:
         QMessageBox.information(
