@@ -18,6 +18,23 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+photo = [
+    "Pillow",
+]
+ast = [
+    "torch",
+    "transformers",
+    "librosa",
+    "huggingface_hub",
+]
+birdnet = [
+    "birdnet",
+]
+perch = [
+    "ml_collections",
+    "perch-hoplite",
+    "scipy",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src/my_app", "."]

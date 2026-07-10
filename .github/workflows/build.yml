@@ -1,4 +1,10 @@
 # .github/workflows/build.yml
+# Dependency source: pyproject.toml (core + [dev] for tests). AI backend
+# extras (ast/birdnet/perch) and the photo extra are intentionally NOT
+# installed here — they require real models/large runtimes and are not
+# needed to run the test suite or build the executable (AI imports are
+# lazy in production code). Real AI runtime checks belong in a separate,
+# explicit, manually-triggered workflow — not yet added.
 name: Build TimbrosaField Cross-Platform
 
 on:
@@ -7,6 +13,28 @@ on:
   workflow_dispatch:  # Handmatig triggeren via GitHub UI
 
 jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install core + development/test dependencies
+      run: |
+        pip install --upgrade pip
+        pip install ".[dev]"
+
+    - name: Run test suite
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        python3 -m pytest -q
+
   build-macos:
     runs-on: macos-latest
     steps:
@@ -21,14 +49,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install PyQt5>=5.15.0
-        pip install pyqtgraph>=0.12.0
-        pip install numpy>=1.20.0
-        pip install scipy>=1.7.0
-        pip install soundfile>=0.10.0
-        pip install matplotlib>=3.5.0
-        pip install librosa>=0.9.0
-        pip install mutagen>=1.45.0
+        pip install .
         pip install pyinstaller
 
     - name: Build macOS app
@@ -69,14 +90,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install PyQt5>=5.15.0
-        pip install pyqtgraph>=0.12.0
-        pip install numpy>=1.20.0
-        pip install scipy>=1.7.0
-        pip install soundfile>=0.10.0
-        pip install matplotlib>=3.5.0
-        pip install librosa>=0.9.0
-        pip install mutagen>=1.45.0
+        pip install .
         pip install pyinstaller
 
     - name: Build Windows app
@@ -91,7 +105,7 @@ jobs:
         path: src/my_app/dist/TimbrosaField.exe
 
   create-release:
-    needs: [build-macos, build-windows]
+    needs: [test, build-macos, build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
