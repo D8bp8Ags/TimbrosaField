@@ -16,7 +16,7 @@ from unittest import mock
 
 import pytest
 
-import wav_save_strategies as wss
+import my_app.wav.save_strategies as wss
 from tests.fixtures.wav import builder as wavbuild
 
 
@@ -75,7 +75,7 @@ def test_save_as_edit_copy_validation_error_bad_extension(tmp_path):
 
 def test_save_as_edit_copy_write_error_is_reported(source_wav):
     with mock.patch(
-        "wav_save_strategies.inject_info_chunk", side_effect=OSError("disk full")
+        "my_app.wav.save_strategies.inject_info_chunk", side_effect=OSError("disk full")
     ):
         result = wss.WavSaveStrategies.save_as_edit_copy(source_wav, {"INAM": "X"})
 
@@ -117,7 +117,7 @@ def test_save_in_place_write_error_rolls_back_and_cleans_temp_file(source_wav):
     original_bytes = open(source_wav, "rb").read()
 
     with mock.patch(
-        "wav_save_strategies.inject_info_chunk", side_effect=OSError("disk full")
+        "my_app.wav.save_strategies.inject_info_chunk", side_effect=OSError("disk full")
     ):
         result = wss.WavSaveStrategies.save_in_place(source_wav, {"INAM": "X"})
 
@@ -130,7 +130,7 @@ def test_save_in_place_write_error_rolls_back_and_cleans_temp_file(source_wav):
 
 
 def test_save_in_place_output_is_re_parseable(source_wav):
-    import wav_analyzer as wa
+    import my_app.wav.analyzer as wa
 
     result = wss.WavSaveStrategies.save_in_place(source_wav, {"INAM": "Parseable"})
 
@@ -155,7 +155,7 @@ def test_save_with_backup_success_creates_backup_and_updates_original(source_wav
     # Backup preserves the pre-save content.
     assert open(result.backup_path, "rb").read() == original_bytes
     # Original path now contains the mutated content.
-    import wav_analyzer as wa
+    import my_app.wav.analyzer as wa
 
     assert wa.wav_analyze(source_wav)["info"]["INAM"] == "Backed up"
 
@@ -164,7 +164,7 @@ def test_save_with_backup_write_error_preserves_original_and_cleans_temp(source_
     original_bytes = open(source_wav, "rb").read()
 
     with mock.patch(
-        "wav_save_strategies.inject_info_chunk", side_effect=OSError("disk full")
+        "my_app.wav.save_strategies.inject_info_chunk", side_effect=OSError("disk full")
     ):
         result = wss.WavSaveStrategies.save_with_backup(source_wav, {"INAM": "X"})
 

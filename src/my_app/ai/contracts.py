@@ -1,7 +1,7 @@
 """Typed contracts shared by the AI registry, backends, and UI.
 
-Re-exports the existing AiBackend interface (unchanged, still defined in
-ai_backends.base) and adds a TypedDict describing the detection dict shape
+Re-exports the existing AiBackend interface (unchanged, defined in
+ai.backends.base) and adds a TypedDict describing the detection dict shape
 backends already return. Detection remains a plain dict at runtime — this
 is a documented, checkable shape, not a new runtime type — so the existing
 sidecar JSON format and UI dict-based consumption are unaffected.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from ai_backends.base import AiBackend
+from my_app.ai.backends.base import AiBackend
 
 __all__ = ["AiBackend", "Detection"]
 

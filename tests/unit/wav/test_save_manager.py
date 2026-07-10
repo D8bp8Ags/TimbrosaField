@@ -13,7 +13,7 @@ from unittest import mock
 
 import pytest
 
-import wav_save_manager as wsm
+import my_app.wav.save_manager as wsm
 from tests.fixtures.wav import builder as wavbuild
 
 
@@ -90,7 +90,7 @@ def test_execute_save_in_place_write_error_preserves_original(source_wav):
     original_bytes = open(source_wav, "rb").read()
 
     with mock.patch(
-        "wav_save_strategies.inject_info_chunk", side_effect=OSError("disk full")
+        "my_app.wav.save_strategies.inject_info_chunk", side_effect=OSError("disk full")
     ):
         result = manager.execute_save(
             save_method=2, filename=source_wav, metadata={"INAM": "X"}
@@ -180,7 +180,7 @@ def test_execute_save_merges_new_tags_with_existing(source_wav):
 
     assert result.success is True
 
-    import wav_analyzer as wa
+    import my_app.wav.analyzer as wa
 
     saved = wa.wav_analyze(result.output_path)
     assert "forest" in saved["info"]["ICMT"]
@@ -199,7 +199,7 @@ def test_execute_save_replaces_tags_when_not_merging(source_wav):
         merge_tags=False,
     )
 
-    import wav_analyzer as wa
+    import my_app.wav.analyzer as wa
 
     saved = wa.wav_analyze(result.output_path)
     assert saved["info"]["ICMT"] == "birds"

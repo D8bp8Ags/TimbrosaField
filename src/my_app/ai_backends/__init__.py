@@ -1,5 +1,4 @@
-"""AI analysis backends package.
+"""Compatibility shim; remove in phase 9.
 
-Each backend module wraps a third-party model under its own licence.
-The base interface is defined in :mod:`ai_backends.base`.
+ai_backends/ moved to ai/backends/ (Fase 7).
 """

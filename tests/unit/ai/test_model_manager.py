@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import ai_model_manager as manager
+import my_app.ai.model_manager as manager
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -192,13 +192,13 @@ class ModelManagerTests(unittest.TestCase):
 
     def test_backends_do_not_call_download_loaders_during_analysis(self) -> None:
         ast_source = (
-            REPO_ROOT / "src/my_app/ai_backends/ast_backend.py"
+            REPO_ROOT / "src/my_app/ai/backends/ast_backend.py"
         ).read_text(encoding="utf-8")
         perch_source = (
-            REPO_ROOT / "src/my_app/ai_backends/perch_backend.py"
+            REPO_ROOT / "src/my_app/ai/backends/perch_backend.py"
         ).read_text(encoding="utf-8")
         birdnet_source = (
-            REPO_ROOT / "src/my_app/ai_backends/birdnet_backend.py"
+            REPO_ROOT / "src/my_app/ai/backends/birdnet_backend.py"
         ).read_text(encoding="utf-8")
 
         self.assertNotIn("from_pretrained(_MODEL_ID", ast_source)
@@ -209,7 +209,7 @@ class ModelManagerTests(unittest.TestCase):
 
     def test_model_dialog_uses_qthread_for_long_actions(self) -> None:
         from PyQt5.QtCore import QThread
-        from ai_model_dialog import _InstallWorker
+        from my_app.ai.ui.model_manager_dialog import _InstallWorker
 
         self.assertTrue(issubclass(_InstallWorker, QThread))
 

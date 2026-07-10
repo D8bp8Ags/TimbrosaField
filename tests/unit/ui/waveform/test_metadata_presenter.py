@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from PyQt5.QtWidgets import QTableWidget
 
-from ui.waveform.metadata_presenter import MetadataPresenter
+from my_app.ui.waveform.metadata_presenter import MetadataPresenter
 
 
 def _make_table(headers):

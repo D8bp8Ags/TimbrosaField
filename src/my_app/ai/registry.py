@@ -45,7 +45,7 @@ class BackendRegistration:
         display_name: Human-readable name shown in the UI (e.g. "BirdNET").
             Matches AiBackend.name on the concrete backend class.
         module_name: Dotted module path containing the backend class
-            (e.g. "ai_backends.birdnet_backend").
+            (e.g. "my_app.ai.backends.birdnet_backend").
         class_name: Name of the AiBackend subclass within that module.
         model_ids: Model IDs (from ai_model_manager.MODEL_DEFINITIONS)
             required for this backend's default operation.
@@ -83,7 +83,7 @@ BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
     BackendRegistration(
         backend_id="birdnet",
         display_name="BirdNET",
-        module_name="ai_backends.birdnet_backend",
+        module_name="my_app.ai.backends.birdnet_backend",
         class_name="BirdnetBackend",
         model_ids=("birdnet_acoustic", "birdnet_geo"),
         capabilities=BackendCapabilities(supports_geo_filter=True),
@@ -91,14 +91,14 @@ BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
     BackendRegistration(
         backend_id="ast",
         display_name="AST",
-        module_name="ai_backends.ast_backend",
+        module_name="my_app.ai.backends.ast_backend",
         class_name="AstBackend",
         model_ids=("ast_audioset",),
     ),
     BackendRegistration(
         backend_id="perch",
         display_name="Perch",
-        module_name="ai_backends.perch_backend",
+        module_name="my_app.ai.backends.perch_backend",
         class_name="PerchBackend",
         model_ids=("perch_v2_cpu",),
     ),

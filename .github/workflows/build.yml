@@ -55,7 +55,7 @@ jobs:
     - name: Build macOS app
       run: |
         cd src/my_app
-        pyinstaller --onefile --windowed --name="TimbrosaField" main.py
+        pyinstaller --onefile --windowed --name="TimbrosaField" --paths=.. main.py
 
     - name: Create DMG (optional)
       run: |
@@ -96,7 +96,7 @@ jobs:
     - name: Build Windows app
       run: |
         cd src/my_app
-        pyinstaller --onefile --windowed --name="TimbrosaField" main.py
+        pyinstaller --onefile --windowed --name="TimbrosaField" --paths=.. main.py
 
     - name: Upload Windows executable
       uses: actions/upload-artifact@v4

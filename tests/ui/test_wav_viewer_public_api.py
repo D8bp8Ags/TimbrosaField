@@ -9,7 +9,7 @@ public methods exist and behave as the code they replaced did.
 
 from __future__ import annotations
 
-import wav_viewer as wv
+from my_app.ui.waveform import viewer as wv
 
 
 def _make_wav_viewer(qapp):

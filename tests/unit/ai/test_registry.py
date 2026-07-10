@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai import registry as reg
+from my_app.ai import registry as reg
 
 
 def test_registry_contains_ast_birdnet_and_perch():
@@ -21,7 +21,7 @@ def test_registry_contains_ast_birdnet_and_perch():
 def test_each_entry_has_valid_factory_reference_and_models(backend_id):
     registration = reg.get_by_id(backend_id)
     assert registration is not None
-    assert registration.module_name.startswith("ai_backends.")
+    assert registration.module_name.startswith("my_app.ai.backends.")
     assert registration.class_name
     assert len(registration.model_ids) >= 1
     assert registration.display_name
@@ -58,7 +58,7 @@ def test_get_by_display_name_unknown_returns_none():
 
 
 def test_load_backends_creates_correct_backend_types():
-    from ai_backends.base import AiBackend
+    from my_app.ai.backends.base import AiBackend
 
     backends = reg.load_backends()
     # At least the backends whose dependencies happen to be installed in

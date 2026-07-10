@@ -10,7 +10,7 @@ import pyqtgraph as pg
 import pytest
 from PyQt5.QtWidgets import QHBoxLayout, QWidget
 
-from ui.waveform.ai_overlay import AiOverlayController
+from my_app.ui.waveform.ai_overlay import AiOverlayController
 
 
 @pytest.fixture

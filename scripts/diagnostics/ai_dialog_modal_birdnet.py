@@ -11,9 +11,11 @@ Requirements:
     - The BirdNET model already installed locally (this script does not
       download models).
     - A real WAV file to analyze.
+    - src/ on the Python path, the same way python -m my_app.main needs it
+      (e.g. PYTHONPATH=src, or an editable/normal install of the project).
 
-Start command:
-    python3 scripts/diagnostics/ai_dialog_modal_birdnet.py /path/to/file.wav
+Start command (from the repository root):
+    PYTHONPATH=src python3 -m scripts.diagnostics.ai_dialog_modal_birdnet /path/to/file.wav
 
 Not collected by pytest: this is a manual, interactive/CLI diagnostic tool,
 not an automated regression test.
@@ -22,14 +24,7 @@ not an automated regression test.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT / "src" / "my_app"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 
 def main() -> int:
@@ -44,8 +39,8 @@ def main() -> int:
     print("[STEP] import Qt + app modules", flush=True)
     from PyQt5.QtCore import QTimer  # noqa: PLC0415
     from PyQt5.QtWidgets import QApplication  # noqa: PLC0415
-    from wav_analyzer import wav_analyze  # noqa: PLC0415
-    from ai_analyzer import AiAnalysisDialog  # noqa: PLC0415
+    from my_app.wav.analyzer import wav_analyze  # noqa: PLC0415
+    from my_app.ai.ui.analysis_dialog import AiAnalysisDialog  # noqa: PLC0415
     print("[OK] import Qt + app modules", flush=True)
 
     print("[STEP] create QApplication", flush=True)

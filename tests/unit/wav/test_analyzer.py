@@ -12,7 +12,7 @@ import io
 
 import pytest
 
-import wav_analyzer as wa
+import my_app.wav.analyzer as wa
 from tests.fixtures.wav import builder as wavbuild
 
 

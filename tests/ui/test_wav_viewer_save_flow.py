@@ -11,7 +11,7 @@ from unittest import mock
 
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
-import wav_viewer as wv
+from my_app.ui.waveform import viewer as wv
 from tests.fixtures.wav import builder as wavbuild
 
 

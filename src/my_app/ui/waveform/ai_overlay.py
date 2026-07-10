@@ -14,7 +14,7 @@ import pyqtgraph as pg
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QCheckBox, QHBoxLayout
 
-from ai_settings import graph_label_for_detection, load_ai_settings
+from my_app.ai.settings import graph_label_for_detection, load_ai_settings
 
 # Top-3 labels per unique start_time — sorted by score, min 0.10
 _GRAPH_MIN = 0.10

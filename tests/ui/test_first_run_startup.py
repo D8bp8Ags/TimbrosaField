@@ -10,7 +10,7 @@ Baseline (architecture notes, section 4.2):
 
 import pytest
 
-from settings_manager import DEFAULT_VIEW_MODE, VALID_VIEW_MODES, SettingsManager
+from my_app.ui.settings import DEFAULT_VIEW_MODE, VALID_VIEW_MODES, SettingsManager
 
 
 def test_default_view_mode_is_a_valid_wav_viewer_mode():
@@ -93,7 +93,7 @@ def test_main_window_restores_settings_without_raising(
         settings.settings.setValue("view/waveform_mode", stored_value)
         settings.settings.sync()
 
-    import main as main_mod
+    import my_app.main as main_mod
 
     window = qt_widget_cleanup(main_mod.MainWindow())
     assert window.wav_viewer.view_mode in VALID_VIEW_MODES

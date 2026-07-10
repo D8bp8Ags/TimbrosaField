@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-import file_manager as fm
+import my_app.files.manager as fm
 
 
 def test_file_manager_load_directory_delegates_to_directory_loader():

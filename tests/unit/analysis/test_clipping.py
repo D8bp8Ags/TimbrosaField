@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from analysis import clipping
+from my_app.analysis import clipping
 
 
 def test_find_raw_clipping_regions_single_region():

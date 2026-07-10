@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-import ai_model_manager as amm
+import my_app.ai.model_manager as amm
 
 
 def test_installer_dispatch_covers_all_known_backends():

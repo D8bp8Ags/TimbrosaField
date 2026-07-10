@@ -45,9 +45,14 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Run the application
-python src/my_app/main.py
+# 4. Install the project itself (editable) so the my_app package is importable
+pip install -e . --no-deps
+
+# 5. Run the application (from the repository root)
+python3 -m my_app.main
 ```
+
+`my_app` is a package under `src/`; step 4 registers it so Python can find it from any working directory. Starting `main.py` directly from inside `src/my_app/` is no longer supported.
 
 ### Ableton Live export (optional)
 

@@ -7,8 +7,8 @@ file, end to end — no personal field recordings, no Qt/GUI involved.
 
 from __future__ import annotations
 
-import wav_analyzer as wa
-import wav_save_strategies as wss
+import my_app.wav.analyzer as wa
+import my_app.wav.save_strategies as wss
 from tests.fixtures.wav import builder as wavbuild
 
 

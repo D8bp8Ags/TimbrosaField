@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import app_config
+import my_app.app_config as app_config
 from PyQt5.QtWidgets import (
     QApplication,
     QDialog,

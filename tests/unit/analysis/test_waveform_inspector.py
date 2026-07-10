@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from analysis import waveform_inspector as wi
+from my_app.analysis import waveform_inspector as wi
 
 
 # ---------------------------------------------------------------------------

@@ -40,8 +40,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from ui_components import load_photo_pixmap
-from wav_analyzer import inject_ixml_chunk, remove_ixml_chunk, wav_analyze
+from my_app.ui.components import load_photo_pixmap
+from my_app.wav.analyzer import inject_ixml_chunk, remove_ixml_chunk, wav_analyze
 
 logger = logging.getLogger(__name__)
 
