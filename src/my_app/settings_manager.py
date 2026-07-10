@@ -33,6 +33,32 @@ from PyQt5.QtWidgets import QDesktopWidget
 
 logger = logging.getLogger(__name__)
 
+# Canonical view-mode identifiers, matching WavViewer.set_view_mode()'s valid_modes.
+VALID_VIEW_MODES = {"mono", "per_kanaal", "overlay"}
+DEFAULT_VIEW_MODE = "per_kanaal"
+# Legacy values previously written to QSettings that must still resolve correctly.
+_LEGACY_VIEW_MODE_ALIASES = {"per-kanaal": "per_kanaal"}
+
+
+def _normalize_view_mode(value, default=DEFAULT_VIEW_MODE):
+    """Map a raw QSettings view-mode value to a canonical, valid identifier.
+
+    Args:
+        value: Raw value read from QSettings. May be a legacy alias (e.g. the
+            historical "per-kanaal" spelling) or an unknown/corrupted value.
+        default: Canonical value to fall back to when ``value`` is neither a
+            known canonical mode nor a recognized legacy alias.
+
+    Returns:
+        str: A value guaranteed to be a member of ``VALID_VIEW_MODES``.
+    """
+    if value in VALID_VIEW_MODES:
+        return value
+    mapped = _LEGACY_VIEW_MODE_ALIASES.get(value)
+    if mapped in VALID_VIEW_MODES:
+        return mapped
+    return default
+
 
 class SettingsManager:
     """Centralized settings management system for the TimbrosaField application.
@@ -167,21 +193,27 @@ class SettingsManager:
         logger.debug(f"View settings saved: {view_mode}")
         logger.debug(f"View settings saved: {show_metadata}")
 
-    def get_view_mode(self, default="per-kanaal"):
+    def get_view_mode(self, default=DEFAULT_VIEW_MODE):
         """Retrieve the saved waveform display mode setting.
 
         Args:
-            default (str, optional): Fallback value if no saved setting exists.
-                                   Defaults to "per-kanaal" (stereo per-channel view).
+            default (str, optional): Fallback value if no saved setting exists,
+                                   and the canonical value used when a stored
+                                   setting is unrecognized. Defaults to
+                                   "per_kanaal" (stereo per-channel view).
 
         Returns:
-            str: The saved view mode identifier, or the default value if no
-                 setting has been saved previously.
+            str: A canonical view mode identifier: "mono", "per_kanaal", or
+                 "overlay". The legacy stored spelling "per-kanaal" is
+                 transparently normalized to "per_kanaal" for
+                 backward compatibility with settings saved by older versions.
 
         Note:
-            Common return values include "mono", "per_kanaal", and "overlay".
+            This is the configuration boundary where raw QSettings values are
+            normalized to the identifiers WavViewer.set_view_mode() accepts.
         """
-        return self.settings.value("view/waveform_mode", default)
+        raw_value = self.settings.value("view/waveform_mode", default)
+        return _normalize_view_mode(raw_value, default=default)
 
     def get_show_metadata(self, default=True):
         """Retrieve the saved metadata panel visibility setting.
@@ -415,7 +447,7 @@ class SettingsManager:
                 main_window.wav_viewer.set_view_mode(view_mode)
                 if view_mode == "mono":
                     main_window.wav_viewer.mono_radio.setChecked(True)
-                elif view_mode == "per-kanaal":
+                elif view_mode == "per_kanaal":
                     main_window.wav_viewer.stereo_radio.setChecked(True)
                 elif view_mode == "overlay":
                     main_window.wav_viewer.overlay_radio.setChecked(True)
@@ -506,7 +538,7 @@ class SettingsManager:
 
         # View settings
         if hasattr(main_window, "wav_viewer"):
-            view_mode = getattr(main_window.wav_viewer, "view_mode", "per-kanaal")
+            view_mode = getattr(main_window.wav_viewer, "view_mode", DEFAULT_VIEW_MODE)
             self.save_view_settings(view_mode)
 
         current_theme = getattr(main_window, 'current_theme', 'light')
