@@ -13,7 +13,7 @@ UI code (e.g. WavViewer) is responsible for:
        messages.
 
 Usage:
-    from wav_save_manager import WavSaveManager
+    from my_app.wav.save_manager import WavSaveManager
 
     manager = WavSaveManager()
     result = manager.execute_save(

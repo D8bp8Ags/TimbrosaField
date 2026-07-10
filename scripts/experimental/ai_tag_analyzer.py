@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
-"""Standalone AI tag analyzer for WAV field recordings.
+"""Experimental, standalone AI tag analyzer for WAV field recordings.
+
+Not integrated with the my_app.ai backend architecture (AST/BirdNET/Perch
+via AiBackend/ai.registry) — this is an independent prototype kept for its
+Claude-API-based tagging approach and its own BirdNET path via the
+third-party `birdnetlib` package (distinct from the `birdnet` package used
+by my_app.ai.backends.birdnet_backend).
 
 Tests two approaches:
   1. Claude API  — tag suggestions based on WAV metadata (no audio needed)
   2. BirdNET     — bird species detection from actual audio (pip install birdnetlib)
 
-Usage:
-    python ai_tag_analyzer.py                    # uses first WAV from config dir
-    python ai_tag_analyzer.py example.wav    # specific filename in config dir
-    python ai_tag_analyzer.py /full/path/to.wav  # absolute path
-
 Requirements:
+    - src/ on the Python path, the same way python -m my_app.main needs it
+      (e.g. PYTHONPATH=src, or an editable/normal install of the project).
     pip install anthropic          # for Claude suggestions
     pip install birdnetlib         # for BirdNET detection (optional)
     export ANTHROPIC_API_KEY=...   # Claude API key
+
+Start command (from the repository root):
+    PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py                   # uses first WAV from config dir
+    PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py example.wav    # specific filename in config dir
+    PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py /full/path/to.wav  # absolute path
+
+Not collected by pytest: this is a manual, experimental CLI script, not an
+automated regression test.
 """
 
 import os
@@ -169,11 +180,8 @@ DUTCH_NAMES = {
     "Gryllotalpa gryllotalpa": "Veenmol",
 }
 
-# Add app modules to path so we can reuse load_user_config and wav_analyze
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src", "my_app"))
-
-from user_config_manager import load_user_config
-from wav_analyzer import wav_analyze
+from my_app.user_config_manager import load_user_config
+from my_app.wav.analyzer import wav_analyze
 
 
 # ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ The tags within each category are carefully curated to:
 - Provide appropriate granularity for useful classification
 
 Usage:
-    from tag_definitions import tag_categories
+    from my_app.tags.definitions import tag_categories
 
     # Get all nature-related tags
     nature_tags = tag_categories["🌿 Nature"]
