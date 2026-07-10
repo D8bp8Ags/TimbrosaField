@@ -18,13 +18,14 @@ import my_app.app_config as app_config
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Redirect HOME/APPDATA/LOCALAPPDATA/XDG_* to tmp_path so no test ever
-    touches the developer's real user-data or cache directories."""
+    """Redirect HOME/APPDATA/LOCALAPPDATA/USERPROFILE/XDG_* to tmp_path so no
+    test ever touches the developer's real user-data or cache directories."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(app_config.Path, "home", classmethod(lambda cls: home))
     monkeypatch.setenv("APPDATA", str(home / "AppData" / "Roaming"))
     monkeypatch.setenv("LOCALAPPDATA", str(home / "AppData" / "Local"))
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("XDG_DATA_HOME", str(home / ".local" / "share"))
     monkeypatch.setenv("XDG_CACHE_HOME", str(home / ".cache"))
     return home
@@ -58,6 +59,24 @@ def test_user_data_dir_linux_fallback(monkeypatch, isolated_home):
     monkeypatch.setattr(app_config.sys, "platform", "linux")
     result = app_config.get_user_data_dir()
     assert result == isolated_home / ".local" / "share" / "Timbrosa" / app_config.APP_NAME
+
+
+def test_models_dir_macos(monkeypatch, isolated_home):
+    monkeypatch.setattr(app_config.sys, "platform", "darwin")
+    result = app_config.get_models_dir()
+    assert result == isolated_home / "Documents" / "TimbrosaField" / "Models"
+
+
+def test_models_dir_windows(monkeypatch, isolated_home):
+    monkeypatch.setattr(app_config.sys, "platform", "win32")
+    result = app_config.get_models_dir()
+    assert result == isolated_home / "Documents" / "TimbrosaField" / "Models"
+
+
+def test_models_dir_linux_fallback(monkeypatch, isolated_home):
+    monkeypatch.setattr(app_config.sys, "platform", "linux")
+    result = app_config.get_models_dir()
+    assert result == isolated_home / "Documents" / "TimbrosaField" / "Models"
 
 
 def test_get_config_path_migrates_from_legacy(monkeypatch, isolated_home, tmp_path):

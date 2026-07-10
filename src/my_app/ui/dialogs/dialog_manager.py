@@ -27,8 +27,6 @@ Features:
 
 import logging
 
-import os
-
 import my_app.app_config as app_config
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
@@ -342,7 +340,7 @@ class AboutDialog(QDialog):
         - OK button for dialog dismissal
         """
         # Background image via QLabel (border-image unreliable on macOS)
-        bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "background.png")
+        bg_path = str(app_config.get_resource_path("background.png"))
         bg_label = QLabel(self)
         pixmap = QPixmap(bg_path)
         if not pixmap.isNull():

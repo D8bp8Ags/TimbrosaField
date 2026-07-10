@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Report scientific names seen in AI sidecars that lack a Dutch mapping."""
+"""Report scientific names seen in AI sidecars that lack a Dutch mapping.
+
+Requirements:
+    - src/ on the Python path, the same way python -m my_app.main needs it
+      (e.g. PYTHONPATH=src, or an editable/normal install of the project).
+
+Start command (from the repository root):
+    PYTHONPATH=src python -m scripts.data_tools.list_missing_species_names [paths...]
+"""
 
 from __future__ import annotations
 
@@ -7,15 +15,8 @@ import argparse
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
-import sys
 
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = ROOT / "src" / "my_app"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-from species_names import SPECIES_TO_DUTCH  # noqa: E402
+from my_app.species_names import SPECIES_TO_DUTCH
 
 
 def iter_sidecars(paths: list[Path]) -> list[Path]:

@@ -168,68 +168,102 @@ def _legacy_models_root() -> Path:
     return Path(__file__).resolve().parent.parent / "models"
 
 
-def get_models_root() -> Path:
-    """Return the central model root.
+def get_models_install_root() -> Path:
+    """Return the root where new models are downloaded/imported/installed.
 
     Priority order:
-        1. TIMBROSA_MODELS_ROOT environment override (unchanged, highest
-           priority — existing installs/CI that set this keep working
-           exactly as before).
-        2. The new platform-appropriate cache directory
-           (app_config.get_cache_dir() / "models"), if it already contains
-           model data.
-        3. The legacy src/my_app/models location, if it contains model
-           data (pre-Fase-8 local installs) — used in place, not copied,
-           since models can be tens to hundreds of MB and a blind copy on
-           every import would risk partial copies and duplicated disk
-           usage.
-        4. Otherwise, the new cache directory (empty; models will be
-           downloaded there going forward).
+        1. TIMBROSA_MODELS_ROOT environment override (highest priority for
+           both reading and writing — existing installs/CI that set this
+           keep working exactly as before).
+        2. The default, visible Documents-based model directory
+           (app_config.get_models_dir(), i.e. ~/Documents/TimbrosaField/
+           Models on macOS/Windows).
 
-    This function never copies or deletes anything — it only decides which
-    existing directory to point at, so staging/validation/rollback in the
-    rest of this module keep working unchanged against whichever root is
-    returned.
+    This function never returns the older hidden cache location or the
+    legacy src/my_app/models location — those are read-only fallbacks (see
+    get_models_search_roots()) so that re-installing a model never lands it
+    back in an old location just because that location happens to contain
+    other, unrelated models.
     """
     override = os.environ.get("TIMBROSA_MODELS_ROOT")
     if override:
         return Path(override).expanduser().resolve()
 
+    from my_app.app_config import get_models_dir  # noqa: PLC0415
+
+    return get_models_dir()
+
+
+def _legacy_models_root() -> Path:
+    """Old, in-source-tree model root (src/my_app/models), pre-Fase-8.
+
+    Kept as a read-only fallback location: some local dev checkouts still
+    have real, already-downloaded models here.
+    """
+    return Path(__file__).resolve().parent.parent / "models"
+
+
+def get_models_search_roots() -> tuple[Path, ...]:
+    """Return, in priority order, every root that may contain existing models.
+
+    Used only to *find* already-installed models (status checks,
+    validation, loading). New installs never write here except via
+    get_models_install_root() (roots[0] when TIMBROSA_MODELS_ROOT is set).
+
+    Priority order:
+        1. TIMBROSA_MODELS_ROOT environment override, if set — read and
+           write priority 1, so it is the only root when present.
+        2. The default Documents-based install root
+           (get_models_install_root()).
+        3. The older, hidden cache-based location
+           (app_config.get_cache_dir() / "models") — backward-compatible
+           read-only fallback for installs from before models moved to
+           Documents.
+        4. The legacy src/my_app/models location — backward-compatible
+           read-only fallback for pre-Fase-8 local installs.
+
+    Roots are not deduplicated by existence here; callers check
+    is_dir()/relative paths themselves.
+    """
+    override = os.environ.get("TIMBROSA_MODELS_ROOT")
+    if override:
+        return (Path(override).expanduser().resolve(),)
+
     from my_app.app_config import get_cache_dir  # noqa: PLC0415
 
-    new_root = get_cache_dir() / "models"
-    if new_root.is_dir() and any(new_root.iterdir()):
-        return new_root
+    return (
+        get_models_install_root(),
+        get_cache_dir() / "models",
+        _legacy_models_root(),
+    )
 
-    legacy_root = _legacy_models_root()
-    if legacy_root.is_dir() and any(legacy_root.iterdir()):
-        return legacy_root
 
-    return new_root
+def find_existing_model_path(model_id: str) -> Path | None:
+    """Return the first existing directory for model_id across all search roots.
+
+    Searches get_models_search_roots() in priority order and returns the
+    first root/relative_dir that already exists on disk. Returns None if
+    the model is not installed anywhere. Never creates, copies, or deletes
+    anything.
+    """
+    relative_dir = get_model_definition(model_id).relative_dir
+    for root in get_models_search_roots():
+        candidate = root / relative_dir
+        if candidate.is_dir():
+            return candidate
+    return None
 
 
 def get_downloads_dir() -> Path:
-    return get_models_root() / ".downloads"
+    return get_models_install_root() / ".downloads"
 
 
 def get_staging_dir() -> Path:
-    return get_models_root() / ".staging"
-
-
-def get_ast_models_dir() -> Path:
-    return get_models_root() / "ast"
-
-
-def get_perch_models_dir() -> Path:
-    return get_models_root() / "perch"
-
-
-def get_birdnet_models_dir() -> Path:
-    return get_models_root() / "birdnet"
+    return get_models_install_root() / ".staging"
 
 
 def get_perch_kagglehub_cache() -> Path:
-    return get_perch_models_dir() / ".kagglehub"
+    return get_models_install_root() / "perch" / ".kagglehub"
 
 
 def get_model_definition(model_id: str) -> ModelDefinition:
@@ -244,7 +278,26 @@ def iter_model_definitions() -> tuple[ModelDefinition, ...]:
 
 
 def get_model_dir(model_id: str) -> Path:
-    return get_models_root() / get_model_definition(model_id).relative_dir
+    """Return the model's directory: wherever it already exists, or the
+    install-root location if it is not installed anywhere yet.
+
+    This is a read/display path (status checks, "where is this model"
+    messages) — it never decides where a new install should be written;
+    that is always get_models_install_root() (see get_install_target_dir()).
+    """
+    existing = find_existing_model_path(model_id)
+    if existing is not None:
+        return existing
+    return get_models_install_root() / get_model_definition(model_id).relative_dir
+
+
+def get_install_target_dir(model_id: str) -> Path:
+    """Return the directory a fresh install of model_id activates into.
+
+    Always under get_models_install_root(), regardless of where an existing
+    copy of this model (if any) currently lives.
+    """
+    return get_models_install_root() / get_model_definition(model_id).relative_dir
 
 
 def get_ast_model_dir() -> Path:
@@ -565,7 +618,7 @@ def _activate_staging(model_id: str, staging: Path, imported_from: str = "") -> 
         base_dir=staging,
     )
     _write_install_metadata(staging, definition, imported_from)
-    destination = get_model_dir(model_id)
+    destination = get_install_target_dir(model_id)
     _assert_managed_path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     backup = destination.with_name(f"{destination.name}.old")
@@ -655,9 +708,16 @@ def _emit(progress: Callable[[str], None] | None, message: str) -> None:
 
 
 def _assert_managed_path(path: Path) -> None:
-    root = get_models_root().resolve()
+    """Refuse to write/delete anything outside a known model root.
+
+    Accepts any of get_models_search_roots() (install root plus the
+    backward-compatible read-only fallbacks), not just the install root,
+    because remove_model() may need to delete a model that was found in an
+    older location — but never a path outside all of them.
+    """
     resolved = path.resolve()
-    if resolved == root or root not in resolved.parents:
+    roots = {root.resolve() for root in get_models_search_roots()}
+    if resolved in roots or not any(root in resolved.parents for root in roots):
         raise ModelInstallError(
             "",
             "Refusing to modify a path outside the managed model root.",

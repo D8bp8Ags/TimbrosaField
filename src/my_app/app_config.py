@@ -18,6 +18,11 @@ Constants:
 
 Functions:
     get_config_path: Generate paths for configuration files
+    get_user_data_dir: Platform-appropriate directory for editable user data
+    get_cache_dir: Platform-appropriate directory for general app caches
+    get_models_dir: Default, visible Documents-based directory for AI models
+    get_resources_dir: Directory containing versioned, bundled UI resources
+    get_resource_path: Absolute path to a single versioned UI resource file
 """
 
 import os
@@ -94,7 +99,13 @@ def get_user_data_dir() -> Path:
 
 
 def get_cache_dir() -> Path:
-    """Return the platform-appropriate directory for caches and downloaded models.
+    """Return the platform-appropriate directory for general app caches.
+
+    Not used for AI models — see get_models_dir() for that (models live in
+    a visible user-facing Documents folder instead, since they are large,
+    user-relevant files a person may want to find/back up/delete manually).
+    Kept as a read-only fallback location: some pre-existing local installs
+    may still have models under here from before that change.
 
     Locations (created on first use, not on import):
         macOS:   ~/Library/Caches/<ORG_NAME>/<APP_NAME>
@@ -102,7 +113,7 @@ def get_cache_dir() -> Path:
         other:   ~/.cache/<org>/<app> (XDG-style fallback)
 
     Returns:
-        Path: Directory for caches/models. Not guaranteed to exist yet.
+        Path: Directory for general caches. Not guaranteed to exist yet.
     """
     if sys.platform == "darwin":
         base = Path.home() / "Library" / "Caches"
@@ -115,6 +126,74 @@ def get_cache_dir() -> Path:
     else:
         base = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
         return base / ORG_NAME / APP_NAME
+
+
+def get_models_dir() -> Path:
+    """Return the default, visible directory for downloaded AI models.
+
+    Models are large, user-relevant files, so they live in a visible
+    location under the user's Documents folder rather than a hidden cache
+    directory — easier to find, back up, or delete manually.
+
+    This is the *default* location only. ai.model_manager.get_models_root()
+    is the actual source of truth at runtime: it checks TIMBROSA_MODELS_ROOT
+    first, then this directory, then falls back to older locations
+    (get_cache_dir()/"models", then the legacy src/my_app/models) for
+    backward compatibility with pre-existing installs.
+
+    Locations (created on first use, not on import):
+        macOS:   ~/Documents/<APP_NAME short form>/Models — see below
+        Windows: Documents/<APP_NAME short form>/Models under the user's
+                 profile
+        other:   ~/Documents/<APP_NAME short form>/Models (best-effort;
+                 XDG has no standard "visible documents" variable)
+
+    Returns:
+        Path: Default directory for AI models. Not guaranteed to exist yet.
+    """
+    if sys.platform == "win32":
+        docs_base = Path(
+            os.environ.get("USERPROFILE", str(Path.home()))
+        ) / "Documents"
+    else:
+        docs_base = Path.home() / "Documents"
+    return docs_base / "TimbrosaField" / "Models"
+
+
+def get_resources_dir() -> Path:
+    """Return the directory containing versioned, bundled UI resources.
+
+    Resolution order:
+        1. PyInstaller onefile/onedir runtime: files are extracted to
+           sys._MEIPASS at startup, so a frozen build looks there first
+           (this is where --paths=.. lets PyInstaller's analysis find
+           my_app.resources and bundle it as package data).
+        2. Normal Python execution (editable install or `python -m
+           my_app.main`): the resources package directory on disk,
+           src/my_app/resources/.
+
+    Returns:
+        Path: Directory containing icon.png, background.png, etc.
+    """
+    frozen_base = getattr(sys, "_MEIPASS", None)
+    if frozen_base:
+        candidate = Path(frozen_base) / "my_app" / "resources"
+        if candidate.is_dir():
+            return candidate
+    return Path(__file__).resolve().parent / "resources"
+
+
+def get_resource_path(name: str) -> Path:
+    """Return the absolute path to a single versioned UI resource file.
+
+    Args:
+        name (str): Resource filename, e.g. "background.png".
+
+    Returns:
+        Path: Absolute path under get_resources_dir(). Existence is not
+            checked here; callers already handle a missing/null pixmap.
+    """
+    return get_resources_dir() / name
 
 
 def get_config_path(filename):

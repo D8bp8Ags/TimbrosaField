@@ -45,7 +45,8 @@ class ModelManagerTests(unittest.TestCase):
         manager._MODEL_BY_ID[definition.model_id] = definition
 
     def test_modelroot_environment_override(self) -> None:
-        self.assertEqual(manager.get_models_root(), self.root.resolve())
+        self.assertEqual(manager.get_models_install_root(), self.root.resolve())
+        self.assertEqual(manager.get_models_search_roots(), (self.root.resolve(),))
         self.assertEqual(manager.get_downloads_dir(), self.root.resolve() / ".downloads")
         self.assertEqual(manager.get_staging_dir(), self.root.resolve() / ".staging")
 

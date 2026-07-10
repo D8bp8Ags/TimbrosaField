@@ -80,7 +80,7 @@ class SplashScreen(QWidget):
         self.setWindowFlags(Qt.SplashScreen | Qt.WindowStaysOnTopHint)
 
         # Background image — covers the full widget, sits below everything
-        _bg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "background.png")
+        _bg_path = str(app_config.get_resource_path("background.png"))
         bg_image = QLabel(self)
         bg_image.setPixmap(
             QPixmap(_bg_path).scaled(500, 300, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)

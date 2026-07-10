@@ -3,6 +3,13 @@
 
 Expected input: a CSV/TSV export containing at least scientific and Dutch name
 columns from Nederlands Soortenregister.
+
+Requirements:
+    - src/ on the Python path, the same way python -m my_app.main needs it
+      (e.g. PYTHONPATH=src, or an editable/normal install of the project).
+
+Start command (from the repository root):
+    PYTHONPATH=src python -m scripts.data_tools.validate_species_names_against_nsr <reference_file>
 """
 
 from __future__ import annotations
@@ -11,16 +18,9 @@ import argparse
 import csv
 import io
 from pathlib import Path
-import sys
 import zipfile
 
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = ROOT / "src" / "my_app"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-from species_names import SPECIES_TO_DUTCH  # noqa: E402
+from my_app.species_names import SPECIES_TO_DUTCH
 
 
 SCI_KEYS = {
