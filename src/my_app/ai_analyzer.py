@@ -51,17 +51,11 @@ from ai_model_manager import (
     ModelStatus,
     get_model_definition,
     get_model_status,
-    required_model_ids_for_backends,
 )
 from ai_settings import load_ai_settings, save_ai_settings
+from ai.registry import all_backends, load_backends, required_model_ids_for_backends
 
 logger = logging.getLogger(__name__)
-
-_BACKEND_SPECS: tuple[tuple[str, str, str], ...] = (
-    ("BirdNET", "ai_backends.birdnet_backend", "BirdnetBackend"),
-    ("AST", "ai_backends.ast_backend", "AstBackend"),
-    ("Perch", "ai_backends.perch_backend", "PerchBackend"),
-)
 
 
 _DETECTION_HEADERS = [
@@ -261,36 +255,25 @@ class DetectionFilterProxyModel(QSortFilterProxyModel):
 
 
 # ---------------------------------------------------------------------------
-# Active backends — add or remove entries here to control which AI models run.
+# Active backends come from ai.registry.BACKEND_REGISTRY — add or remove
+# entries there to control which AI models run.
 # Each backend file carries its own licence notice.
 # ---------------------------------------------------------------------------
 
 def _load_backends(selected_names: set[str] | None = None) -> list:
     """Import and instantiate selected enabled backends.
 
-    Backends that fail to import (missing optional dependency) are silently
-    skipped so the app still starts without every model installed.
+    Thin wrapper delegating to ai.registry.load_backends(), the single
+    source of truth for backend registration.
 
     Args:
         selected_names: Optional backend display names to instantiate. When
-            omitted, all configured backends are imported.
+            omitted, all registered backends are imported.
 
     Returns:
         List of :class:`~ai_backends.base.AiBackend` instances.
     """
-    backends = []
-
-    for backend_name, module_name, class_name in _BACKEND_SPECS:
-        if selected_names is not None and backend_name not in selected_names:
-            continue
-        try:
-            module = __import__(module_name, fromlist=[class_name])
-            backend_cls = getattr(module, class_name)
-            backends.append(backend_cls())
-        except ImportError:
-            logger.info("Backend not available: %s", module_name)
-
-    return backends
+    return load_backends(selected_names)
 
 
 # ---------------------------------------------------------------------------
@@ -606,7 +589,8 @@ class AiAnalysisDialog(QDialog):
                 for layer in (self._existing_results or {}).get("layers", [])
                 if isinstance(layer, dict)
             }
-        for backend_name, _module_name, _class_name in _BACKEND_SPECS:
+        for registration in all_backends():
+            backend_name = registration.display_name
             cb = QCheckBox(backend_name)
             cb.setChecked(backend_name in cached_backend_names if cached_backend_names else True)
             cb.toggled.connect(self._refresh_model_status)

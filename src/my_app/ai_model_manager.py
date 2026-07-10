@@ -228,19 +228,14 @@ def required_model_ids_for_backends(
     backend_names: set[str],
     backend_options: dict | None = None,
 ) -> list[str]:
-    """Return model IDs required for selected backend display names."""
-    result: list[str] = []
-    normalized = {name.lower() for name in backend_names}
-    if "birdnet" in normalized:
-        result.append(BIRDNET_ACOUSTIC_MODEL.model_id)
-        birdnet_options = (backend_options or {}).get("birdnet", {})
-        if birdnet_options.get("use_geo_filter", True):
-            result.append(BIRDNET_GEO_MODEL.model_id)
-    if "ast" in normalized:
-        result.append(AST_MODEL.model_id)
-    if "perch" in normalized:
-        result.append(PERCH_MODEL.model_id)
-    return result
+    """Return model IDs required for selected backend display names.
+
+    Thin wrapper delegating to ai.registry, the single source of truth for
+    backend-to-model-id mapping and geo-filter capability gating.
+    """
+    from ai.registry import required_model_ids_for_backends as _registry_lookup  # noqa: PLC0415
+
+    return _registry_lookup(backend_names, backend_options)
 
 
 def ensure_model_installed(model_id: str) -> Path:
@@ -311,13 +306,10 @@ def install_model(model_id: str, progress: Callable[[str], None] | None = None) 
     """Explicitly install a model using the official package download function."""
     definition = get_model_definition(model_id)
     _emit(progress, f"Installing {definition.display_name}")
-    if model_id == AST_MODEL.model_id:
-        return _install_ast(progress)
-    if model_id == PERCH_MODEL.model_id:
-        return _install_perch(progress)
-    if model_id in (BIRDNET_ACOUSTIC_MODEL.model_id, BIRDNET_GEO_MODEL.model_id):
-        return _install_birdnet(model_id, progress)
-    raise ModelInstallError(model_id, "No installer is defined for this model.")
+    installer = _INSTALLER_DISPATCH.get(definition.backend)
+    if installer is None:
+        raise ModelInstallError(model_id, "No installer is defined for this model.")
+    return installer(model_id, progress)
 
 
 def import_existing_model(model_id: str, progress: Callable[[str], None] | None = None) -> Path:
@@ -387,8 +379,7 @@ def read_install_metadata(model_id: str) -> dict:
         return {}
 
 
-def _install_ast(progress: Callable[[str], None] | None) -> Path:
-    model_id = AST_MODEL.model_id
+def _install_ast(model_id: str, progress: Callable[[str], None] | None) -> Path:
     staging = _fresh_staging(model_id)
     try:
         from huggingface_hub import snapshot_download  # noqa: PLC0415
@@ -411,8 +402,7 @@ def _install_ast(progress: Callable[[str], None] | None) -> Path:
         raise ModelInstallError(model_id, "AST installation failed.", str(exc)) from exc
 
 
-def _install_perch(progress: Callable[[str], None] | None) -> Path:
-    model_id = PERCH_MODEL.model_id
+def _install_perch(model_id: str, progress: Callable[[str], None] | None) -> Path:
     source = _run_child_process(_perch_resolve_worker, (str(get_perch_kagglehub_cache()),))
     staging = _fresh_staging(model_id)
     try:
@@ -446,6 +436,17 @@ def _install_birdnet(model_id: str, progress: Callable[[str], None] | None) -> P
         if isinstance(exc, AIModelError):
             raise
         raise ModelInstallError(model_id, "BirdNET installation failed.", str(exc)) from exc
+
+
+# Dispatch mapping from ModelDefinition.backend to its installer function.
+# Each installer takes (model_id, progress) and returns the activated
+# model directory. Adding a new model family requires one entry here plus
+# one installer function — no if/elif branch to extend.
+_INSTALLER_DISPATCH: dict[str, Callable[[str, Callable[[str], None] | None], Path]] = {
+    "AST": _install_ast,
+    "Perch": _install_perch,
+    "BirdNET": _install_birdnet,
+}
 
 
 def _perch_resolve_worker(cache_root: str, result_queue: mp.Queue) -> None:
