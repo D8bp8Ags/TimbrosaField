@@ -22,7 +22,6 @@ import soundfile as sf
 # Local imports
 import app_config
 from audio_player import AudioPlayer
-from ai_settings import graph_label_for_detection, load_ai_settings
 from PyQt5 import QtCore
 from PyQt5.QtCore import QEvent, QModelIndex, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QMouseEvent
@@ -31,7 +30,6 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QButtonGroup,
-    QCheckBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -43,7 +41,6 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSizePolicy,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -55,6 +52,8 @@ from wav_analyzer import wav_analyze
 from wav_save_manager import WavSaveManager
 from analysis import clipping as clipping_analysis
 from analysis import waveform_inspector
+from ui.waveform.ai_overlay import AiOverlayController
+from ui.waveform.metadata_presenter import MetadataPresenter
 
 
 class WavAnalysisWorker(QThread):
@@ -303,11 +302,9 @@ class WavViewer(QWidget):
         self.cue_labels: dict[str, str] = {}
         self.cue_markers: dict[str, Any] = {}
 
-        # AI detection overlay items (loaded from sidecar JSON)
-        # Each entry: (plot, item, layer_name)
-        self.ai_overlay_items: list = []
-        # Visibility per layer name; defaults to True for unknown layers
-        self._ai_layer_visible: dict[str, bool] = {}
+        # AI detection overlay is managed by self._ai_overlay
+        # (AiOverlayController), constructed in _setup_ui() once the
+        # waveform plots and toggle layout exist.
 
         # UI state flags
         self._sync_connected: bool = False
@@ -430,6 +427,13 @@ class WavViewer(QWidget):
 
         # Setup waveform plots
         self._setup_waveform_plots()
+
+        # AI detection overlay controller (owns overlay items + toggles)
+        self._ai_overlay = AiOverlayController(
+            plots=[self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom],
+            label_plot=self.waveform_plot,
+            toggle_layout=self._ai_toggle_layout,
+        )
 
         # Setup metadata tables
         self._setup_metadata_tables()
@@ -663,6 +667,14 @@ class WavViewer(QWidget):
         self.cue_table = self._create_metadata_table(["ID", "Positie", "Label"])
         self.cue_table.cellClicked.connect(self.highlight_cue_line)
         self.cue_table.setFixedHeight(200)
+
+        self._metadata_presenter = MetadataPresenter(
+            fmt_table=self.fmt_table,
+            bext_table=self.bext_table,
+            info_table=self.info_table,
+            gps_table=self.gps_table,
+            cue_table=self.cue_table,
+        )
 
         self.central_top_layout.addWidget(metadata_label)
 
@@ -1963,23 +1975,24 @@ class WavViewer(QWidget):
     # ------------------------------------------------------------------
 
     def _clear_ai_overlay(self) -> None:
-        """Remove all AI detection overlay items from all plots."""
-        for plot, item, _source in self.ai_overlay_items:
-            try:
-                plot.removeItem(item)
-            except Exception:
-                pass
-        self.ai_overlay_items.clear()
+        """Remove all AI detection overlay items from all plots.
+
+        Thin wrapper delegating to AiOverlayController.
+        """
+        self._ai_overlay.clear()
 
     def _load_ai_overlay(self, wav_path: str) -> None:
         """Load AI detection layers from the sidecar JSON and draw them.
+
+        Sidecar I/O stays in WavViewer; only overlay item management is
+        delegated to AiOverlayController.
 
         Args:
             wav_path: Absolute path to the WAV file.
         """
         from ai_analyzer import _load_sidecar  # noqa: PLC0415
 
-        self._clear_ai_overlay()
+        self._ai_overlay.clear()
         data = _load_sidecar(wav_path)
         if not data:
             return
@@ -1988,123 +2001,12 @@ class WavViewer(QWidget):
     def load_ai_overlay(self, layers: list[dict]) -> None:
         """Draw AI detection layers on the waveform.
 
-        Each layer dict must contain ``name``, ``color`` (RGBA list),
-        ``text_color`` (hex string) and ``detections`` (list of dicts with
-        ``label``, ``score``, ``start_time``, ``end_time``).
-
-        For layers with many overlapping windows (e.g. sliding-window models),
-        only the highest-scoring detection per unique start time is shown.
+        Thin wrapper delegating to AiOverlayController.
 
         Args:
             layers: List of layer dicts as produced by :class:`AiAnalysisWorker`.
         """
-        self._clear_ai_overlay()
-        self._rebuild_ai_toggles(layers)
-
-        plots = [self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom]
-        graph_mode = load_ai_settings().get("graph_label_mode", "scientific")
-
-        for layer in layers:
-            name = layer["name"]
-            color = layer.get("color", [80, 80, 200, 35])
-            brush = pg.mkBrush(*color)
-            text_color = layer.get("text_color", "#aaaaff")
-
-            # Top-3 labels per unique start_time — sorted by score, min 0.10
-            _GRAPH_MIN = 0.10
-            _GRAPH_TOP = 3
-            by_window: dict[float, list] = {}
-            for det in layer["detections"]:
-                if not det.get("enabled", True):
-                    continue
-                if det["score"] < _GRAPH_MIN:
-                    continue
-                s = det["start_time"]
-                by_window.setdefault(s, []).append(det)
-
-            for start_s, dets in sorted(by_window.items()):
-                top = sorted(dets, key=lambda d: -d["score"])[:_GRAPH_TOP]
-                end_s = top[0]["end_time"]
-                labels = [
-                    (graph_label_for_detection(d, graph_mode), d["score"])
-                    for d in top
-                ]
-                self._add_ai_region(
-                    plots, start_s, end_s, labels, name, brush, text_color
-                )
-
-    def _rebuild_ai_toggles(self, layers: list[dict]) -> None:
-        """Recreate the per-layer toggle checkboxes in the header row.
-
-        Args:
-            layers: List of layer dicts.
-        """
-        # Remove existing checkboxes
-        while self._ai_toggle_layout.count():
-            item = self._ai_toggle_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        for layer in layers:
-            name = layer["name"]
-            color = layer.get("text_color", "#aaaaaa")
-            cb = QCheckBox(name)
-            cb.setChecked(self._ai_layer_visible.get(name, True))
-            cb.setStyleSheet(f"color: {color};")
-            cb.toggled.connect(lambda on, n=name: self._toggle_ai_layer(n, on))
-            self._ai_toggle_layout.addWidget(cb)
-
-    def _add_ai_region(
-        self,
-        plots: list,
-        start_s: float,
-        end_s: float,
-        labels: list[tuple[str, float]],
-        layer_name: str,
-        brush,
-        text_color: str,
-    ) -> None:
-        """Add a semi-transparent region and stacked text labels for one window.
-
-        Args:
-            plots: PlotWidget instances to add the region to.
-            start_s: Detection start in seconds.
-            end_s: Detection end in seconds.
-            labels: List of (label, score) tuples sorted by descending score.
-            layer_name: Source layer name used for toggle lookup.
-            brush: PyQtGraph brush for the region fill.
-            text_color: Hex colour string for the text label.
-        """
-        visible = self._ai_layer_visible.get(layer_name, True)
-
-        for plot in plots:
-            region = pg.LinearRegionItem(
-                values=(start_s, end_s),
-                movable=False,
-                brush=brush,
-            )
-            region.setZValue(-10)
-            region.setVisible(visible)
-            plot.addItem(region)
-            self.ai_overlay_items.append((plot, region, layer_name))
-
-        font = QFont()
-        font.setPointSize(9)
-        font.setBold(True)
-
-        for i, (label, score) in enumerate(labels):
-            y = 0.95 - i * 0.15
-            text = pg.TextItem(
-                text=f"{label} {score:.2f}",
-                color=text_color,
-                anchor=(0, 1),
-            )
-            text.setFont(font)
-            text.setPos(start_s, y)
-            text.setZValue(5)
-            text.setVisible(visible)
-            self.waveform_plot.addItem(text)
-            self.ai_overlay_items.append((self.waveform_plot, text, layer_name))
+        self._ai_overlay.load_layers(layers)
 
     def refresh_ai_overlay(self, layers: list[dict] | None = None) -> None:
         """Refresh the AI overlay for the current file.
@@ -2122,14 +2024,13 @@ class WavViewer(QWidget):
     def _toggle_ai_layer(self, layer_name: str, visible: bool) -> None:
         """Show or hide all overlay items for a given layer.
 
+        Thin wrapper delegating to AiOverlayController.
+
         Args:
             layer_name: Name of the layer to toggle.
             visible: True to show, False to hide.
         """
-        self._ai_layer_visible[layer_name] = visible
-        for _plot, item, name in self.ai_overlay_items:
-            if name == layer_name:
-                item.setVisible(visible)
+        self._ai_overlay.toggle_layer(layer_name, visible)
 
     def _on_metadata_error(self, filename: str, message: str) -> None:
         """Handle a failed background WAV analysis.
@@ -2404,9 +2305,12 @@ class WavViewer(QWidget):
         # self._resize_metadata_tables()
 
     def _clear_all_metadata_tables(self) -> None:
-        """Clear all metadata tables."""
-        for table in [self.fmt_table, self.bext_table, self.info_table, self.gps_table, self.cue_table]:
-            table.setRowCount(0)
+        """Clear all metadata tables.
+
+        Thin wrapper delegating table clearing to MetadataPresenter; photo
+        preview widgets are not part of the metadata tables and stay here.
+        """
+        self._metadata_presenter.clear_all()
         self.photo_preview_label.setVisible(False)
         self.photo_preview_image.setVisible(False)
         self.photo_preview_image.setToolTip("")
@@ -2414,52 +2318,41 @@ class WavViewer(QWidget):
     def _populate_fmt_table(self, fmt_data: dict[str, Any]) -> None:
         """Populate FMT chunk information table.
 
+        Thin wrapper delegating to MetadataPresenter.
+
         Args:     fmt_data: FMT chunk data dictionary
         """
-        self._populate_two_column_table(self.fmt_table, fmt_data)
+        self._metadata_presenter.populate_fmt_table(fmt_data)
 
     def _populate_bext_table(self, bext_data: dict[str, Any]) -> None:
         """Populate BEXT chunk information table.
 
+        Thin wrapper delegating to MetadataPresenter.
+
         Args:     bext_data: BEXT chunk data dictionary
         """
-        self._populate_two_column_table(self.bext_table, bext_data)
+        self._metadata_presenter.populate_bext_table(bext_data)
 
     def _populate_info_table(self, info_data: dict[str, Any]) -> None:
         """Populate INFO chunk information table.
 
+        Thin wrapper delegating to MetadataPresenter.
+
         Args:     info_data: INFO chunk data dictionary
         """
-        self._populate_two_column_table_with_defaults_test(self.info_table, info_data)
-        # self._populate_two_column_table(self.info_table, info_data)
+        defaults = self.user_config.get("wav_tags", {})
+        self._metadata_presenter.populate_info_table(info_data, defaults)
 
     def _populate_gps_table(self, gps_data: dict | None) -> None:
         """Populate GPS location table from iXML GPS data.
 
-        Always shows 3 rows (Latitude, Longitude, Altitude) so the user can
-        fill them in even when no GPS data is present in the file.
+        Table row population is delegated to MetadataPresenter; the photo
+        preview widgets stay here since they involve the current filename
+        and widgets outside the metadata tables.
 
         Args:     gps_data: Dict with 'latitude', 'longitude', 'altitude', or None.
         """
-        self._populate_two_column_table_editable(self.gps_table, {
-            "Latitude": str(gps_data["latitude"]) if gps_data else "",
-            "Longitude": str(gps_data["longitude"]) if gps_data else "",
-            "Altitude": str(gps_data.get("altitude", "")) if gps_data else "",
-        })
-
-        # Read-only extra rows: Photo and Location (if present in iXML)
-        photo_ref = gps_data.get("photo_ref") if gps_data else None
-        location_name = gps_data.get("location_name") if gps_data else None
-        for label, value in [("Photo", photo_ref), ("Location", location_name)]:
-            if value:
-                row = self.gps_table.rowCount()
-                self.gps_table.insertRow(row)
-                key_item = QTableWidgetItem(label)
-                key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
-                self.gps_table.setItem(row, 0, key_item)
-                val_item = QTableWidgetItem(value)
-                val_item.setFlags(val_item.flags() & ~Qt.ItemIsEditable)
-                self.gps_table.setItem(row, 1, val_item)
+        self._metadata_presenter.populate_gps_table_rows(gps_data)
 
         # Photo preview
         photo_ref = gps_data.get("photo_ref") if gps_data else None
@@ -2480,123 +2373,6 @@ class WavViewer(QWidget):
         self.photo_preview_label.setVisible(False)
         self.photo_preview_image.setVisible(False)
 
-    def _populate_two_column_table(
-        self, table: QTableWidget, data: dict[str, Any]
-    ) -> None:
-        """Populate a two-column table with key-value data.
-
-        Args:     table: Table widget to populate     data: Dictionary of key-value
-        pairs
-        """
-        # for i, (key, value) in enumerate(data.items()):
-        for i, (key, value) in enumerate((data or {}).items()):
-            table.insertRow(i)
-
-            # Create and configure key item
-            key_item = QTableWidgetItem(str(key))
-            key_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            table.setItem(i, 0, key_item)
-
-            # Create and configure value item
-            value_item = QTableWidgetItem(str(value))
-            value_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            table.setItem(i, 1, value_item)
-
-            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-    def _populate_two_column_table_editable(
-        self, table: QTableWidget, data: dict[str, Any]
-    ) -> None:
-        """Populate a two-column table with editable value cells.
-
-        Args:
-            table: Table widget to populate.
-            data: Dictionary of key-value pairs.
-        """
-        for i, (key, value) in enumerate((data or {}).items()):
-            table.insertRow(i)
-
-            key_item = QTableWidgetItem(str(key))
-            key_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)
-            table.setItem(i, 0, key_item)
-
-            value_item = QTableWidgetItem(str(value))
-            value_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            table.setItem(i, 1, value_item)
-
-        table.setEditTriggers(
-            QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked
-        )
-
-    #####
-    def _populate_two_column_table_with_defaults_test(
-        self, table: QTableWidget, data: dict[str, Any]
-    ) -> None:
-        """Populate a two-column table with key-value data, merging defaults.
-
-        This test function shows how we can implement default values in a simple way: 1.
-        Get defaults from user_config 2. Merge with actual data (actual data overwrites
-        defaults) 3. Populate table normally 4. Make INFO table editable for user
-        modifications
-
-        Args:     table: Table widget to populate     data: Dictionary of key-value
-        pairs from WAV file
-        """
-        defaults = self.user_config.get("wav_tags", {})
-
-        merged_data = defaults.copy()  # Start with defaults
-        if data:
-            merged_data.update(data)  # Overwrite with actual WAV data
-
-        table.setRowCount(0)
-
-        for i, (key, value) in enumerate(merged_data.items()):
-            table.insertRow(i)
-
-            # Create and configure key item (non-editable)
-            key_item = QTableWidgetItem(str(key))
-            key_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            key_item.setFlags(key_item.flags() & ~Qt.ItemIsEditable)  # Make read-only
-            table.setItem(i, 0, key_item)
-
-            # Create and configure value item (editable)
-            value_item = QTableWidgetItem(str(value))
-            value_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-            # Optional: Visual hint if this is a default value
-            original_value = data.get(key, "") if data else ""
-            default_value = defaults.get(key, "")
-
-            if not original_value and default_value:
-                # This is a default value - could add visual styling
-                value_item.setToolTip(
-                    f"Default value: {default_value}\nDouble-click to edit"
-                )
-                # Optional: different color for defaults
-
-                value_item.setForeground(
-                    QColor(180, 180, 180)
-                )  # Light gray for defaults
-
-                font = value_item.font()
-                font.setItalic(True)
-                value_item.setFont(font)
-
-            else:
-                # This is actual WAV data
-                value_item.setToolTip(
-                    "Original value from WAV file\nDouble-click to edit"
-                )
-
-            table.setItem(i, 1, value_item)
-
-        # Step 5: Make table editable if it's the INFO table
-        if hasattr(table, "objectName") and "info" in table.objectName().lower():
-            table.setEditTriggers(
-                QTableWidget.DoubleClicked | QTableWidget.SelectedClicked
-            )
-
     def _reset_info_table_to_defaults(self) -> None:
         """Reset INFO table to show only defaults."""
         reply = QMessageBox.question(
@@ -2611,7 +2387,10 @@ class WavViewer(QWidget):
 
         if reply == QMessageBox.Yes:
             # Re-populate table with empty WAV data (= only defaults)
-            self._populate_two_column_table_with_defaults_test(self.info_table, {})
+            defaults = self.user_config.get("wav_tags", {})
+            self._metadata_presenter.populate_two_column_table_with_defaults(
+                self.info_table, {}, defaults
+            )
 
     def get_info_from_info_table(self) -> dict[str, str]:
         """Extract info data with smart default handling."""
@@ -2733,91 +2512,13 @@ class WavViewer(QWidget):
     def _populate_cue_table(self, cue_points: list[dict[str, Any]]) -> None:
         """Populate cue points table.
 
+        Thin wrapper delegating to MetadataPresenter.
+
         Args:     cue_points: list of cue point dictionaries
         """
-        self.cue_table.setRowCount(0)
-
-        row = 0
-        for cue in cue_points:
-            cue_id = str(cue.get("ID", ""))
-            # Pak label uit self.cue_labels; val desnoods terug op het cue-dict
-            label = (self.cue_labels.get(cue_id) or cue.get("Label", "") or "").strip()
-            if not label:
-                continue  # overslaan als label leeg is
-
-            self.cue_table.insertRow(row)
-
-            # Cue ID
-            id_item = QTableWidgetItem(cue_id)
-            id_item.setTextAlignment(Qt.AlignCenter)
-            self.cue_table.setItem(row, 0, id_item)
-
-            # Position (samples -> tijd)
-            offset = cue.get("Sample Offset", 0)
-            if getattr(self, "current_sr", None):
-                time_pos = offset / self.current_sr
-                pos_text = f"{time_pos:.3f}s"
-            else:
-                pos_text = f"{offset} samples"
-
-            pos_item = QTableWidgetItem(pos_text)
-            pos_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.cue_table.setItem(row, 1, pos_item)
-
-            # Label
-            label_item = QTableWidgetItem(label)
-            label_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            self.cue_table.setItem(row, 2, label_item)
-
-            row += 1
-
-        # If nothing was added: show single row with message
-        if row == 0:
-            self.cue_table.setRowCount(1)
-            msg_item = QTableWidgetItem("No labeled cue points found.")
-            msg_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            # Optional: make item non-editable/selectable
-            msg_item.setFlags(Qt.ItemIsEnabled)
-            self.cue_table.setItem(0, 0, msg_item)
-            # Empty cells for the remaining columns
-            self.cue_table.setItem(0, 1, QTableWidgetItem(""))
-            self.cue_table.setItem(0, 2, QTableWidgetItem(""))
-
-        self.cue_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        # logger.debug(f"Cue points: {cue_points}")
-        #
-        # # labeled = [(str(int(cid)), label) for cid, label in cue_labels.items()
-        # #            if label.strip()]
-        # #
-        #
-        #
-        # for i, cue in enumerate(cue_points):
-        #     self.cue_table.insertRow(i)
-        #
-        #     # Cue ID
-        #     cue_id = str(cue.get("ID", ""))
-        #     id_item = QTableWidgetItem(cue_id)
-        #     id_item.setTextAlignment(Qt.AlignCenter)
-        #     self.cue_table.setItem(i, 0, id_item)
-        #
-        #     # Position (convert samples to time)
-        #     offset = cue.get("Sample Offset", 0)
-        #     if self.current_sr:
-        #         time_pos = offset / self.current_sr
-        #         pos_text = f"{time_pos:.3f}s"
-        #     else:
-        #         pos_text = f"{offset} samples"
-        #
-        #     pos_item = QTableWidgetItem(pos_text)
-        #     pos_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        #     self.cue_table.setItem(i, 1, pos_item)
-        #
-        #     # Label
-        #     label = self.cue_labels.get(cue_id, "")
-        #     label_item = QTableWidgetItem(label)
-        #     label_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        #     self.cue_table.setItem(i, 2, label_item)
+        self._metadata_presenter.populate_cue_table(
+            cue_points, self.cue_labels, getattr(self, "current_sr", None)
+        )
 
     def _resize_metadata_tables12(self) -> None:
         """Resize all metadata tables to fit their content."""
