@@ -2153,8 +2153,11 @@ class ApplicationStylist:
             margin: 0px 2px;
         }}
 
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_rewind_button,
         QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button,
-        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button {{
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_forward_button,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_loop_button {{
             background-color: {ApplicationStylist.COLORS['surface']};
             border: 1px solid {ApplicationStylist.COLORS['border']};
             border-radius: 4px;
@@ -2165,14 +2168,21 @@ class ApplicationStylist:
             padding: 4px;
         }}
 
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_rewind_button:hover,
         QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button:hover,
-        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:hover {{
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:hover,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_forward_button:hover,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_loop_button:hover {{
             background-color: {ApplicationStylist.COLORS['hover_overlay']};
             border-color: {ApplicationStylist.COLORS['primary']};
         }}
 
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_rewind_button:pressed,
         QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button:pressed,
-        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:pressed {{
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:pressed,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_forward_button:pressed,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_loop_button:pressed,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_loop_button:checked {{
             background-color: {ApplicationStylist.COLORS['primary_pressed']};
         }}
 
@@ -2212,8 +2222,42 @@ class ApplicationStylist:
             border-color: {ApplicationStylist.COLORS['border']};
             border-radius: 5px;
             color: {ApplicationStylist.COLORS['text_primary']};
-            font-size: 9pt;
+            font-size: 10pt;
+            font-weight: 800;
             margin: 0px 4px;
+            padding: 4px 6px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QLabel#secondary_time_display {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 9pt;
+            font-weight: 700;
+            padding: 4px 0px;
+        }}
+
+        QFrame#transport_bar QPushButton#transport_zoom_button {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
+            font-weight: 800;
+            min-width: 28px;
+            max-width: 32px;
+            min-height: 24px;
+            padding: 2px;
+        }}
+
+        QFrame#transport_bar QPushButton#transport_zoom_button:hover {{
+            background-color: {ApplicationStylist.COLORS['hover_overlay']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QFrame#transport_bar QLabel#transport_status_label {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 9pt;
+            font-weight: 700;
+            min-width: 150px;
             padding: 4px 6px;
         }}
 

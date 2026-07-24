@@ -152,13 +152,21 @@ def test_field_lab_dark_shell_preserves_metadata_and_transport_controls(
     assert viewer.cue_menu_button.objectName() == "cue_menu_button"
 
     assert viewer.audio_player.play_button.objectName() == "transport_play_button"
+    assert viewer.audio_player.rewind_button.objectName() == "transport_rewind_button"
     assert viewer.audio_player.stop_button.objectName() == "transport_stop_button"
+    assert viewer.audio_player.forward_button.objectName() == "transport_forward_button"
+    assert viewer.audio_player.loop_button.objectName() == "transport_loop_button"
     assert (
         viewer.audio_player.position_slider.objectName()
         == "transport_position_slider"
     )
     assert viewer.audio_player.volume_slider.objectName() == "transport_volume_slider"
     assert viewer.audio_player.time_label.objectName() == "time_display"
+    assert viewer.audio_player.secondary_time_label.objectName() == "secondary_time_display"
+    assert viewer.transport_zoom_fit_button.objectName() == "transport_zoom_button"
+    assert viewer.transport_zoom_out_button.objectName() == "transport_zoom_button"
+    assert viewer.transport_zoom_in_button.objectName() == "transport_zoom_button"
+    assert viewer.transport_status_label.objectName() == "transport_status_label"
     assert viewer._get_professional_default_text() == "Hover for time, sample, dBFS"
 
 
@@ -253,3 +261,47 @@ def test_add_session_cue_updates_cue_surfaces(qapp, qt_widget_cleanup):
     assert viewer.selected_cue_id == "1"
     assert "1" in viewer.cue_lines
     assert "1" in viewer.cue_markers
+
+
+def test_transport_zoom_controls_change_waveform_range(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.audio_duration = 100.0
+    viewer.syncing = True
+    try:
+        for plot in viewer._waveform_plots():
+            plot.getViewBox().setXRange(0, 100, padding=0)
+    finally:
+        viewer.syncing = False
+
+    viewer._zoom_waveform_in()
+    x0, x1 = viewer.waveform_plot.getViewBox().viewRange()[0]
+    assert round(x1 - x0) == 50
+
+    viewer._zoom_waveform_fit()
+    x0, x1 = viewer.waveform_plot.getViewBox().viewRange()[0]
+    assert round(x0) == 0
+    assert round(x1) == 100
+
+
+def test_transport_loop_and_time_display_are_functional(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    viewer.audio_player.loop_button.click()
+    assert viewer.audio_player._loop_enabled is True
+
+    viewer.audio_player._update_time_display(1234, 5000)
+    assert viewer.audio_player.time_label.text() == "00:01.234"
+    assert viewer.audio_player.secondary_time_label.text() == "/00:05.000"
+
+
+def test_transport_status_label_shows_audio_summary(qapp, qt_widget_cleanup):
+    class Info:
+        subtype = "FLOAT"
+        channels = 2
+
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 96000
+
+    viewer._update_transport_status(Info())
+
+    assert viewer.transport_status_label.text() == "96 kHz · FLOAT · 2ch"

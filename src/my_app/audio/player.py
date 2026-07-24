@@ -187,6 +187,8 @@ class AudioPlayer(QWidget):
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
         self.player.stateChanged.connect(self._on_state_changed)
+        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
+        self._loop_enabled = False
 
         # Initialize UI
         self._setup_ui()
@@ -222,6 +224,14 @@ class AudioPlayer(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
+        # Rewind button
+        self.rewind_button = QPushButton()
+        self.rewind_button.setObjectName("transport_rewind_button")
+        self.rewind_button.setText("⏪")
+        self.rewind_button.setToolTip("Seek backward 10 seconds")
+        self.rewind_button.clicked.connect(self.seek_backward)
+        layout.addWidget(self.rewind_button)
+
         # Play/Pause button
         self.play_button = QPushButton()
         self.play_button.setObjectName("transport_play_button")
@@ -237,6 +247,22 @@ class AudioPlayer(QWidget):
         self.stop_button.setToolTip("Stop (Esc)")
         self.stop_button.clicked.connect(self.stop_playback)
         layout.addWidget(self.stop_button)
+
+        # Forward and loop controls
+        self.forward_button = QPushButton()
+        self.forward_button.setObjectName("transport_forward_button")
+        self.forward_button.setText("⏩")
+        self.forward_button.setToolTip("Seek forward 10 seconds")
+        self.forward_button.clicked.connect(self.seek_forward)
+        layout.addWidget(self.forward_button)
+
+        self.loop_button = QPushButton()
+        self.loop_button.setObjectName("transport_loop_button")
+        self.loop_button.setText("↻")
+        self.loop_button.setCheckable(True)
+        self.loop_button.setToolTip("Loop playback")
+        self.loop_button.toggled.connect(self._set_loop_enabled)
+        layout.addWidget(self.loop_button)
 
         # Position slider
         self.position_slider = QSlider(Qt.Horizontal)
@@ -260,11 +286,17 @@ class AudioPlayer(QWidget):
         layout.addWidget(self.volume_slider)
 
         # Time display
-        self.time_label = QLabel("00:00.000/00:00.000")
+        self.time_label = QLabel("00:00.000")
         self.time_label.setObjectName("time_display")
         self.time_label.setAlignment(Qt.AlignCenter)
-        self.time_label.setFixedWidth(220)
+        self.time_label.setFixedWidth(132)
         layout.addWidget(self.time_label)
+
+        self.secondary_time_label = QLabel("/00:00.000")
+        self.secondary_time_label.setObjectName("secondary_time_display")
+        self.secondary_time_label.setAlignment(Qt.AlignCenter)
+        self.secondary_time_label.setFixedWidth(88)
+        layout.addWidget(self.secondary_time_label)
 
     def _setup_shortcuts(self):
         """Setup global keyboard shortcuts.
@@ -443,6 +475,10 @@ class AudioPlayer(QWidget):
             if self.volume_toast:
                 self.volume_toast.show_volume(0)
             logger.debug("Muted")
+
+    def _set_loop_enabled(self, enabled):
+        """Enable or disable loop playback."""
+        self._loop_enabled = bool(enabled)
 
     def stop_playback(self):
         """Stop playback.
@@ -664,6 +700,12 @@ class AudioPlayer(QWidget):
 
         self.stateChanged.emit(state)
 
+    def _on_media_status_changed(self, status):
+        """Restart playback when loop is enabled and the file reaches the end."""
+        if self._loop_enabled and status == QMediaPlayer.EndOfMedia:
+            self.player.setPosition(0)
+            self.player.play()
+
     def _on_volume_changed(self, volume):
         """Handle volume changes from volume slider.
 
@@ -688,7 +730,8 @@ class AudioPlayer(QWidget):
         """
         pos_time = self._format_time(position)
         dur_time = self._format_time(duration)
-        self.time_label.setText(f"{pos_time}/{dur_time}")
+        self.time_label.setText(pos_time)
+        self.secondary_time_label.setText(f"/{dur_time}")
 
     def _format_time(self, ms):
         """Format milliseconds to MM:SS.mmm format.

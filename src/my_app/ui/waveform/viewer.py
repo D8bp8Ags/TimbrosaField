@@ -1344,7 +1344,34 @@ class WavViewer(QWidget):
             self.audio_player.positionChanged.connect(self.update_waveform_cursor)
             self.audio_player.stateChanged.connect(self.handle_playback_state)
 
-            self.transport_layout.addWidget(self.audio_player)
+            self.transport_controls_layout = QHBoxLayout()
+            self.transport_controls_layout.setContentsMargins(0, 0, 0, 0)
+            self.transport_controls_layout.setSpacing(6)
+            self.transport_controls_layout.addWidget(self.audio_player, stretch=1)
+
+            self.transport_zoom_fit_button = QPushButton("⌕")
+            self.transport_zoom_fit_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_fit_button.setToolTip("Fit waveform to window")
+            self.transport_zoom_fit_button.clicked.connect(self._zoom_waveform_fit)
+            self.transport_controls_layout.addWidget(self.transport_zoom_fit_button)
+
+            self.transport_zoom_out_button = QPushButton("−")
+            self.transport_zoom_out_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_out_button.setToolTip("Zoom waveform out")
+            self.transport_zoom_out_button.clicked.connect(self._zoom_waveform_out)
+            self.transport_controls_layout.addWidget(self.transport_zoom_out_button)
+
+            self.transport_zoom_in_button = QPushButton("+")
+            self.transport_zoom_in_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_in_button.setToolTip("Zoom waveform in")
+            self.transport_zoom_in_button.clicked.connect(self._zoom_waveform_in)
+            self.transport_controls_layout.addWidget(self.transport_zoom_in_button)
+
+            self.transport_status_label = QLabel("No audio loaded")
+            self.transport_status_label.setObjectName("transport_status_label")
+            self.transport_controls_layout.addWidget(self.transport_status_label)
+
+            self.transport_layout.addLayout(self.transport_controls_layout)
             logger.debug("Audio components initialized successfully")
         except Exception as exc:  # of specifieker dan Exception
             logger.error("Failed to initialize audio components: %s", exc)
@@ -1797,6 +1824,7 @@ class WavViewer(QWidget):
         self.current_sr = sample_rate
         self.audio_duration = duration
         self.is_float_format = is_float
+        self._update_transport_status(info)
 
         # Pre-calculate mono signal for performance
         self.cached_mean_signal = 0.5 * (data[:, 0] + data[:, 1])
@@ -1805,6 +1833,28 @@ class WavViewer(QWidget):
             f"Loaded audio: {duration:.2f}s, {sample_rate}Hz, "
             f"{data.shape[1]} channels"
         )
+
+    def _update_transport_status(self, info: Any | None = None) -> None:
+        """Update the compact technical summary in the transport bar."""
+        if not hasattr(self, "transport_status_label"):
+            return
+        if info is None or self.current_sr is None:
+            self.transport_status_label.setText("No audio loaded")
+            return
+
+        format_text = getattr(info, "subtype", "") or "unknown"
+        channels = getattr(info, "channels", None)
+        sample_text = (
+            f"{self.current_sr / 1000:g} kHz"
+            if self.current_sr >= 1000
+            else f"{self.current_sr} Hz"
+        )
+        channel_text = f"{channels}ch" if channels else ""
+        text = " · ".join(
+            part for part in [sample_text, format_text, channel_text] if part
+        )
+        self.transport_status_label.setText(text)
+        self.transport_status_label.setToolTip(text)
 
     def _setup_plot_visualization(self) -> None:
         """Set up and clear all plots for new audio file visualization.
@@ -4163,6 +4213,53 @@ class WavViewer(QWidget):
                 if line.scene():
                     line.scene().removeItem(line)
             self.playback_line = None
+
+    def _waveform_plots(self) -> list[pg.PlotWidget]:
+        """Return all waveform plots controlled by transport zoom."""
+        return [self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom]
+
+    def _zoom_waveform_in(self) -> None:
+        """Zoom in around the current visible center."""
+        self._zoom_waveform_by_factor(0.5)
+
+    def _zoom_waveform_out(self) -> None:
+        """Zoom out around the current visible center."""
+        self._zoom_waveform_by_factor(2.0)
+
+    def _zoom_waveform_fit(self) -> None:
+        """Fit the visible waveform range to the loaded audio duration."""
+        if not self.audio_duration:
+            return
+        self.syncing = True
+        try:
+            for plot in self._waveform_plots():
+                plot.getViewBox().setXRange(0, self.audio_duration, padding=0)
+        finally:
+            self.syncing = False
+
+    def _zoom_waveform_by_factor(self, factor: float) -> None:
+        """Apply a horizontal zoom factor to all waveform plots."""
+        duration = self.audio_duration or 0.0
+        x0, x1 = self.waveform_plot.getViewBox().viewRange()[0]
+        center = (x0 + x1) / 2
+        width = max(0.05, (x1 - x0) * factor)
+        if duration:
+            width = min(width, duration)
+            start = max(0.0, center - width / 2)
+            end = min(duration, center + width / 2)
+            if end - start < width:
+                start = max(0.0, end - width)
+                end = min(duration, start + width)
+        else:
+            start = center - width / 2
+            end = center + width / 2
+
+        self.syncing = True
+        try:
+            for plot in self._waveform_plots():
+                plot.getViewBox().setXRange(start, end, padding=0)
+        finally:
+            self.syncing = False
 
     # ========== VIEW MODE CONTROL METHODS ==========
 
