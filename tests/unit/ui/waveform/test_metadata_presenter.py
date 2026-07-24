@@ -52,13 +52,18 @@ def test_populate_fmt_table_shows_representative_values(presenter):
     )
     assert presenter.fmt_table.rowCount() == 3
     assert presenter.fmt_table.item(0, 0).text() == "Sample rate"
-    assert presenter.fmt_table.item(0, 1).text() == "48000"
+    assert presenter.fmt_table.item(0, 1).text() == "48000 Hz"
 
 
 def test_populate_bext_table_representative_values(presenter):
     presenter.populate_bext_table({"Description": "Field test", "Originator": "Tascam"})
     assert presenter.bext_table.rowCount() == 2
     assert presenter.bext_table.item(1, 1).text() == "Tascam"
+
+
+def test_populate_bext_table_formats_missing_readonly_values(presenter):
+    presenter.populate_bext_table({"Description": ""})
+    assert presenter.bext_table.item(0, 1).text() == "--"
 
 
 def test_populate_info_table_merges_defaults(presenter):

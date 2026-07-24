@@ -9,7 +9,7 @@ public methods exist and behave as the code they replaced did.
 
 from __future__ import annotations
 
-from PyQt5.QtWidgets import QFrame, QLabel
+from PyQt5.QtWidgets import QFrame, QLabel, QPushButton, QTableWidgetItem
 
 from my_app.ui.waveform import viewer as wv
 
@@ -109,6 +109,13 @@ def test_field_lab_dark_shell_keeps_required_visual_zones(qapp, qt_widget_cleanu
     assert viewer.audio_player.objectName() == "audio_player_widget"
     assert viewer.cue_label.objectName() == "cue_section_header"
     assert viewer.cue_overview.objectName() == "cue_overview"
+    assert viewer.inspector_settings_button.objectName() == "inspector_settings_button"
+    assert set(viewer.inspector_sections) == {
+        "METADATA",
+        "AUDIO",
+        "LOCATION",
+        "INFO CHUNK",
+    }
 
     inspector_header = viewer.right_panel.findChild(QLabel, "inspector_header")
     waveform_header = viewer.waveform_panel.findChild(QLabel, "waveform_header")
@@ -189,3 +196,33 @@ def test_waveform_toolbar_controls_have_real_behavior(qapp, qt_widget_cleanup):
     viewer.amplitude_mode_combo.setCurrentText("Linear")
     assert viewer._amplitude_display_mode == "linear"
     assert viewer.waveform_plot.getPlotItem().getAxis("top").isVisible() is True
+
+
+def test_inspector_sections_are_collapsible(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    section = viewer.inspector_sections["AUDIO"]
+    toggle = section.findChild(QPushButton, "inspector_section_toggle")
+
+    assert toggle is not None
+    assert viewer.fmt_table.isHidden() is False
+
+    toggle.click()
+    assert viewer.fmt_table.isHidden() is True
+    assert toggle.text().startswith("▸")
+
+    toggle.click()
+    assert viewer.fmt_table.isHidden() is False
+    assert toggle.text().startswith("▾")
+
+
+def test_metadata_table_cells_can_be_copied(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.fmt_table.insertRow(0)
+    viewer.fmt_table.setItem(0, 0, QTableWidgetItem("Sample rate"))
+    viewer.fmt_table.setItem(0, 1, QTableWidgetItem("96000 Hz"))
+    viewer.fmt_table.setCurrentCell(0, 1)
+
+    viewer._copy_selected_table_cell(viewer.fmt_table)
+
+    assert qapp.clipboard().text() == "96000 Hz"

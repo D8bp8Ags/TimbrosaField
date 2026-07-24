@@ -130,8 +130,9 @@ class MetadataPresenter:
             key_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             table.setItem(i, 0, key_item)
 
-            value_item = QTableWidgetItem(str(value))
+            value_item = QTableWidgetItem(self._format_readonly_value(key, value))
             value_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            value_item.setToolTip(str(value) if value not in (None, "") else "")
             table.setItem(i, 1, value_item)
 
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -218,6 +219,17 @@ class MetadataPresenter:
             table.setEditTriggers(
                 QTableWidget.DoubleClicked | QTableWidget.SelectedClicked
             )
+
+    @staticmethod
+    def _format_readonly_value(key: Any, value: Any) -> str:
+        """Format non-editable metadata values for the inspector."""
+        if value in (None, ""):
+            return "--"
+        key_text = str(key).strip().lower()
+        value_text = str(value)
+        if key_text == "sample rate" and value_text.replace(".", "", 1).isdigit():
+            return f"{value_text} Hz"
+        return value_text
 
     def populate_cue_table(
         self,

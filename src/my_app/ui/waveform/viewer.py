@@ -692,9 +692,20 @@ class WavViewer(QWidget):
         self.right_layout.setContentsMargins(8, 8, 8, 8)
         self.right_layout.setSpacing(8)
 
+        inspector_header_row = QHBoxLayout()
+        inspector_header_row.setContentsMargins(0, 0, 0, 0)
+        inspector_header_row.setSpacing(6)
+
         inspector_header = QLabel("INSPECTOR")
         inspector_header.setObjectName("inspector_header")
-        self.right_layout.addWidget(inspector_header)
+        inspector_header_row.addWidget(inspector_header, stretch=1)
+
+        self.inspector_settings_button = QPushButton("⚙")
+        self.inspector_settings_button.setObjectName("inspector_settings_button")
+        self.inspector_settings_button.setToolTip("Inspector settings")
+        self.inspector_settings_button.clicked.connect(self._focus_inspector)
+        inspector_header_row.addWidget(self.inspector_settings_button)
+        self.right_layout.addLayout(inspector_header_row)
 
         self.inspector_scroll = QScrollArea()
         self.inspector_scroll.setWidgetResizable(True)
@@ -1042,10 +1053,11 @@ class WavViewer(QWidget):
             cue_table=self.cue_table,
         )
 
+        self.inspector_sections: dict[str, QFrame] = {}
         self._add_inspector_section(self.bext_label, self.bext_table)
         self._add_inspector_section(self.fmt_label, self.fmt_table)
-        self._add_inspector_section(self.info_label, self.info_table)
         self._add_inspector_section(self.gps_label, self.gps_table)
+        self._add_inspector_section(self.info_label, self.info_table)
 
         # Photo preview (shown when WAV has a PHOTO_REF in iXML)
         self.photo_preview_label = QLabel("Photo:")
@@ -1097,12 +1109,25 @@ class WavViewer(QWidget):
         table.setShowGrid(False)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         table.verticalHeader().setDefaultSectionSize(24)
+        copy_action = QAction("Copy selected cell", table)
+        copy_action.triggered.connect(
+            lambda checked=False, t=table: self._copy_selected_table_cell(t)
+        )
+        table.addAction(copy_action)
+        table.setContextMenuPolicy(Qt.ActionsContextMenu)
         # table.setMaximumHeight(150)
         # table.setFixedHeight(200)
         # table.setMinimumHeight(175)
         table.setMinimumHeight(145)
         # table.setMaximumWidth(50)
         return table
+
+    def _copy_selected_table_cell(self, table: QTableWidget) -> None:
+        """Copy the selected table cell value to the clipboard."""
+        item = table.currentItem()
+        if item is None:
+            return
+        QApplication.clipboard().setText(item.text())
 
     def _add_inspector_section(self, label: QLabel, table: QTableWidget) -> None:
         """Add a titled metadata table to the right inspector."""
@@ -1111,9 +1136,32 @@ class WavViewer(QWidget):
         section_layout = QVBoxLayout(section)
         section_layout.setContentsMargins(0, 0, 0, 0)
         section_layout.setSpacing(4)
-        section_layout.addWidget(label)
+        label.setVisible(False)
+        section_button = QPushButton(f"▾ {label.text()}")
+        section_button.setObjectName("inspector_section_toggle")
+        section_button.setCheckable(True)
+        section_button.setChecked(True)
+        section_button.clicked.connect(
+            lambda checked, b=section_button, t=table, title=label.text(): (
+                self._toggle_inspector_section(b, t, title, checked)
+            )
+        )
+        section_layout.addWidget(section_button)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         section_layout.addWidget(table)
         self.inspector_layout.addWidget(section)
+        self.inspector_sections[label.text()] = section
+
+    def _toggle_inspector_section(
+        self, button: QPushButton, table: QTableWidget, title: str, expanded: bool
+    ) -> None:
+        """Expand or collapse an inspector section."""
+        table.setVisible(expanded)
+        button.setText(f"{'▾' if expanded else '▸'} {title}")
+
+    def _focus_inspector(self) -> None:
+        """Focus the inspector scroll area from the header gear action."""
+        self.inspector_scroll.setFocus(Qt.ShortcutFocusReason)
 
     def _setup_tag_input(self) -> None:
         """Set up the tag input system with intelligent autocomplete functionality.

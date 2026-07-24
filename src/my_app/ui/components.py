@@ -2225,6 +2225,25 @@ class ApplicationStylist:
             letter-spacing: 0px;
         }}
 
+        QFrame#inspector_panel QPushButton#inspector_settings_button {{
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 9pt;
+            font-weight: 800;
+            min-width: 22px;
+            max-width: 24px;
+            min-height: 20px;
+            padding: 0px;
+        }}
+
+        QFrame#inspector_panel QPushButton#inspector_settings_button:hover {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['text_primary']};
+        }}
+
         QLabel#cue_section_header {{
             color: {ApplicationStylist.COLORS['text_primary']};
             font-size: 10pt;
@@ -2355,6 +2374,21 @@ class ApplicationStylist:
             padding: 6px 8px 2px 8px;
         }}
 
+        QFrame#inspector_section QPushButton#inspector_section_toggle {{
+            background-color: transparent;
+            border: none;
+            color: {ApplicationStylist.COLORS['primary']};
+            font-size: 9pt;
+            font-weight: 800;
+            padding: 6px 8px 2px 8px;
+            text-align: left;
+        }}
+
+        QFrame#inspector_section QPushButton#inspector_section_toggle:hover {{
+            color: {ApplicationStylist.COLORS['text_primary']};
+            background-color: rgba(106, 168, 79, 0.10);
+        }}
+
         QFrame#inspector_panel QTableWidget,
         QFrame#cue_panel QTableWidget {{
             background-color: {ApplicationStylist.COLORS['surface']};
@@ -2363,6 +2397,10 @@ class ApplicationStylist:
             border-radius: 4px;
             gridline-color: {ApplicationStylist.COLORS['divider']};
             font-size: 9pt;
+        }}
+
+        QFrame#inspector_panel QTableWidget {{
+            border-top: none;
         }}
 
         QFrame#inspector_panel QTableWidget::item,
