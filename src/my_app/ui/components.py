@@ -2157,11 +2157,11 @@ class ApplicationStylist:
         QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button {{
             background-color: {ApplicationStylist.COLORS['surface']};
             border: 1px solid {ApplicationStylist.COLORS['border']};
-            border-radius: 5px;
+            border-radius: 4px;
             color: {ApplicationStylist.COLORS['text_primary']};
-            min-width: 34px;
-            max-width: 40px;
-            min-height: 26px;
+            min-width: 32px;
+            max-width: 38px;
+            min-height: 24px;
             padding: 4px;
         }}
 
@@ -2202,9 +2202,9 @@ class ApplicationStylist:
 
         QFrame#transport_bar QWidget#audio_player_widget QLabel#transport_volume_label {{
             color: {ApplicationStylist.COLORS['text_secondary']};
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: 700;
-            padding: 0px 2px 0px 8px;
+            padding: 0px 1px 0px 8px;
         }}
 
         QFrame#transport_bar QWidget#audio_player_widget QLabel[objectName="time_display"] {{
@@ -2212,7 +2212,7 @@ class ApplicationStylist:
             border-color: {ApplicationStylist.COLORS['border']};
             border-radius: 5px;
             color: {ApplicationStylist.COLORS['text_primary']};
-            font-size: 10pt;
+            font-size: 9pt;
             margin: 0px 4px;
             padding: 4px 6px;
         }}
@@ -2333,6 +2333,21 @@ class ApplicationStylist:
             background-color: {ApplicationStylist.COLORS['background']};
             border: 1px solid {ApplicationStylist.COLORS['border']};
             border-radius: 4px;
+            min-height: 92px;
+        }}
+
+        QFrame#recording_sidebar QListWidget {{
+            padding-right: 2px;
+        }}
+
+        QFrame#recording_sidebar QListWidget::item {{
+            border-bottom: 1px solid {ApplicationStylist.COLORS['divider']};
+            min-height: 28px;
+            padding: 0px;
+        }}
+
+        QFrame#recording_sidebar QListWidget::item:hover {{
+            background-color: {ApplicationStylist.COLORS['hover_overlay']};
         }}
 
         QFrame#recording_sidebar QListWidget::item:selected {{
@@ -2515,14 +2530,14 @@ class ApplicationStylist:
 
         QLabel#recording_row_name {{
             color: {ApplicationStylist.COLORS['text_primary']};
-            font-size: 10pt;
-            font-weight: 500;
+            font-size: 9pt;
+            font-weight: 700;
         }}
 
         QLabel#recording_row_duration {{
             color: {ApplicationStylist.COLORS['text_muted']};
             font-size: 8pt;
-            font-weight: 500;
+            font-weight: 700;
         }}
 
         QFrame#recording_sidebar QRadioButton#view_mode_option {{

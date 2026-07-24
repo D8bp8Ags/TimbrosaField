@@ -23,7 +23,7 @@ import soundfile as sf
 import my_app.app_config as app_config
 from my_app.audio.player import AudioPlayer
 from PyQt5 import QtCore
-from PyQt5.QtCore import QEvent, QModelIndex, Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QEvent, QModelIndex, QSize, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
@@ -136,8 +136,8 @@ class RecordingListRow(QWidget):
         self.setObjectName("recording_row")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 3, 6, 3)
-        layout.setSpacing(8)
+        layout.setContentsMargins(8, 2, 18, 2)
+        layout.setSpacing(6)
 
         icon_label = QLabel("⌁")
         icon_label.setObjectName("recording_row_icon")
@@ -147,12 +147,13 @@ class RecordingListRow(QWidget):
         name_label = QLabel(filename)
         name_label.setObjectName("recording_row_name")
         name_label.setToolTip(filename)
+        name_label.setMinimumWidth(0)
         layout.addWidget(name_label, stretch=1)
 
         duration_label = QLabel(duration_text)
         duration_label.setObjectName("recording_row_duration")
         duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        duration_label.setMinimumWidth(52)
+        duration_label.setMinimumWidth(44)
         layout.addWidget(duration_label)
 
 
@@ -203,11 +204,11 @@ class CueOverviewWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        rect = self.rect().adjusted(12, 14, -12, -18)
+        rect = self.rect().adjusted(14, 16, -14, -20)
         baseline_y = rect.center().y()
 
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#171b1c"))
+        painter.setBrush(QColor("#111516"))
         painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 4, 4)
 
         axis_pen = QPen(QColor("#53605a"))
@@ -216,11 +217,11 @@ class CueOverviewWidget(QWidget):
         painter.drawLine(rect.left(), baseline_y, rect.right(), baseline_y)
 
         if self._duration <= 0:
-            painter.setPen(QColor("#8d9992"))
+            painter.setPen(QColor("#76837c"))
             painter.drawText(rect, Qt.AlignCenter, "No cue timeline")
             return
 
-        painter.setPen(QColor("#8d9992"))
+        painter.setPen(QColor("#9ba8a1"))
         painter.drawText(
             rect.left(),
             rect.bottom() + 14,
@@ -233,20 +234,23 @@ class CueOverviewWidget(QWidget):
         )
 
         if not self._markers:
-            painter.setPen(QColor("#8d9992"))
+            painter.setPen(QColor("#9ba8a1"))
             painter.drawText(rect, Qt.AlignCenter, "No labeled cue points")
             return
 
         for cue_id, time_s, label in self._markers:
             x = rect.left() + int((time_s / self._duration) * rect.width())
             selected = cue_id == self._selected_id
+            label = label if len(label) <= 22 else f"{label[:19]}..."
             marker_pen = QPen(QColor("#e05b4f" if selected else "#f0b84b"))
             marker_pen.setWidth(3 if selected else 2)
             painter.setPen(marker_pen)
             painter.drawLine(x, rect.top(), x, rect.bottom())
             if selected:
                 painter.setPen(QColor("#e6ece8"))
-                painter.drawText(x + 5, rect.top() + 14, label)
+                label_rect = rect.adjusted(6, 0, -6, 0)
+                label_rect.setLeft(min(x + 5, rect.right() - 120))
+                painter.drawText(label_rect, Qt.AlignLeft | Qt.AlignTop, label)
 
     @staticmethod
     def _format_duration(seconds: float) -> str:
@@ -706,6 +710,7 @@ class WavViewer(QWidget):
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.file_list.currentRowChanged.connect(self.plot_selected_wav)
+        self.file_list.setUniformItemSizes(True)
         self.left_layout.addWidget(self.file_list)
 
     def _setup_waveform_plots(self) -> None:
@@ -1193,6 +1198,7 @@ class WavViewer(QWidget):
             item.setData(Qt.UserRole, full_path)
             item.setData(Qt.UserRole + 1, wav_file)
             item.setToolTip(full_path)
+            item.setSizeHint(QSize(0, 28))
             self.file_list.addItem(item)
             self.file_list.setItemWidget(
                 item, RecordingListRow(wav_file, duration_text, self.file_list)
@@ -3421,14 +3427,15 @@ class WavViewer(QWidget):
                 # Neutrale startup kleur
 
                 label.setColor(QColor(150, 150, 150))
-                label.setOpacity(0.65)
+                label.setOpacity(0.52)
 
                 # Safe positioning
                 try:
                     if hasattr(plot, "getViewBox") and plot.getViewBox():
                         x_range, y_range = plot.getViewBox().viewRange()
                         if x_range and y_range:
-                            label.setPos(x_range[0], y_range[1])
+                            y_offset = (y_range[1] - y_range[0]) * 0.06
+                            label.setPos(x_range[0], y_range[1] - y_offset)
                         else:
                             label.setPos(0, 1)
                     else:
@@ -3465,7 +3472,7 @@ class WavViewer(QWidget):
             timecode display, precision values, and feature enablement.
             Provides consistent baseline information for all label modes.
         """
-        return "Hover waveform\nfor time, sample, dBFS"
+        return "Hover for time, sample, dBFS"
 
     # ========== CLICK HANDLER METHODS ==========
 
