@@ -2232,6 +2232,12 @@ class ApplicationStylist:
             font-weight: 700;
         }}
 
+        QWidget#cue_overview {{
+            background-color: {ApplicationStylist.COLORS['background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+        }}
+
         QFrame#recording_sidebar QListWidget::item:selected {{
             background-color: rgba(106, 168, 79, 0.28);
             color: {ApplicationStylist.COLORS['selection_text']};

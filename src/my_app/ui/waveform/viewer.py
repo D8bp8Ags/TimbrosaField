@@ -24,7 +24,7 @@ import my_app.app_config as app_config
 from my_app.audio.player import AudioPlayer
 from PyQt5 import QtCore
 from PyQt5.QtCore import QEvent, QModelIndex, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QMouseEvent
+from PyQt5.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -154,6 +154,67 @@ class RecordingListRow(QWidget):
         duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         duration_label.setMinimumWidth(52)
         layout.addWidget(duration_label)
+
+
+class CueOverviewWidget(QWidget):
+    """Compact cue overview strip shown beside the cue table."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setObjectName("cue_overview")
+        self._duration: float = 0.0
+        self._markers: list[tuple[str, float]] = []
+        self._selected_id: str | None = None
+        self.setMinimumHeight(80)
+
+    def set_cues(
+        self,
+        cue_points: list[dict[str, Any]],
+        cue_labels: dict[str, str],
+        sample_rate: int | None,
+        duration: float | None,
+    ) -> None:
+        """Update the overview marker positions."""
+        self._duration = float(duration or 0.0)
+        self._markers = []
+        if sample_rate and self._duration > 0:
+            for cue in cue_points:
+                cue_id = str(cue.get("ID", ""))
+                offset = cue.get("Sample Offset", 0)
+                if cue_id and offset >= 0:
+                    self._markers.append((cue_id, offset / sample_rate))
+        self.update()
+
+    def set_selected_cue(self, cue_id: str | None) -> None:
+        """Set the selected cue marker."""
+        self._selected_id = cue_id
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt override
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        rect = self.rect().adjusted(12, 16, -12, -16)
+        baseline_y = rect.center().y()
+
+        axis_pen = QPen(QColor("#53605a"))
+        axis_pen.setWidth(1)
+        painter.setPen(axis_pen)
+        painter.drawLine(rect.left(), baseline_y, rect.right(), baseline_y)
+
+        if self._duration <= 0:
+            painter.setPen(QColor("#8d9992"))
+            painter.drawText(rect, Qt.AlignCenter, "No cue timeline")
+            return
+
+        for cue_id, time_s in self._markers:
+            x = rect.left() + int((time_s / self._duration) * rect.width())
+            selected = cue_id == self._selected_id
+            marker_pen = QPen(QColor("#e05b4f" if selected else "#f0b84b"))
+            marker_pen.setWidth(3 if selected else 2)
+            painter.setPen(marker_pen)
+            painter.drawLine(x, rect.top(), x, rect.bottom())
 
 
 logger = logging.getLogger(__name__)
@@ -754,7 +815,13 @@ class WavViewer(QWidget):
         self.inspector_layout.addStretch()
 
         self.cue_layout.addWidget(self.cue_label)
-        self.cue_layout.addWidget(self.cue_table)
+        self.cue_body_layout = QHBoxLayout()
+        self.cue_body_layout.setContentsMargins(0, 0, 0, 0)
+        self.cue_body_layout.setSpacing(8)
+        self.cue_body_layout.addWidget(self.cue_table, stretch=3)
+        self.cue_overview = CueOverviewWidget()
+        self.cue_body_layout.addWidget(self.cue_overview, stretch=2)
+        self.cue_layout.addLayout(self.cue_body_layout)
 
     def _create_metadata_table(self, headers: list[str]) -> QTableWidget:
         """Create a standardized metadata table widget with consistent styling.
@@ -2739,6 +2806,12 @@ class WavViewer(QWidget):
         self._metadata_presenter.populate_cue_table(
             cue_points, self.cue_labels, getattr(self, "current_sr", None)
         )
+        self.cue_overview.set_cues(
+            cue_points,
+            self.cue_labels,
+            getattr(self, "current_sr", None),
+            getattr(self, "audio_duration", None),
+        )
 
     def _resize_metadata_tables12(self) -> None:
         """Resize all metadata tables to fit their content."""
@@ -3468,6 +3541,7 @@ class WavViewer(QWidget):
         # Update selected cue ID and refresh highlighting
         self.selected_cue_id = cue_id
         self._update_cue_highlighting()
+        self.cue_overview.set_selected_cue(cue_id)
 
     def _update_cue_highlighting(self) -> None:
         """Update visual highlighting of cue markers."""
