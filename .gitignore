@@ -145,3 +145,6 @@ local_settings.py
 celerybeat-schedule
 celerybeat.pid
 *.sage.py
+
+# External/public datasets should not be committed
+/data/
