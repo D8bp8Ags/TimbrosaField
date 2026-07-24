@@ -34,7 +34,6 @@ from PyQt5.QtWidgets import (
     QLabel,
     QPushButton,
     QSlider,
-    QStyle,
     QWidget,
 )
 
@@ -225,28 +224,33 @@ class AudioPlayer(QWidget):
 
         # Play/Pause button
         self.play_button = QPushButton()
-        self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.play_button.setObjectName("transport_play_button")
+        self.play_button.setText("▶")
         self.play_button.setToolTip("Play/Pause (Spacebar)")
         self.play_button.clicked.connect(self.toggle_playback)
         layout.addWidget(self.play_button)
 
         # Stop button
         self.stop_button = QPushButton()
-        self.stop_button.setIcon(self.style().standardIcon(QStyle.SP_MediaStop))
+        self.stop_button.setObjectName("transport_stop_button")
+        self.stop_button.setText("■")
         self.stop_button.setToolTip("Stop (Esc)")
         self.stop_button.clicked.connect(self.stop_playback)
         layout.addWidget(self.stop_button)
 
         # Position slider
         self.position_slider = QSlider(Qt.Horizontal)
+        self.position_slider.setObjectName("transport_position_slider")
         self.position_slider.sliderMoved.connect(self.seek_to_position)
         self.position_slider.setToolTip("Seek position (←/→ for ±10sec)")
         layout.addWidget(self.position_slider, stretch=4)
 
         # Volume control
         volume_label = QLabel("♪")
+        volume_label.setObjectName("transport_volume_label")
         volume_label.setFixedWidth(12)
         self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setObjectName("transport_volume_slider")
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(DEFAULT_VOLUME)
         self.volume_slider.setMaximumWidth(60)
@@ -651,11 +655,11 @@ class AudioPlayer(QWidget):
             state (QMediaPlayer.State): New playback state
         """
         if state == QMediaPlayer.PlayingState:
-            self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
+            self.play_button.setText("Ⅱ")
             self.play_button.setToolTip("Pause (Spacebar)")
 
         elif state == QMediaPlayer.PausedState or state == QMediaPlayer.StoppedState:
-            self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+            self.play_button.setText("▶")
             self.play_button.setToolTip("Play (Spacebar)")
 
         self.stateChanged.emit(state)

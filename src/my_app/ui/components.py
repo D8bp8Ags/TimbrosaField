@@ -2144,7 +2144,66 @@ class ApplicationStylist:
             margin: 0px 2px;
         }}
 
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 5px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            min-width: 34px;
+            max-width: 40px;
+            min-height: 26px;
+            padding: 4px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button:hover,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:hover {{
+            background-color: {ApplicationStylist.COLORS['hover_overlay']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_play_button:pressed,
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton#transport_stop_button:pressed {{
+            background-color: {ApplicationStylist.COLORS['primary_pressed']};
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_position_slider::groove:horizontal,
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_volume_slider::groove:horizontal {{
+            background-color: {ApplicationStylist.COLORS['background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 3px;
+            height: 6px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_position_slider::sub-page:horizontal,
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_volume_slider::sub-page:horizontal {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+            border-radius: 3px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_position_slider::handle:horizontal,
+        QFrame#transport_bar QWidget#audio_player_widget QSlider#transport_volume_slider::handle:horizontal {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+            border: 2px solid {ApplicationStylist.COLORS['selection_text']};
+            border-radius: 5px;
+            height: 12px;
+            margin: -5px 0px;
+            width: 12px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QLabel#transport_volume_label {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 11pt;
+            font-weight: 700;
+            padding: 0px 2px 0px 8px;
+        }}
+
         QFrame#transport_bar QWidget#audio_player_widget QLabel[objectName="time_display"] {{
+            background-color: {ApplicationStylist.COLORS['background']};
+            border-color: {ApplicationStylist.COLORS['border']};
+            border-radius: 5px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
             margin: 0px 4px;
             padding: 4px 6px;
         }}
