@@ -2157,6 +2157,34 @@ class ApplicationStylist:
             letter-spacing: 0px;
         }}
 
+        QFrame#waveform_panel QCheckBox#ai_layer_toggle {{
+            spacing: 6px;
+            font-size: 9pt;
+            font-weight: 700;
+            padding: 2px 8px;
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+        }}
+
+        QFrame#waveform_panel QCheckBox#ai_layer_toggle:hover {{
+            border-color: {ApplicationStylist.COLORS['primary']};
+            background-color: {ApplicationStylist.COLORS['surface']};
+        }}
+
+        QFrame#waveform_panel QCheckBox#ai_layer_toggle::indicator {{
+            width: 13px;
+            height: 13px;
+            border: 1px solid {ApplicationStylist.COLORS['divider']};
+            border-radius: 2px;
+            background-color: {ApplicationStylist.COLORS['background']};
+        }}
+
+        QFrame#waveform_panel QCheckBox#ai_layer_toggle::indicator:checked {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
         QFrame#inspector_panel QScrollArea,
         QFrame#inspector_panel QScrollArea QWidget {{
             background-color: transparent;

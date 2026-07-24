@@ -108,6 +108,7 @@ class AiOverlayController:
             name = layer["name"]
             color = layer.get("text_color", "#aaaaaa")
             cb = QCheckBox(name)
+            cb.setObjectName("ai_layer_toggle")
             cb.setChecked(self.layer_visible.get(name, True))
             cb.setStyleSheet(f"color: {color};")
             cb.toggled.connect(lambda on, n=name: self.toggle_layer(n, on))
