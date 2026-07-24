@@ -9,6 +9,8 @@ public methods exist and behave as the code they replaced did.
 
 from __future__ import annotations
 
+from PyQt5.QtWidgets import QFrame, QLabel
+
 from my_app.ui.waveform import viewer as wv
 
 
@@ -75,3 +77,71 @@ def test_get_audio_duration_returns_none_without_loaded_file(qapp, qt_widget_cle
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
     viewer.audio_duration = None
     assert viewer.get_audio_duration() is None
+
+
+def test_field_lab_dark_shell_keeps_required_visual_zones(qapp, qt_widget_cleanup):
+    """The Field Lab Dark layout must keep every main screen zone present."""
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    for attr_name, object_name in (
+        ("left_panel", "recording_sidebar"),
+        ("central_panel", "waveform_workspace"),
+        ("right_panel", "inspector_panel"),
+        ("waveform_panel", "waveform_panel"),
+        ("cue_panel", "cue_panel"),
+        ("transport_panel", "transport_bar"),
+    ):
+        widget = getattr(viewer, attr_name)
+        assert isinstance(widget, QFrame)
+        assert widget.objectName() == object_name
+
+    assert viewer.main_splitter.count() == 3
+    assert viewer.main_splitter.widget(0) is viewer.left_panel
+    assert viewer.main_splitter.widget(1) is viewer.central_panel
+    assert viewer.main_splitter.widget(2) is viewer.right_panel
+
+    assert viewer.file_search_input.placeholderText() == "Search recordings..."
+    assert viewer.audio_player.objectName() == "audio_player_widget"
+    assert viewer.cue_label.objectName() == "cue_section_header"
+    assert viewer.cue_overview.objectName() == "cue_overview"
+
+    inspector_header = viewer.right_panel.findChild(QLabel, "inspector_header")
+    waveform_header = viewer.waveform_panel.findChild(QLabel, "waveform_header")
+    assert inspector_header is not None
+    assert inspector_header.text() == "INSPECTOR"
+    assert waveform_header is not None
+    assert waveform_header.text() == "WAVEFORM VIEW"
+
+
+def test_field_lab_dark_shell_preserves_metadata_and_transport_controls(
+    qapp, qt_widget_cleanup
+):
+    """Guard the information-parity controls called out in the refactor plan."""
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    assert viewer.bext_label.text() == "METADATA"
+    assert viewer.fmt_label.text() == "AUDIO"
+    assert viewer.info_label.text() == "INFO CHUNK"
+    assert viewer.gps_label.text() == "LOCATION"
+    viewer._populate_gps_table(None)
+    assert viewer.gps_table.rowCount() == 3
+    assert [viewer.gps_table.item(row, 0).text() for row in range(3)] == [
+        "Latitude",
+        "Longitude",
+        "Altitude",
+    ]
+
+    assert viewer.cue_table.columnCount() == 3
+    assert [
+        viewer.cue_table.horizontalHeaderItem(column).text() for column in range(3)
+    ] == ["ID", "Positie", "Label"]
+
+    assert viewer.audio_player.play_button.objectName() == "transport_play_button"
+    assert viewer.audio_player.stop_button.objectName() == "transport_stop_button"
+    assert (
+        viewer.audio_player.position_slider.objectName()
+        == "transport_position_slider"
+    )
+    assert viewer.audio_player.volume_slider.objectName() == "transport_volume_slider"
+    assert viewer.audio_player.time_label.objectName() == "time_display"
+    assert viewer._get_professional_default_text() == "Hover for time, sample, dBFS"
