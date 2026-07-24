@@ -386,6 +386,12 @@ logger = logging.getLogger(__name__)
 CONFIG_FILE = "user_config.json"
 DEFAULT_LINE_WIDTH = 0.8
 MAX_RECENT_FILES = 10
+WAVEFORM_CUE_LINE_WIDTH = 2
+WAVEFORM_CUE_SELECTED_LINE_WIDTH = 4
+WAVEFORM_CUE_LABEL_FONT_SIZE_PT = 8
+WAVEFORM_CUE_LABEL_FONT_WEIGHT = 800
+WAVEFORM_CUE_LABEL_PADDING = "1px 4px"
+WAVEFORM_CUE_LABEL_RADIUS = "2px"
 
 
 def downsample_min_max(
@@ -2890,7 +2896,7 @@ class WavViewer(QWidget):
         # Convert to time position
         x_pos = offset / self.current_sr
         cue_id_str = str(int(cue_id))
-        pen = pg.mkPen("#ff334d", width=2)
+        pen = self._cue_marker_pen(is_selected=False)
 
         # Add marker to all plots
         for plot in [
@@ -2907,11 +2913,7 @@ class WavViewer(QWidget):
 
             number = cue_id_str[-2:] if len(cue_id_str) > 2 else cue_id_str
             cap = pg.TextItem(
-                html=(
-                    "<div style='background:#d83a4a;color:#f4f8f5;"
-                    "padding:1px 4px;border-radius:2px;font-weight:700;'>"
-                    f"{number}</div>"
-                ),
+                html=self._cue_marker_label_html(number, is_selected=False),
                 anchor=(0.5, 0.0),
             )
             cap.plot_ref = plot
@@ -2926,6 +2928,40 @@ class WavViewer(QWidget):
         y_min, y_max = plot.getViewBox().viewRange()[1]
         y_span = max(0.001, y_max - y_min)
         return y_max - (y_span * 0.08)
+
+    @staticmethod
+    def _cue_marker_pen(is_selected: bool) -> QPen:
+        """Return the centralized waveform cue marker pen."""
+        return pg.mkPen(
+            ApplicationStylist.COLORS[
+                "waveform_cue_selected" if is_selected else "waveform_cue"
+            ],
+            width=(
+                WAVEFORM_CUE_SELECTED_LINE_WIDTH
+                if is_selected
+                else WAVEFORM_CUE_LINE_WIDTH
+            ),
+        )
+
+    @staticmethod
+    def _cue_marker_label_html(text: str, is_selected: bool) -> str:
+        """Return centralized HTML for numbered waveform cue labels."""
+        background_key = (
+            "waveform_cue_selected" if is_selected else "waveform_cue_label_background"
+        )
+        return (
+            "<div style='"
+            f"background:{ApplicationStylist.COLORS[background_key]};"
+            f"color:{ApplicationStylist.COLORS['waveform_cue_text']};"
+            f"padding:{WAVEFORM_CUE_LABEL_PADDING};"
+            f"border-radius:{WAVEFORM_CUE_LABEL_RADIUS};"
+            f"font-size:{WAVEFORM_CUE_LABEL_FONT_SIZE_PT}pt;"
+            f"font-weight:{WAVEFORM_CUE_LABEL_FONT_WEIGHT};"
+            "line-height:1.0;"
+            "'>"
+            f"{text}"
+            "</div>"
+        )
 
     def _setup_interaction_handlers(self) -> None:
         """Set up comprehensive mouse interaction handlers for all plot widgets.
@@ -4241,10 +4277,7 @@ class WavViewer(QWidget):
         for cue_id, lines in self.cue_lines.items():
             is_selected = cue_id == self.selected_cue_id
 
-            pen = pg.mkPen(
-                "#ff6b7d" if is_selected else "#ff334d",
-                width=4 if is_selected else 2,
-            )
+            pen = self._cue_marker_pen(is_selected)
 
             # Apply highlighting to all lines for this cue
             for line in lines:
@@ -4254,6 +4287,8 @@ class WavViewer(QWidget):
                 plot = getattr(cap, "plot_ref", None)
                 if plot is not None:
                     cap.setPos(cap.pos().x(), self._cue_marker_cap_y(plot))
+                number = cue_id[-2:] if len(cue_id) > 2 else cue_id
+                cap.setHtml(self._cue_marker_label_html(number, is_selected))
                 cap.setOpacity(1.0 if is_selected else 0.82)
 
     # ========== AUDIO PLAYBACK INTEGRATION METHODS ==========

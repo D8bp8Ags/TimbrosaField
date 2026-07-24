@@ -1153,6 +1153,10 @@ class ApplicationStylist:
         "tooltip_background": "#0f172a",
         "tooltip_text": "#ffffff",
         "plot_background": "#ffffff",
+        "waveform_cue": "#e11d48",
+        "waveform_cue_selected": "#fb7185",
+        "waveform_cue_text": "#ffffff",
+        "waveform_cue_label_background": "#e11d48",
     }
 
     # Active palette — replaced on every theme switch; never use this as a base for
@@ -2846,6 +2850,10 @@ class ApplicationStylist:
                 "tooltip_background": "#e6ece8",
                 "tooltip_text": "#151819",
                 "plot_background": "#171b1c",
+                "waveform_cue": "#ff2f5f",
+                "waveform_cue_selected": "#ff6f91",
+                "waveform_cue_text": "#f7fff8",
+                "waveform_cue_label_background": "#ff2f5f",
             }
         )
         ApplicationStylist.COLORS.update(dark_colors)
@@ -2901,6 +2909,10 @@ class ApplicationStylist:
                 "tooltip_background": "#EBEBF5",
                 "tooltip_text": "#1C1C1E",
                 "plot_background": "#2C2C2E",
+                "waveform_cue": "#ff375f",
+                "waveform_cue_selected": "#ff6482",
+                "waveform_cue_text": "#ffffff",
+                "waveform_cue_label_background": "#ff375f",
             }
         )
 

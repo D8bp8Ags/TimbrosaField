@@ -328,6 +328,23 @@ def test_cue_marker_caps_stay_inside_current_y_range(qapp, qt_widget_cleanup):
     assert y_min < cap.pos().y() < y_max
 
 
+def test_cue_marker_labels_use_centralized_waveform_style(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+
+    viewer._add_single_cue_marker({"ID": 1, "Sample Offset": 1000})
+    cap = viewer.cue_markers["1"][0]
+
+    assert wv.ApplicationStylist.COLORS["waveform_cue_label_background"] in (
+        cap.textItem.toHtml()
+    )
+    assert wv.ApplicationStylist.COLORS["waveform_cue_text"] in cap.textItem.toHtml()
+
+    viewer.selected_cue_id = "1"
+    viewer._update_cue_highlighting()
+    assert wv.ApplicationStylist.COLORS["waveform_cue_selected"] in cap.textItem.toHtml()
+
+
 def test_waveform_plot_fonts_are_explicit_and_compact(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
 
