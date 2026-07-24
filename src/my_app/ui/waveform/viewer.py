@@ -881,12 +881,14 @@ class WavViewer(QWidget):
 
         # Mono view radio button
         self.mono_radio = QRadioButton("Mono")
+        self.mono_radio.setObjectName("view_mode_option")
         self.mono_radio.clicked.connect(lambda: self.set_view_mode("mono"))
         self.view_group.addButton(self.mono_radio)
         view_layout.addWidget(self.mono_radio)
 
         # Stereo view radio button (default)
         self.stereo_radio = QRadioButton("Stereo")
+        self.stereo_radio.setObjectName("view_mode_option")
         self.stereo_radio.setChecked(True)
         self.stereo_radio.clicked.connect(lambda: self.set_view_mode("per_kanaal"))
         self.view_group.addButton(self.stereo_radio)
@@ -894,6 +896,7 @@ class WavViewer(QWidget):
 
         # Overlay view radio button
         self.overlay_radio = QRadioButton("Overlay")
+        self.overlay_radio.setObjectName("view_mode_option")
         self.overlay_radio.clicked.connect(lambda: self.set_view_mode("overlay"))
         self.view_group.addButton(self.overlay_radio)
         view_layout.addWidget(self.overlay_radio)

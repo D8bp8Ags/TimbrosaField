@@ -2273,6 +2273,26 @@ class ApplicationStylist:
             font-weight: 500;
         }}
 
+        QFrame#recording_sidebar QRadioButton#view_mode_option {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 10pt;
+            font-weight: 500;
+            spacing: 5px;
+        }}
+
+        QFrame#recording_sidebar QRadioButton#view_mode_option::indicator {{
+            width: 10px;
+            height: 10px;
+            border: 1px solid {ApplicationStylist.COLORS['divider']};
+            border-radius: 5px;
+            background-color: {ApplicationStylist.COLORS['background']};
+        }}
+
+        QFrame#recording_sidebar QRadioButton#view_mode_option::indicator:checked {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
         QSplitter::handle {{
             background-color: {ApplicationStylist.COLORS['border']};
         }}
