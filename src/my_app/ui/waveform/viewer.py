@@ -4266,6 +4266,26 @@ class WavViewer(QWidget):
         self.selected_cue_id = cue_id
         self._update_cue_highlighting()
         self.cue_overview.set_selected_cue(cue_id)
+        cue_time = self._cue_time_seconds(cue_id)
+        if cue_time is not None:
+            self.seek_and_play(cue_time)
+
+    def _cue_time_seconds(self, cue_id: str) -> float | None:
+        """Return a cue position in seconds for the given cue ID."""
+        if not self.current_sr:
+            return None
+        for cue in self.current_cue_points:
+            try:
+                current_id = str(int(cue.get("ID")))
+            except (TypeError, ValueError):
+                continue
+            if current_id != cue_id:
+                continue
+            offset = cue.get("Sample Offset")
+            if offset is None:
+                return None
+            return max(0.0, float(offset) / float(self.current_sr))
+        return None
 
     def _add_session_cue_point(self) -> None:
         """Add a non-persistent cue at the current playhead position."""

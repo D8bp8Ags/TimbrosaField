@@ -310,6 +310,25 @@ def test_add_session_cue_updates_cue_surfaces(qapp, qt_widget_cleanup):
     assert "1" in viewer.cue_markers
 
 
+def test_clicking_cue_table_row_seeks_player_to_cue(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    viewer.current_cue_points = [
+        {"ID": 1, "Sample Offset": 468, "Label": "PEAK_01"},
+        {"ID": 2, "Sample Offset": 27660, "Label": "PEAK_02"},
+    ]
+    viewer.cue_labels = {"1": "PEAK_01", "2": "PEAK_02"}
+    viewer._populate_cue_table(viewer.current_cue_points)
+    sought_positions = []
+    viewer.audio_player.seek_to_position = sought_positions.append
+    viewer.audio_player.is_stopped = lambda: False
+
+    viewer.highlight_cue_line(1, 0)
+
+    assert sought_positions == [27660]
+    assert viewer.selected_cue_id == "2"
+
+
 def test_session_cue_id_prefers_short_free_display_id(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
     viewer.current_cue_points = [{"ID": 4278190179, "Sample Offset": 100}]
