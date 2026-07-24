@@ -204,10 +204,15 @@ def get_config_path(filename):
     backward compatibility with pre-Fase-8 installs:
         - if the new-location file already exists, it is used as-is;
         - otherwise, if a legacy src/my_app/config/<filename> exists, its
-          contents are copied once to the new location (the legacy file is
-          left in place, untouched, as a safety net — no data is deleted);
+          contents are copied once to the new location during source/developer
+          runs only (the legacy file is left in place, untouched, as a safety
+          net — no data is deleted);
         - otherwise, a fresh path in the new location is returned (the file
           itself is created by the caller on first write).
+
+    Frozen app builds deliberately skip legacy source-tree migration. A packaged
+    release must start from platform user data or built-in defaults, never from
+    bundled developer/user JSON files.
 
     The new user-data directory is created eagerly (mkdir), matching the
     original get_config_path() behavior of always ensuring the directory
@@ -228,7 +233,7 @@ def get_config_path(filename):
     new_dir.mkdir(parents=True, exist_ok=True)
     new_path = new_dir / filename
 
-    if not new_path.exists():
+    if not new_path.exists() and not getattr(sys, "frozen", False):
         legacy_path = Path(get_legacy_config_path(filename))
         if legacy_path.exists():
             try:

@@ -28,13 +28,19 @@ cd TimbrosaField
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-pip install -r requirements.txt
-pip install -e . --no-deps
-python3 -m my_app.main
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,photo]"
+python -m my_app.main
 ```
 
 Run commands from the repository root. `my_app` is a package under `src/`, so
 starting `main.py` directly from inside `src/my_app/` is not supported.
+
+Optional AI backends can be installed into the same `.venv`:
+
+```bash
+python -m pip install -e ".[ast,birdnet,perch]"
+```
 
 ## Documentation
 
@@ -51,7 +57,6 @@ TimbrosaField/
   scripts/          # public maintenance and diagnostic scripts
   tests/            # public test suite
   docs/             # public markdown documentation
-  requirements.txt  # pinned runtime dependencies
   pyproject.toml    # build metadata and tool configuration
 ```
 

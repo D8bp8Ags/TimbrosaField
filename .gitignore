@@ -132,7 +132,7 @@ celerybeat.pid
 !/LICENSE
 !/README.md
 !/pyproject.toml
-!/requirements.txt
+!/TimbrosaField_macos.spec
 
 # Public source, scripts, tests, and docs
 !/src/
@@ -148,4 +148,5 @@ celerybeat.pid
 /src/my_app/config/
 /src/my_app/models/
 /src/my_app/default_template.als
+*.egg-info/
 **/__pycache__/

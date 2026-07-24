@@ -11,6 +11,7 @@ if/elif branch.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 from dataclasses import dataclass, field
 from typing import Callable
@@ -49,6 +50,8 @@ class BackendRegistration:
         class_name: Name of the AiBackend subclass within that module.
         model_ids: Model IDs (from ai_model_manager.MODEL_DEFINITIONS)
             required for this backend's default operation.
+        dependency_modules: Optional Python import module names that must be
+            installed before this backend can run.
         capabilities: Optional feature flags for this backend.
         settings_key: Key used in ai_settings.DEFAULT_AI_SETTINGS for this
             backend's runtime options (defaults to backend_id).
@@ -59,6 +62,7 @@ class BackendRegistration:
     module_name: str
     class_name: str
     model_ids: tuple[str, ...] = ()
+    dependency_modules: tuple[str, ...] = ()
     capabilities: BackendCapabilities = field(default_factory=BackendCapabilities)
     settings_key: str = ""
 
@@ -74,9 +78,27 @@ class BackendRegistration:
                 installed. Callers should catch this to skip unavailable
                 backends, matching existing behavior.
         """
+        missing = self.missing_dependency_modules()
+        if missing:
+            raise ImportError(
+                f"Missing optional dependencies for {self.display_name}: "
+                f"{', '.join(missing)}"
+            )
         module = __import__(self.module_name, fromlist=[self.class_name])
         backend_cls = getattr(module, self.class_name)
         return backend_cls()
+
+    def missing_dependency_modules(self) -> tuple[str, ...]:
+        """Return optional dependency import names that are not installed."""
+        return tuple(
+            module_name
+            for module_name in self.dependency_modules
+            if importlib.util.find_spec(module_name) is None
+        )
+
+    def has_python_dependencies(self) -> bool:
+        """Return whether this backend's optional Python packages are present."""
+        return not self.missing_dependency_modules()
 
 
 BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
@@ -86,6 +108,7 @@ BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
         module_name="my_app.ai.backends.birdnet_backend",
         class_name="BirdnetBackend",
         model_ids=("birdnet_acoustic", "birdnet_geo"),
+        dependency_modules=("birdnet",),
         capabilities=BackendCapabilities(supports_geo_filter=True),
     ),
     BackendRegistration(
@@ -94,6 +117,7 @@ BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
         module_name="my_app.ai.backends.ast_backend",
         class_name="AstBackend",
         model_ids=("ast_audioset",),
+        dependency_modules=("torch", "transformers", "librosa", "huggingface_hub"),
     ),
     BackendRegistration(
         backend_id="perch",
@@ -101,6 +125,7 @@ BACKEND_REGISTRY: tuple[BackendRegistration, ...] = (
         module_name="my_app.ai.backends.perch_backend",
         class_name="PerchBackend",
         model_ids=("perch_v2_cpu",),
+        dependency_modules=("ml_collections", "perch_hoplite", "scipy"),
     ),
 )
 
@@ -143,9 +168,25 @@ def load_backends(selected_names: set[str] | None = None) -> list:
             continue
         try:
             backends.append(registration.create_backend())
-        except ImportError:
-            logger.info("Backend not available: %s", registration.module_name)
+        except ImportError as exc:
+            logger.info("Backend not available: %s (%s)", registration.module_name, exc)
     return backends
+
+
+def missing_python_dependencies_for_backends(
+    backend_names: set[str],
+) -> dict[str, tuple[str, ...]]:
+    """Return missing optional Python modules for selected backend display names."""
+    missing_by_backend: dict[str, tuple[str, ...]] = {}
+    normalized = {name.lower() for name in backend_names}
+
+    for registration in BACKEND_REGISTRY:
+        if registration.backend_id not in normalized:
+            continue
+        missing = registration.missing_dependency_modules()
+        if missing:
+            missing_by_backend[registration.display_name] = missing
+    return missing_by_backend
 
 
 def required_model_ids_for_backends(

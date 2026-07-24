@@ -25,6 +25,7 @@ def test_each_entry_has_valid_factory_reference_and_models(backend_id):
     assert registration.class_name
     assert len(registration.model_ids) >= 1
     assert registration.display_name
+    assert registration.dependency_modules
 
 
 def test_birdnet_has_geo_capability():
@@ -84,6 +85,30 @@ def test_load_backends_skips_unavailable_backend_without_raising(monkeypatch):
     monkeypatch.setattr(reg.BackendRegistration, "create_backend", _raise_import_error)
 
     backends = reg.load_backends()
+
+    assert backends == []
+
+
+def test_missing_python_dependencies_are_reported_per_selected_backend(monkeypatch):
+    def _fake_find_spec(module_name):
+        if module_name in {"torch", "birdnet"}:
+            return None
+        return object()
+
+    monkeypatch.setattr(reg.importlib.util, "find_spec", _fake_find_spec)
+
+    missing = reg.missing_python_dependencies_for_backends({"AST", "BirdNET"})
+
+    assert missing == {
+        "BirdNET": ("birdnet",),
+        "AST": ("torch",),
+    }
+
+
+def test_load_backends_skips_backend_when_dependency_probe_fails(monkeypatch):
+    monkeypatch.setattr(reg.importlib.util, "find_spec", lambda _name: None)
+
+    backends = reg.load_backends({"AST"})
 
     assert backends == []
 

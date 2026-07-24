@@ -27,12 +27,14 @@ absolute paths, IDE state, shell history, or generated mirror directories.
 
 Run commands from the repository root unless a task explicitly says otherwise.
 
-- Install runtime dependencies: `pip install -r requirements.txt`
-- Install the package for local development: `pip install -e . --no-deps`
-- Run the application: `python3 -m my_app.main`
-- Run tests: `python3 -m pytest`
+- Create and activate a project-local environment: `python -m venv .venv`
+- Install local development dependencies: `python -m pip install -e ".[dev,photo]"`
+- Install optional AI backends only when needed:
+  `python -m pip install -e ".[ast,birdnet,perch]"`
+- Run the application: `python -m my_app.main`
+- Run tests: `python -m pytest`
 - Run tests for Qt/UI code in headless environments:
-  `QT_QPA_PLATFORM=offscreen python3 -m pytest`
+  `QT_QPA_PLATFORM=offscreen python -m pytest`
 - Lint/format using the settings in `pyproject.toml`.
 
 ## Coding standards

@@ -53,7 +53,13 @@ from my_app.ai.model_manager import (
     get_model_status,
 )
 from my_app.ai.settings import load_ai_settings, save_ai_settings
-from my_app.ai.registry import all_backends, load_backends, required_model_ids_for_backends
+from my_app.ai.registry import (
+    all_backends,
+    get_by_display_name,
+    load_backends,
+    missing_python_dependencies_for_backends,
+    required_model_ids_for_backends,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1237,7 +1243,21 @@ class AiAnalysisDialog(QDialog):
         if not hasattr(self, "_model_status_label"):
             return
         parts = []
+        selected_names = self._selected_backend_names()
+        missing_dependencies = missing_python_dependencies_for_backends(selected_names)
+        for backend_name, missing_modules in missing_dependencies.items():
+            parts.append(
+                f"{backend_name}: missing Python package"
+                f"{'s' if len(missing_modules) > 1 else ''}"
+                f" ({', '.join(missing_modules)})"
+            )
         for model_id in self._required_model_ids():
+            registration = get_by_display_name(get_model_definition(model_id).backend)
+            if (
+                registration is not None
+                and registration.display_name in missing_dependencies
+            ):
+                continue
             definition = get_model_definition(model_id)
             status = get_model_status(model_id)
             parts.append(
@@ -1323,6 +1343,26 @@ class AiAnalysisDialog(QDialog):
     def start_analysis(self) -> None:
         """Start analysis — loads from sidecar cache if available."""
         self._save_runtime_settings()
+        selected_names = self._selected_backend_names()
+        missing_dependencies = missing_python_dependencies_for_backends(selected_names)
+        if missing_dependencies:
+            details = "\n".join(
+                f"{backend}: {', '.join(modules)}"
+                for backend, modules in missing_dependencies.items()
+            )
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle("AI packages ontbreken")
+            box.setText(
+                "Installeer de optionele AI packages voordat analyse start."
+            )
+            box.setInformativeText(
+                'Gebruik: python -m pip install -e ".[ast,birdnet,perch]"'
+            )
+            box.setDetailedText(details)
+            box.exec_()
+            self._refresh_model_status()
+            return
         backends = self._selected_backends()
         if not backends:
             QMessageBox.information(

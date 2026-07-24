@@ -103,6 +103,29 @@ def test_get_config_path_migrates_from_legacy(monkeypatch, isolated_home, tmp_pa
     assert legacy_file.exists()
 
 
+def test_get_config_path_skips_legacy_migration_when_frozen(
+    monkeypatch, isolated_home, tmp_path
+):
+    """Packaged releases must not seed user data from bundled legacy config."""
+    monkeypatch.setattr(app_config.sys, "platform", "darwin")
+    monkeypatch.setattr(app_config.sys, "frozen", True, raising=False)
+
+    legacy_dir = tmp_path / "legacy_config"
+    legacy_dir.mkdir()
+    legacy_file = legacy_dir / "user_config.json"
+    legacy_file.write_text(json.dumps({"wav_tags": {"private": "value"}}), encoding="utf-8")
+    monkeypatch.setattr(
+        app_config, "get_legacy_config_path", lambda filename: str(legacy_dir / filename)
+    )
+
+    new_path = app_config.get_config_path("user_config.json")
+
+    assert new_path != str(legacy_file)
+    assert isolated_home in app_config.Path(new_path).parents
+    assert not app_config.Path(new_path).exists()
+    assert legacy_file.exists()
+
+
 def test_get_config_path_no_legacy_file_creates_fresh_path(monkeypatch, isolated_home, tmp_path):
     monkeypatch.setattr(app_config.sys, "platform", "darwin")
     legacy_dir = tmp_path / "legacy_config_empty"

@@ -20,7 +20,7 @@ Use TimbrosaField when you want to:
 Start the app from the repository root:
 
 ```bash
-python3 -m my_app.main
+python -m my_app.main
 ```
 
 If this is the first run, open **Edit > User Config** and review the default
@@ -265,6 +265,10 @@ file. The dialog supports selecting enabled AI modules, starting analysis,
 re-analyzing, managing models, filtering detections, selecting tags, and applying
 selected AI-derived tags back to the recording workflow.
 
+AI backends are optional. The main app remains usable without AST, BirdNET, or
+Perch packages; the AI dialog reports missing Python packages before analysis
+starts.
+
 Main AI analysis areas:
 
 - **AI modules**: choose which installed backends to run.
@@ -372,8 +376,8 @@ Run the app from the repository root after installing the package in editable
 mode:
 
 ```bash
-pip install -e . --no-deps
-python3 -m my_app.main
+python -m pip install -e ".[dev,photo]"
+python -m my_app.main
 ```
 
 ### A folder does not show expected files

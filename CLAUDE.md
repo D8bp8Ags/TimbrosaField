@@ -29,11 +29,13 @@ local shell history.
 
 Run commands from the repository root unless a task explicitly says otherwise.
 
-- Install runtime dependencies: `pip install -r requirements.txt`
-- Install the package for local development: `pip install -e . --no-deps`
-- Run the application: `python3 -m my_app.main`
-- Run all tests: `python3 -m pytest`
-- Run Qt/UI tests headlessly: `QT_QPA_PLATFORM=offscreen python3 -m pytest`
+- Create and activate a project-local environment: `python -m venv .venv`
+- Install local development dependencies: `python -m pip install -e ".[dev,photo]"`
+- Install optional AI backends only when needed:
+  `python -m pip install -e ".[ast,birdnet,perch]"`
+- Run the application: `python -m my_app.main`
+- Run all tests: `python -m pytest`
+- Run Qt/UI tests headlessly: `QT_QPA_PLATFORM=offscreen python -m pytest`
 - Use the formatting and linting configuration in `pyproject.toml`.
 
 ## Working rules
