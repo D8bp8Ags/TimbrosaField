@@ -599,8 +599,8 @@ class WavViewer(QWidget):
         self.left_panel = QFrame()
         self.left_panel.setFrameShape(QFrame.StyledPanel)
         self.left_panel.setObjectName("recording_sidebar")
-        self.left_panel.setMinimumWidth(280)
-        self.left_panel.setMaximumWidth(380)
+        self.left_panel.setMinimumWidth(260)
+        self.left_panel.setMaximumWidth(340)
 
         self.left_layout = QVBoxLayout(self.left_panel)
         self.left_layout.setContentsMargins(8, 8, 8, 8)
@@ -645,8 +645,8 @@ class WavViewer(QWidget):
         self.right_panel = QFrame()
         self.right_panel.setFrameShape(QFrame.StyledPanel)
         self.right_panel.setObjectName("inspector_panel")
-        self.right_panel.setMinimumWidth(280)
-        self.right_panel.setMaximumWidth(380)
+        self.right_panel.setMinimumWidth(260)
+        self.right_panel.setMaximumWidth(360)
 
         self.right_layout = QVBoxLayout(self.right_panel)
         self.right_layout.setContentsMargins(8, 8, 8, 8)
@@ -672,7 +672,7 @@ class WavViewer(QWidget):
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
         self.main_splitter.setStretchFactor(2, 0)
-        self.main_splitter.setSizes([330, 1040, 320])
+        self.main_splitter.setSizes([310, 1100, 300])
 
     def _setup_file_list(self) -> None:
         """Set up the file list widget for WAV file selection and navigation.
@@ -925,6 +925,7 @@ class WavViewer(QWidget):
         table.setAlternatingRowColors(True)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
         table.setShowGrid(False)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         table.verticalHeader().setDefaultSectionSize(24)
         # table.setMaximumHeight(150)
         # table.setFixedHeight(200)
@@ -3404,16 +3405,17 @@ class WavViewer(QWidget):
             ),
         ]
 
-        # Generate dynamic default text
-        default_text = self._get_professional_default_text()
-
         for attr_name, plot, _color_name in default_configs:
             if hasattr(self, attr_name):
                 label = getattr(self, attr_name)
                 if label is None:
                     continue
 
-                label.setText(default_text)
+                label.setText(
+                    self._get_professional_default_text()
+                    if attr_name == "mouse_label_main"
+                    else ""
+                )
                 label.setAnchor((0, 0))
 
                 # Neutrale startup kleur
