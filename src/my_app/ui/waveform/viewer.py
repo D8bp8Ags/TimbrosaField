@@ -40,7 +40,9 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSizePolicy,
+    QSplitter,
     QTableWidget,
     QVBoxLayout,
     QWidget,
@@ -450,70 +452,98 @@ class WavViewer(QWidget):
         logger.debug("UI setup completed")
 
     def _create_main_layout(self) -> None:
-        """Create the main three-panel layout structure for the application.
+        """Create the Field Lab shell: sidebar | waveform workspace | inspector.
 
-        Establishes the fundamental layout architecture with:
-        - Left panel: Fixed-width file browser and controls (240px)
-        - Center panel: Metadata displays and input controls (max 400px)
-        - Right panel: Expandable waveform visualization area (flexible)
-
-        The layout uses QHBoxLayout for horizontal organization and QFrame containers
-        for visual separation. Stretch factors ensure proper resizing behavior when
-        the window is resized.
-
-        Note:
-            Margins and spacing are minimized to maximize available space for
-            waveform visualization while maintaining clear visual separation.
+        Phase 1 keeps the existing widgets and data flow intact, but changes the
+        visual ownership: metadata moves to a right inspector, while waveform,
+        cue points, and transport become the central workspace.
         """
-        # Main layout: left | center | right
         self.main_layout = QHBoxLayout(self)
-        # self.main_layout.setContentsMargins(8, 8, 8, 8)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # ════════════════ 1. LEFT PANEL ════════════════
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_layout.addWidget(self.main_splitter)
+
+        # 1. LEFT SIDEBAR: recordings, tags, templates, view mode
         self.left_panel = QFrame()
         self.left_panel.setFrameShape(QFrame.StyledPanel)
-        self.left_panel.setFixedWidth(240)  # fixed width
+        self.left_panel.setObjectName("recording_sidebar")
+        self.left_panel.setMinimumWidth(280)
+        self.left_panel.setMaximumWidth(380)
 
         self.left_layout = QVBoxLayout(self.left_panel)
-        self.left_layout.setContentsMargins(5, 0, 0, 10)
+        self.left_layout.setContentsMargins(8, 8, 8, 8)
+        self.left_layout.setSpacing(8)
 
-        # ════════════════ 2. CENTER PANEL ═════════════
+        # 2. CENTER WORKSPACE: waveform, cue points, transport
         self.central_panel = QFrame()
         self.central_panel.setFrameShape(QFrame.StyledPanel)
-        self.central_panel.setMaximumWidth(400)
+        self.central_panel.setObjectName("waveform_workspace")
 
         self.central_layout = QVBoxLayout(self.central_panel)
-
-        # ── 2a. CENTRAL-TOP  (grows with window) ──────────
-        self.central_top_layout = QVBoxLayout()
-        self.central_layout.addLayout(self.central_top_layout, stretch=1)
-
-        # ── 2b. CENTRAL-BOTTOM  (fixed height) ─────
-        self.central_bottom_layout = QVBoxLayout()
-        self.central_layout.addLayout(self.central_bottom_layout, stretch=0)
-
-        # -- 3c. Central-Bottom Controls
-        self.central_controls_layout = QHBoxLayout()
-        self.central_layout.addLayout(self.central_controls_layout)
-
         self.central_layout.setContentsMargins(0, 0, 0, 0)
+        self.central_layout.setSpacing(0)
 
-        # ════════════════ 3. RIGHT PANEL ═══════════════
+        self.waveform_panel = QFrame()
+        self.waveform_panel.setObjectName("waveform_panel")
+        self.waveform_layout = QVBoxLayout(self.waveform_panel)
+        self.waveform_layout.setContentsMargins(8, 8, 8, 6)
+        self.waveform_layout.setSpacing(6)
+        self.central_layout.addWidget(self.waveform_panel, stretch=7)
+
+        self.cue_panel = QFrame()
+        self.cue_panel.setObjectName("cue_panel")
+        self.cue_layout = QVBoxLayout(self.cue_panel)
+        self.cue_layout.setContentsMargins(8, 6, 8, 6)
+        self.cue_layout.setSpacing(4)
+        self.central_layout.addWidget(self.cue_panel, stretch=2)
+
+        self.transport_panel = QFrame()
+        self.transport_panel.setObjectName("transport_bar")
+        self.transport_layout = QVBoxLayout(self.transport_panel)
+        self.transport_layout.setContentsMargins(8, 4, 8, 6)
+        self.transport_layout.setSpacing(0)
+        self.central_layout.addWidget(self.transport_panel, stretch=0)
+
+        # Compatibility layout aliases used by existing setup helpers.
+        self.central_top_layout = self.waveform_layout
+        self.central_bottom_layout = self.cue_layout
+        self.central_controls_layout = QHBoxLayout()
+
+        # 3. RIGHT INSPECTOR: metadata, audio format, location, info/photo
         self.right_panel = QFrame()
         self.right_panel.setFrameShape(QFrame.StyledPanel)
+        self.right_panel.setObjectName("inspector_panel")
+        self.right_panel.setMinimumWidth(280)
+        self.right_panel.setMaximumWidth(380)
 
         self.right_layout = QVBoxLayout(self.right_panel)
+        self.right_layout.setContentsMargins(8, 8, 8, 8)
+        self.right_layout.setSpacing(8)
 
-        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        inspector_header = QLabel("INSPECTOR")
+        inspector_header.setObjectName("inspector_header")
+        self.right_layout.addWidget(inspector_header)
 
-        self.right_layout.addStretch()
+        self.inspector_scroll = QScrollArea()
+        self.inspector_scroll.setWidgetResizable(True)
+        self.inspector_scroll.setFrameShape(QFrame.NoFrame)
+        self.inspector_content = QWidget()
+        self.inspector_layout = QVBoxLayout(self.inspector_content)
+        self.inspector_layout.setContentsMargins(0, 0, 0, 0)
+        self.inspector_layout.setSpacing(8)
+        self.inspector_scroll.setWidget(self.inspector_content)
+        self.right_layout.addWidget(self.inspector_scroll, stretch=1)
 
-        # Add panels to main_layout
-        self.main_layout.addWidget(self.left_panel, stretch=0)
-        self.main_layout.addWidget(self.central_panel, stretch=2)  # moderate space
-        self.main_layout.addWidget(self.right_panel, stretch=4)
+        self.main_splitter.addWidget(self.left_panel)
+        self.main_splitter.addWidget(self.central_panel)
+        self.main_splitter.addWidget(self.right_panel)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setStretchFactor(2, 0)
+        self.main_splitter.setSizes([330, 1040, 320])
 
     def _setup_file_list(self) -> None:
         """Set up the file list widget for WAV file selection and navigation.
@@ -567,7 +597,8 @@ class WavViewer(QWidget):
         """
         # Waveform plots label + dynamic AI overlay toggles
         header_row = QHBoxLayout()
-        plots_label = QLabel("Waveform Visualization:")
+        plots_label = QLabel("WAVEFORM VIEW")
+        plots_label.setObjectName("waveform_header")
         header_row.addWidget(plots_label)
         header_row.addStretch()
 
@@ -576,7 +607,7 @@ class WavViewer(QWidget):
         self._ai_toggle_layout.setSpacing(8)
         header_row.addLayout(self._ai_toggle_layout)
 
-        self.right_layout.addLayout(header_row)
+        self.waveform_layout.addLayout(header_row)
 
         # Create plot widgets with optimized settings
         # plot_config = {
@@ -595,13 +626,13 @@ class WavViewer(QWidget):
         self.waveform_plot.setLabel("left", "Amplitude")
         self.waveform_plot.setLabel("bottom", "Time (s)")
         # self.waveform_plot.setMinimumHeight(120)
-        self.right_layout.addWidget(self.waveform_plot, stretch=50)
+        self.waveform_layout.addWidget(self.waveform_plot, stretch=50)
 
         # Channel 1 (left) plot
         self.waveform_plot_top = pg.PlotWidget(**plot_config)
         self.waveform_plot_top.setLabel("left", "Left Ch")
         # self.waveform_plot_top.setMinimumHeight(100)
-        self.right_layout.addWidget(self.waveform_plot_top, stretch=50)
+        self.waveform_layout.addWidget(self.waveform_plot_top, stretch=50)
 
         # Channel 2 (right) plot
         self.waveform_plot_bottom = pg.PlotWidget(**plot_config)
@@ -609,7 +640,7 @@ class WavViewer(QWidget):
         self.waveform_plot_bottom.setLabel("bottom", "Time (s)")
         # self.waveform_plot_bottom.setMinimumHeight(100)
 
-        self.right_layout.addWidget(self.waveform_plot_bottom, stretch=50)
+        self.waveform_layout.addWidget(self.waveform_plot_bottom, stretch=50)
 
         # self.waveform_plot.getViewBox().sigXRangeChanged.connect(
         #     self.update_plot_for_view_range)
@@ -640,27 +671,20 @@ class WavViewer(QWidget):
             Tables are distributed between center and right panels based on
             their relevance to the current workflow and available space.
         """
-        # Metadata section label
-        metadata_label = QLabel("Metadata:")
-        # metadata_label.setStyleSheet("font-weight: bold; margin: 10px 0 5px 0;")
-
-        # Create horizontal layout for tables
-        # tables_layout = QHBoxLayout()
-
         # FMT table
-        self.fmt_label = QLabel("Format Info:")
+        self.fmt_label = QLabel("AUDIO")
         self.fmt_table = self._create_metadata_table(["Key", "Value"])
 
         # BEXT table
-        self.bext_label = QLabel("Bext Info:")
+        self.bext_label = QLabel("METADATA")
         self.bext_table = self._create_metadata_table(["Key", "Value"])
 
         # INFO table
-        self.info_label = QLabel("INFO Chunk:")
+        self.info_label = QLabel("INFO CHUNK")
         self.info_table = self._create_metadata_table(["Key", "Value"])
 
         # GPS table (always 3 editable rows)
-        self.gps_label = QLabel("GPS Location:")
+        self.gps_label = QLabel("LOCATION")
         self.gps_table = self._create_metadata_table(["Key", "Value"])
         # self.gps_table.setFixedHeight(90)
 
@@ -679,19 +703,17 @@ class WavViewer(QWidget):
             cue_table=self.cue_table,
         )
 
-        self.central_top_layout.addWidget(metadata_label)
+        self.inspector_layout.addWidget(self.bext_label)
+        self.inspector_layout.addWidget(self.bext_table)
 
-        self.central_top_layout.addWidget(self.bext_label)
-        self.central_top_layout.addWidget(self.bext_table)
+        self.inspector_layout.addWidget(self.fmt_label)
+        self.inspector_layout.addWidget(self.fmt_table)
 
-        self.central_top_layout.addWidget(self.fmt_label)
-        self.central_top_layout.addWidget(self.fmt_table)
+        self.inspector_layout.addWidget(self.info_label)
+        self.inspector_layout.addWidget(self.info_table)
 
-        self.central_top_layout.addWidget(self.info_label)
-        self.central_top_layout.addWidget(self.info_table)
-
-        self.central_top_layout.addWidget(self.gps_label)
-        self.central_top_layout.addWidget(self.gps_table)
+        self.inspector_layout.addWidget(self.gps_label)
+        self.inspector_layout.addWidget(self.gps_table)
 
         # Photo preview (shown when WAV has a PHOTO_REF in iXML)
         self.photo_preview_label = QLabel("Photo:")
@@ -699,11 +721,12 @@ class WavViewer(QWidget):
         self.photo_preview_image = QLabel()
         self.photo_preview_image.setAlignment(Qt.AlignLeft)
         self.photo_preview_image.setVisible(False)
-        self.central_top_layout.addWidget(self.photo_preview_label)
-        self.central_top_layout.addWidget(self.photo_preview_image)
+        self.inspector_layout.addWidget(self.photo_preview_label)
+        self.inspector_layout.addWidget(self.photo_preview_image)
+        self.inspector_layout.addStretch()
 
-        self.right_layout.addWidget(self.cue_label)
-        self.right_layout.addWidget(self.cue_table)
+        self.cue_layout.addWidget(self.cue_label)
+        self.cue_layout.addWidget(self.cue_table)
 
     def _create_metadata_table(self, headers: list[str]) -> QTableWidget:
         """Create a standardized metadata table widget with consistent styling.
@@ -869,7 +892,7 @@ class WavViewer(QWidget):
             self.audio_player.positionChanged.connect(self.update_waveform_cursor)
             self.audio_player.stateChanged.connect(self.handle_playback_state)
 
-            self.right_layout.addWidget(self.audio_player)
+            self.transport_layout.addWidget(self.audio_player)
             logger.debug("Audio components initialized successfully")
         except Exception as exc:  # of specifieker dan Exception
             logger.error("Failed to initialize audio components: %s", exc)

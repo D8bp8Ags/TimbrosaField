@@ -257,8 +257,9 @@ class AudioPlayer(QWidget):
 
         # Time display
         self.time_label = QLabel("00:00.000/00:00.000")
+        self.time_label.setObjectName("time_display")
         self.time_label.setAlignment(Qt.AlignCenter)
-        self.time_label.setFixedWidth(150)
+        self.time_label.setFixedWidth(220)
         layout.addWidget(self.time_label)
 
     def _setup_shortcuts(self):

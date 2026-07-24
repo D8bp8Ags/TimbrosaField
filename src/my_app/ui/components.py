@@ -2100,6 +2100,109 @@ class ApplicationStylist:
             qproperty-alignment: AlignCenter;
             margin-top: 8px;
         }}
+
+        /* === FIELD LAB DARK MAIN WORKSPACE === */
+        QFrame#recording_sidebar,
+        QFrame#waveform_workspace,
+        QFrame#inspector_panel {{
+            background-color: {ApplicationStylist.COLORS['background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 0px;
+        }}
+
+        QFrame#waveform_panel {{
+            background-color: {ApplicationStylist.COLORS['background']};
+            border: none;
+        }}
+
+        QFrame#cue_panel {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border-top: 1px solid {ApplicationStylist.COLORS['border']};
+            border-bottom: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 0px;
+        }}
+
+        QFrame#transport_bar {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border-top: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 0px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget {{
+            background-color: transparent;
+            border: none;
+            border-radius: 0px;
+            margin: 0px;
+            padding: 0px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QPushButton {{
+            min-width: 28px;
+            max-width: 42px;
+            min-height: 24px;
+            padding: 4px;
+            margin: 0px 2px;
+        }}
+
+        QFrame#transport_bar QWidget#audio_player_widget QLabel[objectName="time_display"] {{
+            margin: 0px 4px;
+            padding: 4px 6px;
+        }}
+
+        QLabel#waveform_header,
+        QLabel#inspector_header {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 9pt;
+            font-weight: 700;
+            letter-spacing: 0px;
+        }}
+
+        QFrame#inspector_panel QScrollArea,
+        QFrame#inspector_panel QScrollArea QWidget {{
+            background-color: transparent;
+            border: none;
+        }}
+
+        QFrame#inspector_panel QLabel {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 10pt;
+            font-weight: 600;
+        }}
+
+        QFrame#inspector_panel QTableWidget,
+        QFrame#cue_panel QTableWidget {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            alternate-background-color: {ApplicationStylist.COLORS['background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            gridline-color: {ApplicationStylist.COLORS['divider']};
+            font-size: 9pt;
+        }}
+
+        QFrame#inspector_panel QHeaderView::section,
+        QFrame#cue_panel QHeaderView::section {{
+            background: {ApplicationStylist.COLORS['surface_elevated']};
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            border: none;
+            border-bottom: 1px solid {ApplicationStylist.COLORS['border']};
+            padding: 3px 6px;
+            font-size: 9pt;
+            font-weight: 700;
+        }}
+
+        QFrame#recording_sidebar QListWidget::item:selected {{
+            background-color: rgba(106, 168, 79, 0.28);
+            color: {ApplicationStylist.COLORS['selection_text']};
+            border-left: 3px solid {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QSplitter::handle {{
+            background-color: {ApplicationStylist.COLORS['border']};
+        }}
+
+        QSplitter::handle:hover {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+        }}
         """
 
     @staticmethod
@@ -2130,51 +2233,44 @@ class ApplicationStylist:
 
     @staticmethod
     def apply_dark_theme(app):
-        """Apply dark theme variant (future enhancement)."""
+        """Apply the Field Lab Dark theme variant."""
         dark_colors = ApplicationStylist._LIGHT_COLORS.copy()
         dark_colors.update(
             {
-                # Primary colors - brighter for dark theme
-                "primary": "#3b82f6",
-                "primary_hover": "#60a5fa",
-                "primary_pressed": "#2563eb",
-                # Secondary colors for dark
-                "secondary": "#94a3b8",
-                "secondary_hover": "#cbd5e1",
-                "secondary_pressed": "#e2e8f0",
-                # Dark backgrounds
-                "background": "#0f0f23",  # Very dark navy
-                "surface": "#1a1b3a",  # Dark surface
-                "surface_elevated": "#252659",  # Elevated surface
-                # Dark borders and dividers
-                "border": "#374151",  # Subtle border
-                "divider": "#4b5563",  # Visible divider
-                # Dark text hierarchy
-                "text_primary": "#f9fafb",  # Almost white
-                "text_secondary": "#d1d5db",  # Light gray
-                "text_muted": "#9ca3af",  # Muted gray
-                "text_disabled": "#6b7280",  # Disabled gray
-                # Status colors - adjusted for dark
-                "success": "#10b981",
-                "warning": "#f59e0b",
-                "error": "#ef4444",
-                "info": "#06b6d4",
-                # Interactive states
-                "hover_overlay": "rgba(59, 130, 246, 0.15)",
-                "active_overlay": "rgba(59, 130, 246, 0.25)",
-                "focus_ring": "rgba(96, 165, 250, 0.4)",
-                "input_background": "#1a1b3a",
-                "selection_text": "#f9fafb",
-                "card_background": "#1a1b3a",
-                "overlay_background": "rgba(26, 27, 58, 0.9)",
-                "error_background": "#2d1b1b",
-                "error_border": "#4a2525",
-                "success_background": "#1b2d20",
-                "success_border": "#254a2a",
-                "danger_hover": "#dc2626",
-                "tooltip_background": "#f9fafb",
-                "tooltip_text": "#0f172a",
-                "plot_background": "#1a1b3a",
+                "primary": "#6aa84f",
+                "primary_hover": "#7fbd63",
+                "primary_pressed": "#4f813a",
+                "secondary": "#5f6973",
+                "secondary_hover": "#737f89",
+                "secondary_pressed": "#49525b",
+                "background": "#151819",
+                "surface": "#1b1f20",
+                "surface_elevated": "#222729",
+                "border": "#2f3638",
+                "divider": "#384144",
+                "text_primary": "#e6ece8",
+                "text_secondary": "#b4beb8",
+                "text_muted": "#8d9992",
+                "text_disabled": "#65716a",
+                "success": "#72b957",
+                "warning": "#f0b84b",
+                "error": "#e05b4f",
+                "info": "#68a6c8",
+                "hover_overlay": "rgba(114, 185, 87, 0.14)",
+                "active_overlay": "rgba(114, 185, 87, 0.24)",
+                "focus_ring": "rgba(114, 185, 87, 0.38)",
+                "input_background": "#191d1e",
+                "selection_text": "#f7fff8",
+                "card_background": "#1d2223",
+                "overlay_background": "rgba(21, 24, 25, 0.92)",
+                "error_background": "#2a1b1a",
+                "error_border": "#63302b",
+                "success_background": "#18261b",
+                "success_border": "#2d4a32",
+                "danger_hover": "#b94b43",
+                "tooltip_background": "#e6ece8",
+                "tooltip_text": "#151819",
+                "plot_background": "#171b1c",
             }
         )
         ApplicationStylist.COLORS.update(dark_colors)
