@@ -234,6 +234,14 @@ def test_waveform_toolbar_controls_have_real_behavior(qapp, qt_widget_cleanup):
     assert viewer.waveform_plot.getPlotItem().getAxis("top").isVisible() is True
 
 
+def test_waveform_time_axis_defaults_are_consistent(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    for plot in viewer._waveform_plots():
+        axis = plot.getPlotItem().getAxis("bottom")
+        assert "Time (s)" in axis.label.toPlainText()
+
+
 def test_inspector_sections_are_collapsible(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
 

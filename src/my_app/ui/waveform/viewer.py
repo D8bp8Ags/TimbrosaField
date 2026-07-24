@@ -1016,6 +1016,7 @@ class WavViewer(QWidget):
             **plot_config,
         )
         self.waveform_plot_top.setLabel("left", "Left Ch")
+        self.waveform_plot_top.setLabel("bottom", "Time (s)")
         # self.waveform_plot_top.setMinimumHeight(100)
         self.waveform_layout.addWidget(self.waveform_plot_top, stretch=50)
 
