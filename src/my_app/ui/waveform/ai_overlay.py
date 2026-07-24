@@ -20,7 +20,7 @@ from my_app.ai.settings import graph_label_for_detection, load_ai_settings
 _GRAPH_MIN = 0.10
 _GRAPH_TOP = 3
 _GRAPH_LABEL_MAX_CHARS = 18
-_GRAPH_LABEL_MIN_SPACING_SECONDS = 30.0
+_GRAPH_LABEL_MIN_SPACING_SECONDS = 45.0
 _REGION_FILL_ALPHA_MAX = 16
 _REGION_EDGE_ALPHA_MAX = 48
 
@@ -199,8 +199,8 @@ class AiOverlayController:
         font.setPointSize(8)
         font.setBold(False)
 
-        for i, (label, score) in enumerate(labels):
-            y = 0.95 - i * 0.12
+        for i, (label, score) in enumerate(labels[:1]):
+            y = 0.78 - i * 0.12
             full_text = f"{label} {score:.2f}"
             text = pg.TextItem(
                 text=f"{_compact_graph_label(label)} {score:.2f}",
