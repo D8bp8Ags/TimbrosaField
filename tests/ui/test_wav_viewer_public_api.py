@@ -184,6 +184,12 @@ def test_recording_sidebar_controls_have_real_behavior(qapp, qt_widget_cleanup):
     viewer._update_recording_count_label(116)
     assert viewer.recording_count_label.text() == "116 recordings"
 
+    assert viewer._recording_details_visible is True
+    viewer.recording_settings_button.click()
+    assert viewer._recording_details_visible is False
+    viewer.recording_settings_button.click()
+    assert viewer._recording_details_visible is True
+
 
 def test_waveform_toolbar_controls_have_real_behavior(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
@@ -301,6 +307,18 @@ def test_cue_marker_caps_stay_inside_current_y_range(qapp, qt_widget_cleanup):
     cap = viewer.cue_markers["1"][0]
     y_min, y_max = viewer.waveform_plot.getViewBox().viewRange()[1]
     assert y_min < cap.pos().y() < y_max
+
+
+def test_waveform_plot_fonts_are_explicit_and_compact(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    for plot in viewer._waveform_plots():
+        axis = plot.getPlotItem().getAxis("bottom")
+        assert axis.style["tickFont"].pointSize() == 8
+        assert axis.label.font().pointSize() == 9
+
+    viewer._apply_mouse_label_style(viewer.mouse_label_main)
+    assert viewer.mouse_label_main.textItem.font().pointSize() == 8
 
 
 def test_transport_zoom_controls_change_waveform_range(qapp, qt_widget_cleanup):

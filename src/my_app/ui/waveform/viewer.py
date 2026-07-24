@@ -139,6 +139,7 @@ class RecordingListRow(QWidget):
         filename: str,
         duration_text: str = "",
         date_text: str = "",
+        show_details: bool = True,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -160,23 +161,24 @@ class RecordingListRow(QWidget):
         name_label.setMinimumWidth(0)
         layout.addWidget(name_label, stretch=1)
 
-        meta_layout = QVBoxLayout()
-        meta_layout.setContentsMargins(0, 0, 0, 0)
-        meta_layout.setSpacing(0)
+        if show_details:
+            meta_layout = QVBoxLayout()
+            meta_layout.setContentsMargins(0, 0, 0, 0)
+            meta_layout.setSpacing(0)
 
-        duration_label = QLabel(duration_text)
-        duration_label.setObjectName("recording_row_duration")
-        duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        duration_label.setMinimumWidth(52)
-        meta_layout.addWidget(duration_label)
+            duration_label = QLabel(duration_text)
+            duration_label.setObjectName("recording_row_duration")
+            duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            duration_label.setMinimumWidth(52)
+            meta_layout.addWidget(duration_label)
 
-        date_label = QLabel(date_text)
-        date_label.setObjectName("recording_row_date")
-        date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        date_label.setMinimumWidth(92)
-        meta_layout.addWidget(date_label)
+            date_label = QLabel(date_text)
+            date_label.setObjectName("recording_row_date")
+            date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            date_label.setMinimumWidth(92)
+            meta_layout.addWidget(date_label)
 
-        layout.addLayout(meta_layout)
+            layout.addLayout(meta_layout)
 
 
 class MinuteSecondAxis(pg.AxisItem):
@@ -829,6 +831,7 @@ class WavViewer(QWidget):
             updates for the selected file.
         """
         self._recording_sort_descending = False
+        self._recording_details_visible = True
 
         # File list header with settings action
         header_row = QHBoxLayout()
@@ -844,8 +847,10 @@ class WavViewer(QWidget):
         self.recording_settings_button.setObjectName("recording_settings_button")
         self.recording_settings_button.setIcon(UiIconFactory.icon("settings"))
         self.recording_settings_button.setIconSize(QSize(14, 14))
-        self.recording_settings_button.setToolTip("Recording list settings")
-        self.recording_settings_button.clicked.connect(self._focus_recording_search)
+        self.recording_settings_button.setToolTip(
+            "Toggle recording duration/date details"
+        )
+        self.recording_settings_button.clicked.connect(self._toggle_recording_details)
         header_row.addWidget(self.recording_settings_button)
         self.left_layout.addLayout(header_row)
 
@@ -1031,6 +1036,11 @@ class WavViewer(QWidget):
         axis_pen = pg.mkPen(ApplicationStylist.COLORS["divider"], width=1)
         grid_pen = pg.mkPen(ApplicationStylist.COLORS["border"], width=1)
         text_pen = pg.mkPen(ApplicationStylist.COLORS["text_muted"], width=1)
+        tick_font = QFont()
+        tick_font.setPointSize(8)
+        label_font = QFont()
+        label_font.setPointSize(9)
+        label_font.setWeight(QFont.Medium)
 
         for plot in (
             self.waveform_plot,
@@ -1047,12 +1057,22 @@ class WavViewer(QWidget):
                 axis = plot_item.getAxis(axis_name)
                 axis.setPen(axis_pen)
                 axis.setTextPen(text_pen)
+                axis.setTickFont(tick_font)
                 axis.setStyle(tickTextOffset=6)
+                axis.label.setFont(label_font)
+                axis.label.setDefaultTextColor(
+                    QColor(ApplicationStylist.COLORS["text_muted"])
+                )
             top_axis = plot_item.getAxis("top")
             if top_axis:
                 top_axis.setPen(axis_pen)
                 top_axis.setTextPen(text_pen)
+                top_axis.setTickFont(tick_font)
                 top_axis.setStyle(tickTextOffset=6)
+                top_axis.label.setFont(label_font)
+                top_axis.label.setDefaultTextColor(
+                    QColor(ApplicationStylist.COLORS["text_muted"])
+                )
 
     def _set_toolbar_view_mode(self, mode: str) -> None:
         """Apply a waveform view mode from the mockup toolbar controls."""
@@ -1575,11 +1595,17 @@ class WavViewer(QWidget):
             item.setData(Qt.UserRole, full_path)
             item.setData(Qt.UserRole + 1, wav_file)
             item.setToolTip(full_path)
-            item.setSizeHint(QSize(0, 34))
+            item.setSizeHint(
+                QSize(0, 34 if getattr(self, "_recording_details_visible", True) else 28)
+            )
             self.file_list.addItem(item)
             self.file_list.setItemWidget(
                 item, RecordingListRow(
-                    wav_file, duration_text, date_text, self.file_list
+                    wav_file,
+                    duration_text,
+                    date_text,
+                    getattr(self, "_recording_details_visible", True),
+                    self.file_list,
                 )
             )
 
@@ -1694,6 +1720,14 @@ class WavViewer(QWidget):
     def _focus_recording_search(self) -> None:
         """Focus the recording search field from the sidebar gear action."""
         self.file_search_input.setFocus(Qt.ShortcutFocusReason)
+
+    def _toggle_recording_details(self) -> None:
+        """Show or hide recording duration/date details in the file list."""
+        self._recording_details_visible = not getattr(
+            self, "_recording_details_visible", True
+        )
+        selected_path = self.get_selected_file_path()
+        self.load_wav_files(select_path=selected_path)
 
     def _toggle_recording_filter(self) -> None:
         """Focus the active filter, or clear it when already filtering."""
@@ -3464,8 +3498,32 @@ class WavViewer(QWidget):
                 setattr(self, attr_name, label)
 
             label = getattr(self, attr_name)
+            self._apply_mouse_label_style(label)
             if label.scene() is None:
                 plot.addItem(label)
+
+    @staticmethod
+    def _apply_mouse_label_style(label: pg.TextItem, point_size: int = 8) -> None:
+        """Apply stable pyqtgraph text styling independent of the app font."""
+        font = QFont()
+        font.setPointSize(point_size)
+        font.setWeight(QFont.DemiBold)
+        label.setFont(font)
+
+    @staticmethod
+    def _mouse_label_position(
+        plot: pg.PlotWidget,
+        left_margin_ratio: float = 0.004,
+        top_margin_ratio: float = 0.06,
+    ) -> tuple[float, float]:
+        """Return a top-left label position inside the current plot range."""
+        x_range, y_range = plot.getViewBox().viewRange()
+        x_span = max(0.001, x_range[1] - x_range[0])
+        y_span = max(0.001, y_range[1] - y_range[0])
+        return (
+            x_range[0] + (x_span * left_margin_ratio),
+            y_range[1] - (y_span * top_margin_ratio),
+        )
 
     def _connect_hover_events(self) -> None:
         """Connect mouse hover events to plots."""
@@ -3558,7 +3616,7 @@ class WavViewer(QWidget):
         label.setText(label_text)
         label.setAnchor((0, 0))
         label.setColor(self.get_color(color_name))
-        label.setPos(x_range[0], y_range[1])
+        label.setPos(*self._mouse_label_position(plot))
 
     def _handle_mouse_moved(
         self, mouse_event: QEvent, plot: pg.PlotWidget, label_attr: str, color_name: str
@@ -3659,9 +3717,10 @@ class WavViewer(QWidget):
         label_color = self._get_label_color_for_level(db_fs)
         label.setText(label_text)
         label.setAnchor((0, 0))
+        self._apply_mouse_label_style(label)
         label.setColor(label_color)
         label.setOpacity(1.0)
-        label.setPos(x_range[0], y_range[1])
+        label.setPos(*self._mouse_label_position(plot))
 
     def _analyze_local_peak(self, sample_idx: int, current_amplitude: float) -> str:
         """Analyze if current position is near a local peak.
@@ -3830,9 +3889,7 @@ class WavViewer(QWidget):
             if hasattr(self, attr_name):
                 label = getattr(self, attr_name)
                 try:
-                    x_range, y_range = plot.getViewBox().viewRange()
-                    # Position label at top-left of current view
-                    label.setPos(x_range[0], y_range[1])
+                    label.setPos(*self._mouse_label_position(plot))
                     # Refresh color in case it got lost
                     label.setColor(self.get_color(_color_name))
                 except (
@@ -3946,6 +4003,7 @@ class WavViewer(QWidget):
                     else ""
                 )
                 label.setAnchor((0, 0))
+                self._apply_mouse_label_style(label)
 
                 # Neutrale startup kleur
 
@@ -3955,10 +4013,8 @@ class WavViewer(QWidget):
                 # Safe positioning
                 try:
                     if hasattr(plot, "getViewBox") and plot.getViewBox():
-                        x_range, y_range = plot.getViewBox().viewRange()
-                        if x_range and y_range:
-                            y_offset = (y_range[1] - y_range[0]) * 0.06
-                            label.setPos(x_range[0], y_range[1] - y_offset)
+                        if plot.getViewBox().viewRange():
+                            label.setPos(*self._mouse_label_position(plot))
                         else:
                             label.setPos(0, 1)
                     else:
