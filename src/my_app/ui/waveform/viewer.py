@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -596,6 +597,12 @@ class WavViewer(QWidget):
         self.file_list_label.setToolTip("")
         self.left_layout.addWidget(self.file_list_label)
 
+        self.file_search_input = QLineEdit()
+        self.file_search_input.setObjectName("recording_search")
+        self.file_search_input.setPlaceholderText("Search recordings...")
+        self.file_search_input.textChanged.connect(self._filter_file_list)
+        self.left_layout.addWidget(self.file_search_input)
+
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.file_list.currentRowChanged.connect(self.plot_selected_wav)
@@ -1071,6 +1078,18 @@ class WavViewer(QWidget):
         if not info.samplerate:
             return ""
         return self._format_duration_for_list(info.frames / info.samplerate)
+
+    def _filter_file_list(self, query: str) -> None:
+        """Filter visible recording rows by filename."""
+        needle = query.strip().lower()
+        for row in range(self.file_list.count()):
+            item = self.file_list.item(row)
+            if item is None:
+                continue
+            filename = item.data(Qt.UserRole + 1) or os.path.basename(
+                item.data(Qt.UserRole) or ""
+            )
+            item.setHidden(bool(needle) and needle not in filename.lower())
 
     def _select_file_by_path(self, target_path: str) -> bool:
         """Select a specific file in the file list by matching its full path.

@@ -2238,6 +2238,19 @@ class ApplicationStylist:
             border-left: 3px solid {ApplicationStylist.COLORS['primary']};
         }}
 
+        QLineEdit#recording_search {{
+            background-color: {ApplicationStylist.COLORS['input_background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            padding: 5px 8px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
+        }}
+
+        QLineEdit#recording_search:focus {{
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
         QWidget#recording_row {{
             background-color: transparent;
         }}
