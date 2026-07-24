@@ -163,7 +163,7 @@ class CueOverviewWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("cue_overview")
         self._duration: float = 0.0
-        self._markers: list[tuple[str, float]] = []
+        self._markers: list[tuple[str, float, str]] = []
         self._selected_id: str | None = None
         self.setMinimumHeight(80)
 
@@ -182,7 +182,15 @@ class CueOverviewWidget(QWidget):
                 cue_id = str(cue.get("ID", ""))
                 offset = cue.get("Sample Offset", 0)
                 if cue_id and offset >= 0:
-                    self._markers.append((cue_id, offset / sample_rate))
+                    label = cue_labels.get(cue_id, "")
+                    if not label:
+                        continue
+                    time_s = max(0.0, min(offset / sample_rate, self._duration))
+                    self._markers.append((cue_id, time_s, label))
+        if self._selected_id and not any(
+            cue_id == self._selected_id for cue_id, _time_s, _label in self._markers
+        ):
+            self._selected_id = None
         self.update()
 
     def set_selected_cue(self, cue_id: str | None) -> None:
@@ -195,8 +203,12 @@ class CueOverviewWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        rect = self.rect().adjusted(12, 16, -12, -16)
+        rect = self.rect().adjusted(12, 14, -12, -18)
         baseline_y = rect.center().y()
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#171b1c"))
+        painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 4, 4)
 
         axis_pen = QPen(QColor("#53605a"))
         axis_pen.setWidth(1)
@@ -208,13 +220,40 @@ class CueOverviewWidget(QWidget):
             painter.drawText(rect, Qt.AlignCenter, "No cue timeline")
             return
 
-        for cue_id, time_s in self._markers:
+        painter.setPen(QColor("#8d9992"))
+        painter.drawText(
+            rect.left(),
+            rect.bottom() + 14,
+            "0:00",
+        )
+        painter.drawText(
+            rect.right() - 44,
+            rect.bottom() + 14,
+            self._format_duration(self._duration),
+        )
+
+        if not self._markers:
+            painter.setPen(QColor("#8d9992"))
+            painter.drawText(rect, Qt.AlignCenter, "No labeled cue points")
+            return
+
+        for cue_id, time_s, label in self._markers:
             x = rect.left() + int((time_s / self._duration) * rect.width())
             selected = cue_id == self._selected_id
             marker_pen = QPen(QColor("#e05b4f" if selected else "#f0b84b"))
             marker_pen.setWidth(3 if selected else 2)
             painter.setPen(marker_pen)
             painter.drawLine(x, rect.top(), x, rect.bottom())
+            if selected:
+                painter.setPen(QColor("#e6ece8"))
+                painter.drawText(x + 5, rect.top() + 14, label)
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        """Format seconds for the compact cue overview axis."""
+        total_seconds = max(0, int(round(seconds)))
+        minutes, secs = divmod(total_seconds, 60)
+        return f"{minutes}:{secs:02d}"
 
 
 logger = logging.getLogger(__name__)
