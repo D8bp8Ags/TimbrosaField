@@ -144,6 +144,7 @@ class RecordingListRow(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("recording_row")
+        self.details_visible = show_details
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 2, 14, 2)
@@ -845,12 +846,14 @@ class WavViewer(QWidget):
 
         self.recording_settings_button = QPushButton()
         self.recording_settings_button.setObjectName("recording_settings_button")
+        self.recording_settings_button.setCheckable(True)
+        self.recording_settings_button.setChecked(True)
         self.recording_settings_button.setIcon(UiIconFactory.icon("settings"))
         self.recording_settings_button.setIconSize(QSize(14, 14))
-        self.recording_settings_button.setToolTip(
-            "Toggle recording duration/date details"
+        self._update_recording_details_button_state()
+        self.recording_settings_button.toggled.connect(
+            self._set_recording_details_visible
         )
-        self.recording_settings_button.clicked.connect(self._toggle_recording_details)
         header_row.addWidget(self.recording_settings_button)
         self.left_layout.addLayout(header_row)
 
@@ -1721,13 +1724,27 @@ class WavViewer(QWidget):
         """Focus the recording search field from the sidebar gear action."""
         self.file_search_input.setFocus(Qt.ShortcutFocusReason)
 
-    def _toggle_recording_details(self) -> None:
+    def _set_recording_details_visible(self, visible: bool) -> None:
         """Show or hide recording duration/date details in the file list."""
-        self._recording_details_visible = not getattr(
-            self, "_recording_details_visible", True
-        )
-        selected_path = self.get_selected_file_path()
+        self._recording_details_visible = bool(visible)
+        self._update_recording_details_button_state()
+        selected_path = self._get_selected_file_path()
         self.load_wav_files(select_path=selected_path)
+
+    def _toggle_recording_details(self) -> None:
+        """Toggle recording duration/date details in the file list."""
+        self.recording_settings_button.setChecked(
+            not getattr(self, "_recording_details_visible", True)
+        )
+
+    def _update_recording_details_button_state(self) -> None:
+        """Keep the recording settings action readable and discoverable."""
+        if not hasattr(self, "recording_settings_button"):
+            return
+        if getattr(self, "_recording_details_visible", True):
+            self.recording_settings_button.setToolTip("Hide recording duration/date")
+        else:
+            self.recording_settings_button.setToolTip("Show recording duration/date")
 
     def _toggle_recording_filter(self) -> None:
         """Focus the active filter, or clear it when already filtering."""

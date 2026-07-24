@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from PyQt5.QtWidgets import QFrame, QLabel, QPushButton, QTableWidgetItem
 
+from tests.fixtures.wav import builder as wavbuild
 from my_app.ui.waveform import viewer as wv
 
 
@@ -170,7 +171,9 @@ def test_field_lab_dark_shell_preserves_metadata_and_transport_controls(
     assert viewer._get_professional_default_text() == "Hover for time, sample, dBFS"
 
 
-def test_recording_sidebar_controls_have_real_behavior(qapp, qt_widget_cleanup):
+def test_recording_sidebar_controls_have_real_behavior(
+    qapp, qt_widget_cleanup, tmp_path, write_wav
+):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
 
     viewer.file_search_input.setText("089")
@@ -187,8 +190,24 @@ def test_recording_sidebar_controls_have_real_behavior(qapp, qt_widget_cleanup):
     assert viewer._recording_details_visible is True
     viewer.recording_settings_button.click()
     assert viewer._recording_details_visible is False
+    assert viewer.recording_settings_button.isChecked() is False
     viewer.recording_settings_button.click()
     assert viewer._recording_details_visible is True
+    assert viewer.recording_settings_button.isChecked() is True
+
+    write_wav(wavbuild.make_minimal_wav(), name="250818_0089.wav")
+    viewer.user_config["paths"]["fieldrecording_dir"] = str(tmp_path)
+    viewer.load_wav_files()
+    row = viewer.file_list.itemWidget(viewer.file_list.item(0))
+    assert row.details_visible is True
+    assert row.findChild(QLabel, "recording_row_duration") is not None
+    assert row.findChild(QLabel, "recording_row_date") is not None
+
+    viewer.recording_settings_button.click()
+    row = viewer.file_list.itemWidget(viewer.file_list.item(0))
+    assert row.details_visible is False
+    assert row.findChild(QLabel, "recording_row_duration") is None
+    assert row.findChild(QLabel, "recording_row_date") is None
 
 
 def test_waveform_toolbar_controls_have_real_behavior(qapp, qt_widget_cleanup):

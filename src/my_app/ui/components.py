@@ -2562,6 +2562,11 @@ class ApplicationStylist:
             color: {ApplicationStylist.COLORS['text_primary']};
         }}
 
+        QFrame#recording_sidebar QPushButton#recording_settings_button:checked {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
         QFrame#recording_sidebar QLabel#sidebar_section_header {{
             color: {ApplicationStylist.COLORS['text_primary']};
             font-size: 9pt;
