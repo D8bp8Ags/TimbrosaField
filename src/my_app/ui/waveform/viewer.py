@@ -654,7 +654,7 @@ class WavViewer(QWidget):
         """
         # File list label and widget
         self.file_list_label = QLabel("WAV Files:")
-        self.file_list_label.setStyleSheet("font-weight: bold; margin-bottom: 5px;")
+        self.file_list_label.setObjectName("sidebar_section_header")
         self.file_list_label.setToolTip("")
         self.left_layout.addWidget(self.file_list_label)
 
@@ -927,6 +927,7 @@ class WavViewer(QWidget):
         """
         # Tag input section — placed in left panel, between file list and view controls
         tag_label = QLabel("Tags and Metadata:")
+        tag_label.setObjectName("sidebar_section_header")
         self.left_layout.addWidget(tag_label)
 
         self.tagger_widget = FileTagAutocomplete()
@@ -972,6 +973,7 @@ class WavViewer(QWidget):
         """
         # View controls section
         view_label = QLabel("View Mode:")
+        view_label.setObjectName("sidebar_section_header")
         self.left_layout.addWidget(view_label)
 
         # Create view mode controls

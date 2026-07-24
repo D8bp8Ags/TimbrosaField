@@ -2326,6 +2326,14 @@ class ApplicationStylist:
             border-color: {ApplicationStylist.COLORS['primary']};
         }}
 
+        QFrame#recording_sidebar QLabel#sidebar_section_header {{
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
+            font-weight: 800;
+            letter-spacing: 0px;
+            padding: 2px 0px 0px 0px;
+        }}
+
         QWidget#tag_completer {{
             background-color: transparent;
             border: none;
