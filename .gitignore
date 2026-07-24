@@ -11,6 +11,10 @@ timbrosafield/
 *.json
 *.asd
 *.wav
+*.WAV
+*.bak
+*.wav.bak
+*.WAV.bak
 .idea/
 backup/
 *.als
