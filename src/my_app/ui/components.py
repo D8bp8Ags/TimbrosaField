@@ -2157,6 +2157,16 @@ class ApplicationStylist:
             letter-spacing: 0px;
         }}
 
+        QLabel#waveform_toolbar_chip {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 9pt;
+            font-weight: 600;
+        }}
+
         QFrame#waveform_panel QCheckBox#ai_layer_toggle {{
             spacing: 6px;
             font-size: 9pt;

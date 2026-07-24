@@ -696,6 +696,14 @@ class WavViewer(QWidget):
         plots_label = QLabel("WAVEFORM VIEW")
         plots_label.setObjectName("waveform_header")
         header_row.addWidget(plots_label)
+
+        self.waveform_toolbar_controls = QHBoxLayout()
+        self.waveform_toolbar_controls.setSpacing(6)
+        for text in ("Time", "Snap: Off", "dBFS"):
+            chip = QLabel(text)
+            chip.setObjectName("waveform_toolbar_chip")
+            self.waveform_toolbar_controls.addWidget(chip)
+        header_row.addLayout(self.waveform_toolbar_controls)
         header_row.addStretch()
 
         # Checkboxes are built dynamically when a layer is loaded
