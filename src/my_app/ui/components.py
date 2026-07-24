@@ -1623,23 +1623,21 @@ class ApplicationStylist:
 
         /* === STATUS BAR === */
         QStatusBar {{
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {ApplicationStylist.COLORS['surface_elevated']},
-                stop:1 {ApplicationStylist.COLORS['surface']});
-            border-top: 2px solid {ApplicationStylist.COLORS['border']};
-            color: {ApplicationStylist.COLORS['text_secondary']};
-            font-size: 10pt;
-            padding: 4px 8px;
+            background-color: {ApplicationStylist.COLORS['background']};
+            border-top: 1px solid {ApplicationStylist.COLORS['border']};
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 9pt;
+            padding: 2px 6px;
         }}
 
         QStatusBar::item {{
             border: none;
-            padding: 4px 8px;
+            padding: 2px 6px;
         }}
 
         QStatusBar QLabel {{
-            color: {ApplicationStylist.COLORS['text_secondary']};
-            font-size: 10pt;
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 9pt;
             margin: 0px 4px;
         }}
 
@@ -2216,6 +2214,13 @@ class ApplicationStylist:
             letter-spacing: 0px;
         }}
 
+        QLabel#cue_section_header {{
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
+            font-weight: 800;
+            padding: 0px;
+        }}
+
         QLabel#waveform_toolbar_chip {{
             color: {ApplicationStylist.COLORS['text_secondary']};
             background-color: {ApplicationStylist.COLORS['surface_elevated']};
@@ -2290,13 +2295,25 @@ class ApplicationStylist:
             font-size: 9pt;
         }}
 
+        QFrame#inspector_panel QTableWidget::item,
+        QFrame#cue_panel QTableWidget::item {{
+            border-bottom: 1px solid {ApplicationStylist.COLORS['divider']};
+            padding: 3px 6px;
+        }}
+
+        QFrame#inspector_panel QTableWidget::item:selected,
+        QFrame#cue_panel QTableWidget::item:selected {{
+            background-color: rgba(106, 168, 79, 0.24);
+            color: {ApplicationStylist.COLORS['selection_text']};
+        }}
+
         QFrame#inspector_panel QHeaderView::section,
         QFrame#cue_panel QHeaderView::section {{
             background: {ApplicationStylist.COLORS['surface_elevated']};
             color: {ApplicationStylist.COLORS['text_secondary']};
             border: none;
             border-bottom: 1px solid {ApplicationStylist.COLORS['border']};
-            padding: 3px 6px;
+            padding: 4px 6px;
             font-size: 9pt;
             font-weight: 700;
         }}
@@ -2407,6 +2424,38 @@ class ApplicationStylist:
             color: {ApplicationStylist.COLORS['text_muted']};
             font-size: 9pt;
             padding-top: 4px;
+        }}
+
+        QFrame#recording_sidebar QPushButton#tag_reset_button,
+        QFrame#recording_sidebar QPushButton#tag_save_button {{
+            border-radius: 5px;
+            font-size: 9pt;
+            font-weight: 800;
+            min-height: 22px;
+            min-width: 46px;
+            padding: 3px 9px;
+        }}
+
+        QFrame#recording_sidebar QPushButton#tag_reset_button {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            color: {ApplicationStylist.COLORS['text_secondary']};
+        }}
+
+        QFrame#recording_sidebar QPushButton#tag_reset_button:hover {{
+            border-color: {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['text_primary']};
+        }}
+
+        QFrame#recording_sidebar QPushButton#tag_save_button {{
+            background-color: {ApplicationStylist.COLORS['primary']};
+            border: 1px solid {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['selection_text']};
+        }}
+
+        QFrame#recording_sidebar QPushButton#tag_save_button:hover {{
+            background-color: {ApplicationStylist.COLORS['primary_hover']};
+            border-color: {ApplicationStylist.COLORS['primary_hover']};
         }}
 
         QWidget#tag_completer QPushButton#template_chip {{

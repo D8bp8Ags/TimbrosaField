@@ -859,6 +859,7 @@ class WavViewer(QWidget):
 
         # Cue points table
         self.cue_label = QLabel("Cue Points:")
+        self.cue_label.setObjectName("cue_section_header")
         self.cue_table = self._create_metadata_table(["ID", "Positie", "Label"])
         self.cue_table.cellClicked.connect(self.highlight_cue_line)
         self.cue_table.setFixedHeight(200)
@@ -923,6 +924,8 @@ class WavViewer(QWidget):
         table.verticalHeader().setVisible(False)
         table.setAlternatingRowColors(True)
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setShowGrid(False)
+        table.verticalHeader().setDefaultSectionSize(24)
         # table.setMaximumHeight(150)
         # table.setFixedHeight(200)
         # table.setMinimumHeight(175)
@@ -975,12 +978,14 @@ class WavViewer(QWidget):
         tag_buttons_layout = QHBoxLayout()
 
         self.reset_tags_button = QPushButton("Reset")
+        self.reset_tags_button.setObjectName("tag_reset_button")
         self.reset_tags_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.reset_tags_button.setToolTip("Reset tags to default")
         self.reset_tags_button.clicked.connect(self._reset_info_table_to_defaults)
         tag_buttons_layout.addWidget(self.reset_tags_button)
 
         self.save_tags_button = QPushButton("Save")
+        self.save_tags_button.setObjectName("tag_save_button")
         self.save_tags_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.save_tags_button.setToolTip("Save tags to file")
         self.save_tags_button.clicked.connect(self.save_info_from_info_table_to_file)
