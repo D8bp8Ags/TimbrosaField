@@ -165,3 +165,27 @@ def test_recording_sidebar_controls_have_real_behavior(qapp, qt_widget_cleanup):
 
     viewer._update_recording_count_label(116)
     assert viewer.recording_count_label.text() == "116 recordings"
+
+
+def test_waveform_toolbar_controls_have_real_behavior(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    assert set(viewer.waveform_mode_buttons) == {"mono", "per_kanaal", "overlay"}
+    viewer.waveform_mode_buttons["mono"].click()
+    assert viewer.get_view_mode() == "mono"
+    assert viewer.mono_radio.isChecked() is True
+
+    viewer.waveform_mode_buttons["per_kanaal"].click()
+    assert viewer.get_view_mode() == "per_kanaal"
+    assert viewer.stereo_radio.isChecked() is True
+
+    viewer.snap_button.click()
+    assert viewer._snap_to_cues is True
+    assert viewer.snap_button.text() == "Snap: On"
+
+    viewer.time_mode_combo.setCurrentText("Timecode")
+    assert viewer._time_display_mode == "timecode"
+
+    viewer.amplitude_mode_combo.setCurrentText("Linear")
+    assert viewer._amplitude_display_mode == "linear"
+    assert viewer.waveform_plot.getPlotItem().getAxis("top").isVisible() is True

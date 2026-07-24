@@ -32,6 +32,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QAction,
     QButtonGroup,
+    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -175,6 +176,18 @@ class RecordingListRow(QWidget):
         meta_layout.addWidget(date_label)
 
         layout.addLayout(meta_layout)
+
+
+class MinuteSecondAxis(pg.AxisItem):
+    """Axis that formats seconds as compact minute:second labels."""
+
+    def tickStrings(self, values, scale, spacing):  # noqa: N802 - pyqtgraph API
+        labels = []
+        for value in values:
+            seconds_value = max(0, int(round(value * scale)))
+            minutes, seconds = divmod(seconds_value, 60)
+            labels.append(f"{minutes}:{seconds:02d}")
+        return labels
 
 
 class CueOverviewWidget(QWidget):
@@ -468,6 +481,9 @@ class WavViewer(QWidget):
         self._sync_connected: bool = False
         self._hover_connected: bool = False
         self._click_handlers_setup: bool = False
+        self._snap_to_cues: bool = False
+        self._time_display_mode: str = "time"
+        self._amplitude_display_mode: str = "dbfs"
 
         # View configuration
         self.view_mode: str = "per_kanaal"
@@ -802,10 +818,44 @@ class WavViewer(QWidget):
 
         self.waveform_toolbar_controls = QHBoxLayout()
         self.waveform_toolbar_controls.setSpacing(6)
-        for text in ("Time", "Snap: Off", "dBFS"):
-            chip = QLabel(text)
-            chip.setObjectName("waveform_toolbar_chip")
-            self.waveform_toolbar_controls.addWidget(chip)
+
+        self.waveform_mode_buttons: dict[str, QPushButton] = {}
+        for mode, text, tooltip in (
+            ("mono", "≋", "Mono waveform view"),
+            ("per_kanaal", "⋯", "Stereo lane view"),
+            ("overlay", "⧉", "Overlay waveform view"),
+        ):
+            button = QPushButton(text)
+            button.setObjectName("waveform_mode_button")
+            button.setToolTip(tooltip)
+            button.clicked.connect(lambda _checked=False, m=mode: self._set_toolbar_view_mode(m))
+            self.waveform_mode_buttons[mode] = button
+            self.waveform_toolbar_controls.addWidget(button)
+
+        self.time_mode_combo = QComboBox()
+        self.time_mode_combo.setObjectName("waveform_toolbar_combo")
+        self.time_mode_combo.addItems(["Time", "Timecode"])
+        self.time_mode_combo.currentTextChanged.connect(self._set_time_display_mode)
+        self.waveform_toolbar_controls.addWidget(self.time_mode_combo)
+
+        self.snap_button = QPushButton("Snap: Off")
+        self.snap_button.setObjectName("waveform_toolbar_button")
+        self.snap_button.setCheckable(True)
+        self.snap_button.setToolTip("Toggle cue snap state")
+        self.snap_button.toggled.connect(self._set_snap_to_cues)
+        self.waveform_toolbar_controls.addWidget(self.snap_button)
+
+        self.amplitude_mode_combo = QComboBox()
+        self.amplitude_mode_combo.setObjectName("waveform_toolbar_combo")
+        self.amplitude_mode_combo.addItems(["dBFS", "Linear"])
+        self.amplitude_mode_combo.currentTextChanged.connect(self._set_amplitude_display_mode)
+        self.waveform_toolbar_controls.addWidget(self.amplitude_mode_combo)
+
+        self.waveform_settings_button = QPushButton("⚙")
+        self.waveform_settings_button.setObjectName("waveform_settings_button")
+        self.waveform_settings_button.setToolTip("Waveform display settings")
+        self.waveform_settings_button.clicked.connect(self._focus_waveform_workspace)
+        self.waveform_toolbar_controls.addWidget(self.waveform_settings_button)
         header_row.addLayout(self.waveform_toolbar_controls)
         header_row.addStretch()
 
@@ -829,26 +879,41 @@ class WavViewer(QWidget):
         }
 
         # Main mono/overlay plot
-        self.waveform_plot = pg.PlotWidget(**plot_config)
+        self.waveform_plot = pg.PlotWidget(
+            axisItems={
+                "bottom": MinuteSecondAxis("bottom"),
+                "top": MinuteSecondAxis("top"),
+            },
+            **plot_config,
+        )
         self.waveform_plot.setLabel("left", "Amplitude")
         self.waveform_plot.setLabel("bottom", "Time (s)")
+        self.waveform_plot.getPlotItem().showAxis("top", True)
+        self.waveform_plot.getPlotItem().setLabel("top", "Time")
         # self.waveform_plot.setMinimumHeight(120)
         self.waveform_layout.addWidget(self.waveform_plot, stretch=50)
 
         # Channel 1 (left) plot
-        self.waveform_plot_top = pg.PlotWidget(**plot_config)
+        self.waveform_plot_top = pg.PlotWidget(
+            axisItems={"bottom": MinuteSecondAxis("bottom")},
+            **plot_config,
+        )
         self.waveform_plot_top.setLabel("left", "Left Ch")
         # self.waveform_plot_top.setMinimumHeight(100)
         self.waveform_layout.addWidget(self.waveform_plot_top, stretch=50)
 
         # Channel 2 (right) plot
-        self.waveform_plot_bottom = pg.PlotWidget(**plot_config)
+        self.waveform_plot_bottom = pg.PlotWidget(
+            axisItems={"bottom": MinuteSecondAxis("bottom")},
+            **plot_config,
+        )
         self.waveform_plot_bottom.setLabel("left", "Right Ch")
         self.waveform_plot_bottom.setLabel("bottom", "Time (s)")
         # self.waveform_plot_bottom.setMinimumHeight(100)
 
         self.waveform_layout.addWidget(self.waveform_plot_bottom, stretch=50)
         self.apply_waveform_plot_theme()
+        self._update_toolbar_mode_buttons()
 
         # self.waveform_plot.getViewBox().sigXRangeChanged.connect(
         #     self.update_plot_for_view_range)
@@ -880,6 +945,47 @@ class WavViewer(QWidget):
                 axis.setPen(axis_pen)
                 axis.setTextPen(text_pen)
                 axis.setStyle(tickTextOffset=6)
+            top_axis = plot_item.getAxis("top")
+            if top_axis:
+                top_axis.setPen(axis_pen)
+                top_axis.setTextPen(text_pen)
+                top_axis.setStyle(tickTextOffset=6)
+
+    def _set_toolbar_view_mode(self, mode: str) -> None:
+        """Apply a waveform view mode from the mockup toolbar controls."""
+        self.set_view_mode(mode)
+        self.sync_view_mode_controls(mode)
+        self._update_toolbar_mode_buttons()
+
+    def _update_toolbar_mode_buttons(self) -> None:
+        """Reflect the active waveform mode in toolbar icon buttons."""
+        for mode, button in getattr(self, "waveform_mode_buttons", {}).items():
+            button.setProperty("active", mode == self.view_mode)
+            button.style().unpolish(button)
+            button.style().polish(button)
+
+    def _set_time_display_mode(self, label: str) -> None:
+        """Switch time display mode state and update axis labels."""
+        self._time_display_mode = "timecode" if label == "Timecode" else "time"
+        axis_label = "Timecode" if self._time_display_mode == "timecode" else "Time (s)"
+        for plot in (self.waveform_plot, self.waveform_plot_top, self.waveform_plot_bottom):
+            plot.setLabel("bottom", axis_label)
+        self.waveform_plot.getPlotItem().setLabel("top", "Time")
+
+    def _set_snap_to_cues(self, enabled: bool) -> None:
+        """Store cue-snap state for toolbar parity and future click behavior."""
+        self._snap_to_cues = enabled
+        self.snap_button.setText("Snap: On" if enabled else "Snap: Off")
+
+    def _set_amplitude_display_mode(self, label: str) -> None:
+        """Switch amplitude display state and update lane labels."""
+        self._amplitude_display_mode = "linear" if label == "Linear" else "dbfs"
+        main_label = "Linear" if self._amplitude_display_mode == "linear" else "dBFS"
+        self.waveform_plot.setLabel("left", main_label)
+
+    def _focus_waveform_workspace(self) -> None:
+        """Focus the waveform workspace from the toolbar settings action."""
+        self.waveform_plot.setFocus(Qt.ShortcutFocusReason)
 
     def _setup_metadata_tables(self) -> None:
         """Set up comprehensive metadata display tables for WAV file information.
@@ -3973,6 +4079,7 @@ class WavViewer(QWidget):
         if self.current_data is not None:
             self._render_waveforms()
 
+        self._update_toolbar_mode_buttons()
         logger.debug(f"View mode changed to: {mode}")
 
     def get_view_mode(self) -> str:

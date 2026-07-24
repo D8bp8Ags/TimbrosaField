@@ -2242,6 +2242,65 @@ class ApplicationStylist:
             font-weight: 600;
         }}
 
+        QFrame#waveform_panel QPushButton#waveform_mode_button,
+        QFrame#waveform_panel QPushButton#waveform_toolbar_button,
+        QFrame#waveform_panel QPushButton#waveform_settings_button,
+        QFrame#waveform_panel QComboBox#waveform_toolbar_combo {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            font-size: 9pt;
+            font-weight: 700;
+            min-height: 22px;
+            padding: 2px 8px;
+        }}
+
+        QFrame#waveform_panel QPushButton#waveform_mode_button {{
+            min-width: 26px;
+            max-width: 30px;
+            padding: 1px 4px;
+        }}
+
+        QFrame#waveform_panel QPushButton#waveform_settings_button {{
+            background-color: transparent;
+            border-color: transparent;
+            min-width: 24px;
+            max-width: 26px;
+            padding: 1px;
+        }}
+
+        QFrame#waveform_panel QPushButton#waveform_mode_button[active="true"],
+        QFrame#waveform_panel QPushButton#waveform_toolbar_button:checked {{
+            color: {ApplicationStylist.COLORS['selection_text']};
+            background-color: rgba(106, 168, 79, 0.32);
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QFrame#waveform_panel QPushButton#waveform_mode_button:hover,
+        QFrame#waveform_panel QPushButton#waveform_toolbar_button:hover,
+        QFrame#waveform_panel QPushButton#waveform_settings_button:hover,
+        QFrame#waveform_panel QComboBox#waveform_toolbar_combo:hover {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['text_primary']};
+        }}
+
+        QFrame#waveform_panel QComboBox#waveform_toolbar_combo::drop-down {{
+            border: none;
+            width: 14px;
+        }}
+
+        QFrame#waveform_panel QComboBox#waveform_toolbar_combo::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {ApplicationStylist.COLORS['text_muted']};
+            width: 0px;
+            height: 0px;
+            margin-right: 3px;
+        }}
+
         QFrame#waveform_panel QCheckBox#ai_layer_toggle {{
             spacing: 6px;
             font-size: 9pt;
