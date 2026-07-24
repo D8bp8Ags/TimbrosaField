@@ -1,6 +1,6 @@
 """Regression tests for Fase 2 public WavViewer API and SettingsManager decoupling.
 
-Fase 2 (architecture notes) replaced direct
+The refactor replaced direct
 external access to WavViewer's private methods and internal widgets
 (mono_radio/stereo_radio/overlay_radio, audio_player, _reset_info_table_to_defaults,
 _current_mouse_mode) with a small public API. These tests confirm the new

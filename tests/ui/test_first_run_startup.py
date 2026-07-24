@@ -1,6 +1,5 @@
 """Regression tests for the first-run startup crash.
 
-Baseline (architecture notes, section 4.2):
 ``SettingsManager.get_view_mode()`` used to default to the misspelled
 "per-kanaal" (hyphen), while ``WavViewer.set_view_mode()`` only accepts
 "per_kanaal" (underscore). ``restore_all_settings()`` only caught
@@ -85,8 +84,7 @@ def test_main_window_restores_settings_without_raising(
     Each MainWindow is registered with the ``qt_widget_cleanup`` fixture,
     which closes and schedules deletion of widgets after every test; without
     this, repeated MainWindow construction within a single offscreen Qt
-    process caused a segmentation fault in pyqtgraph after a few iterations
-    (see architecture notes, Fase 1 section).
+    process caused a segmentation fault in pyqtgraph after a few iterations.
     """
     if stored_value is not None:
         settings = SettingsManager()

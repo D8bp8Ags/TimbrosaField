@@ -41,8 +41,8 @@ def qapp():
     avoids the native-widget resource accumulation that caused a
     segmentation fault in pyqtgraph after repeatedly constructing and
     tearing down full MainWindow instances within a single offscreen
-    Qt process (see architecture notes,
-    Fase 1 section).
+    Qt process. This keeps the regression test environment stable
+    across repeated MainWindow construction.
     """
     from PyQt5.QtWidgets import QApplication
 

@@ -20,7 +20,7 @@ Requirements:
 
 Start command (from the repository root):
     PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py                   # uses first WAV from config dir
-    PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py example.wav    # specific filename in config dir
+    PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py example.wav        # specific filename in config dir
     PYTHONPATH=src python3 scripts/experimental/ai_tag_analyzer.py /full/path/to.wav  # absolute path
 
 Not collected by pytest: this is a manual, experimental CLI script, not an
