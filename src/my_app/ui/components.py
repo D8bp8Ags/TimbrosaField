@@ -244,7 +244,7 @@ class ModernStatusBar(QStatusBar):
         self.activity_indicator.setVisible(False)
 
         # Audio status
-        self.audio_status = QLabel("♪ Stopped")
+        self.audio_status = QLabel("Stopped")
         # self.addPermanentWidget(self.audio_status)
 
         # Current file info
@@ -461,9 +461,6 @@ class ModernStatusBar(QStatusBar):
             be updated whenever audio player state changes.
         """
         # todo
-        # icons = {"playing": "▶️", "paused": "⏸️", "stopped": "⏹️"}
-        # icon = icons.get(status.lower(), "♪")
-        # Icons don't work yet in some environments
         self.audio_status.setText(f"{status.title()}")
 
     def update_file_info(self, filename=None, duration=None, size=None):
@@ -1878,7 +1875,7 @@ class ApplicationStylist:
         }}
 
         /* Volume control styling */
-        QWidget[objectName="audio_player_widget"] QLabel[text="♪"] {{
+        QWidget[objectName="audio_player_widget"] QLabel#transport_volume_label {{
             font-size: 16pt;
             font-weight: 500;
             color: {ApplicationStylist.COLORS['primary']};

@@ -148,9 +148,10 @@ class RecordingListRow(QWidget):
         layout.setContentsMargins(8, 2, 14, 2)
         layout.setSpacing(8)
 
-        icon_label = QLabel("≋")
+        icon_label = QLabel()
         icon_label.setObjectName("recording_row_icon")
         icon_label.setFixedWidth(16)
+        icon_label.setPixmap(UiIconFactory.pixmap("waveform", 14))
         layout.addWidget(icon_label)
 
         name_label = QLabel(filename)
@@ -188,6 +189,60 @@ class MinuteSecondAxis(pg.AxisItem):
             minutes, seconds = divmod(seconds_value, 60)
             labels.append(f"{minutes}:{seconds:02d}")
         return labels
+
+
+class UiIconFactory:
+    """Small painted icons that avoid platform font fallback issues."""
+
+    @staticmethod
+    def icon(name: str, size: int = 16, color: str | None = None) -> QIcon:
+        return QIcon(UiIconFactory.pixmap(name, size, color))
+
+    @staticmethod
+    def pixmap(name: str, size: int = 16, color: str | None = None) -> QPixmap:
+        color = color or "#c8d0cc"
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(QColor(color), max(1, size // 12))
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+
+        if name == "waveform":
+            y = size // 2
+            for x, amp in ((3, 2), (6, 4), (9, 3), (12, 5)):
+                painter.drawLine(x, y - amp, x, y + amp)
+        elif name == "stereo":
+            for y in (size // 3, (size * 2) // 3):
+                painter.drawLine(3, y, size - 3, y)
+                painter.drawLine(5, y - 2, 5, y + 2)
+                painter.drawLine(size - 5, y - 2, size - 5, y + 2)
+        elif name == "overlay":
+            painter.drawRect(4, 4, 7, 7)
+            painter.drawRect(7, 7, 7, 7)
+        elif name == "settings":
+            center = size // 2
+            painter.drawEllipse(center - 3, center - 3, 6, 6)
+            for dx, dy in ((0, -6), (0, 6), (-6, 0), (6, 0)):
+                painter.drawLine(center, center, center + dx, center + dy)
+        elif name == "menu":
+            painter.setBrush(QColor(color))
+            for x in (5, 8, 11):
+                painter.drawEllipse(x - 1, size // 2 - 1, 2, 2)
+        elif name == "zoom_fit":
+            painter.drawEllipse(3, 3, 7, 7)
+            painter.drawLine(9, 9, 13, 13)
+            painter.drawLine(5, 6, 8, 6)
+            painter.drawLine(6, 5, 6, 8)
+        elif name == "minus":
+            painter.drawLine(4, size // 2, size - 4, size // 2)
+        elif name == "plus":
+            painter.drawLine(4, size // 2, size - 4, size // 2)
+            painter.drawLine(size // 2, 4, size // 2, size - 4)
+
+        painter.end()
+        return pixmap
 
 
 class CueOverviewWidget(QWidget):
@@ -729,8 +784,10 @@ class WavViewer(QWidget):
         inspector_header.setObjectName("inspector_header")
         inspector_header_row.addWidget(inspector_header, stretch=1)
 
-        self.inspector_settings_button = QPushButton("⚙")
+        self.inspector_settings_button = QPushButton()
         self.inspector_settings_button.setObjectName("inspector_settings_button")
+        self.inspector_settings_button.setIcon(UiIconFactory.icon("settings"))
+        self.inspector_settings_button.setIconSize(QSize(14, 14))
         self.inspector_settings_button.setToolTip("Inspector settings")
         self.inspector_settings_button.clicked.connect(self._focus_inspector)
         inspector_header_row.addWidget(self.inspector_settings_button)
@@ -783,8 +840,10 @@ class WavViewer(QWidget):
         self.file_list_label.setToolTip("")
         header_row.addWidget(self.file_list_label, stretch=1)
 
-        self.recording_settings_button = QPushButton("⚙")
+        self.recording_settings_button = QPushButton()
         self.recording_settings_button.setObjectName("recording_settings_button")
+        self.recording_settings_button.setIcon(UiIconFactory.icon("settings"))
+        self.recording_settings_button.setIconSize(QSize(14, 14))
         self.recording_settings_button.setToolTip("Recording list settings")
         self.recording_settings_button.clicked.connect(self._focus_recording_search)
         header_row.addWidget(self.recording_settings_button)
@@ -860,13 +919,15 @@ class WavViewer(QWidget):
         self.waveform_toolbar_controls.setSpacing(6)
 
         self.waveform_mode_buttons: dict[str, QPushButton] = {}
-        for mode, text, tooltip in (
-            ("mono", "≋", "Mono waveform view"),
-            ("per_kanaal", "⋯", "Stereo lane view"),
-            ("overlay", "⧉", "Overlay waveform view"),
+        for mode, icon_name, tooltip in (
+            ("mono", "waveform", "Mono waveform view"),
+            ("per_kanaal", "stereo", "Stereo lane view"),
+            ("overlay", "overlay", "Overlay waveform view"),
         ):
-            button = QPushButton(text)
+            button = QPushButton()
             button.setObjectName("waveform_mode_button")
+            button.setIcon(UiIconFactory.icon(icon_name))
+            button.setIconSize(QSize(16, 16))
             button.setToolTip(tooltip)
             button.clicked.connect(lambda _checked=False, m=mode: self._set_toolbar_view_mode(m))
             self.waveform_mode_buttons[mode] = button
@@ -891,8 +952,10 @@ class WavViewer(QWidget):
         self.amplitude_mode_combo.currentTextChanged.connect(self._set_amplitude_display_mode)
         self.waveform_toolbar_controls.addWidget(self.amplitude_mode_combo)
 
-        self.waveform_settings_button = QPushButton("⚙")
+        self.waveform_settings_button = QPushButton()
         self.waveform_settings_button.setObjectName("waveform_settings_button")
+        self.waveform_settings_button.setIcon(UiIconFactory.icon("settings"))
+        self.waveform_settings_button.setIconSize(QSize(14, 14))
         self.waveform_settings_button.setToolTip("Waveform display settings")
         self.waveform_settings_button.clicked.connect(self._focus_waveform_workspace)
         self.waveform_toolbar_controls.addWidget(self.waveform_settings_button)
@@ -1074,8 +1137,10 @@ class WavViewer(QWidget):
         self.cue_add_button.setObjectName("cue_add_button")
         self.cue_add_button.setToolTip("Add a session cue at the current playhead")
         self.cue_add_button.clicked.connect(self._add_session_cue_point)
-        self.cue_menu_button = QPushButton("⋯")
+        self.cue_menu_button = QPushButton()
         self.cue_menu_button.setObjectName("cue_menu_button")
+        self.cue_menu_button.setIcon(UiIconFactory.icon("menu"))
+        self.cue_menu_button.setIconSize(QSize(14, 14))
         self.cue_menu_button.setToolTip("Copy selected cue")
         self.cue_menu_button.clicked.connect(
             lambda: self._copy_selected_table_cell(self.cue_table)
@@ -1182,7 +1247,7 @@ class WavViewer(QWidget):
         section_layout.setContentsMargins(0, 0, 0, 0)
         section_layout.setSpacing(4)
         label.setVisible(False)
-        section_button = QPushButton(f"▾ {label.text()}")
+        section_button = QPushButton(f"v {label.text()}")
         section_button.setObjectName("inspector_section_toggle")
         section_button.setCheckable(True)
         section_button.setChecked(True)
@@ -1202,7 +1267,7 @@ class WavViewer(QWidget):
     ) -> None:
         """Expand or collapse an inspector section."""
         table.setVisible(expanded)
-        button.setText(f"{'▾' if expanded else '▸'} {title}")
+        button.setText(f"{'v' if expanded else '>'} {title}")
 
     def _focus_inspector(self) -> None:
         """Focus the inspector scroll area from the header gear action."""
@@ -1349,20 +1414,26 @@ class WavViewer(QWidget):
             self.transport_controls_layout.setSpacing(6)
             self.transport_controls_layout.addWidget(self.audio_player, stretch=1)
 
-            self.transport_zoom_fit_button = QPushButton("⌕")
+            self.transport_zoom_fit_button = QPushButton()
             self.transport_zoom_fit_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_fit_button.setIcon(UiIconFactory.icon("zoom_fit"))
+            self.transport_zoom_fit_button.setIconSize(QSize(14, 14))
             self.transport_zoom_fit_button.setToolTip("Fit waveform to window")
             self.transport_zoom_fit_button.clicked.connect(self._zoom_waveform_fit)
             self.transport_controls_layout.addWidget(self.transport_zoom_fit_button)
 
-            self.transport_zoom_out_button = QPushButton("−")
+            self.transport_zoom_out_button = QPushButton()
             self.transport_zoom_out_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_out_button.setIcon(UiIconFactory.icon("minus"))
+            self.transport_zoom_out_button.setIconSize(QSize(14, 14))
             self.transport_zoom_out_button.setToolTip("Zoom waveform out")
             self.transport_zoom_out_button.clicked.connect(self._zoom_waveform_out)
             self.transport_controls_layout.addWidget(self.transport_zoom_out_button)
 
-            self.transport_zoom_in_button = QPushButton("+")
+            self.transport_zoom_in_button = QPushButton()
             self.transport_zoom_in_button.setObjectName("transport_zoom_button")
+            self.transport_zoom_in_button.setIcon(UiIconFactory.icon("plus"))
+            self.transport_zoom_in_button.setIconSize(QSize(14, 14))
             self.transport_zoom_in_button.setToolTip("Zoom waveform in")
             self.transport_zoom_in_button.clicked.connect(self._zoom_waveform_in)
             self.transport_controls_layout.addWidget(self.transport_zoom_in_button)

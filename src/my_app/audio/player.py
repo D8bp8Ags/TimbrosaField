@@ -27,7 +27,8 @@ import logging
 import os
 
 from my_app.app_config import DEFAULT_VOLUME, SEEK_STEP_MS
-from PyQt5.QtCore import Qt, QTimer, QUrl, pyqtSignal
+from PyQt5.QtCore import QPoint, QSize, Qt, QTimer, QUrl, pyqtSignal
+from PyQt5.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygon
 from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 from PyQt5.QtWidgets import (
     QHBoxLayout,
@@ -38,6 +39,68 @@ from PyQt5.QtWidgets import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class TransportIconFactory:
+    """Painted transport icons independent of platform emoji/symbol fonts."""
+
+    COLOR = "#c8d0cc"
+
+    @staticmethod
+    def icon(name: str, size: int = 16) -> QIcon:
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(QPen(QColor(TransportIconFactory.COLOR), max(1, size // 12)))
+        painter.setBrush(QColor(TransportIconFactory.COLOR))
+
+        if name == "rewind":
+            TransportIconFactory._triangle(painter, 9, 4, 4, 8, 9, 12)
+            TransportIconFactory._triangle(painter, 14, 4, 9, 8, 14, 12)
+        elif name == "play":
+            TransportIconFactory._triangle(painter, 5, 3, 13, 8, 5, 13)
+        elif name == "pause":
+            painter.drawRect(5, 4, 2, 9)
+            painter.drawRect(10, 4, 2, 9)
+        elif name == "stop":
+            painter.drawRect(5, 5, 8, 8)
+        elif name == "forward":
+            TransportIconFactory._triangle(painter, 3, 4, 8, 8, 3, 12)
+            TransportIconFactory._triangle(painter, 8, 4, 13, 8, 8, 12)
+        elif name == "loop":
+            painter.setBrush(Qt.NoBrush)
+            painter.drawArc(3, 4, 10, 8, 30 * 16, 285 * 16)
+            painter.drawLine(12, 4, 14, 4)
+            painter.drawLine(14, 4, 14, 6)
+        elif name == "speaker":
+            painter.drawPolygon(
+                QPolygon(
+                    [
+                        QPoint(2, 7),
+                        QPoint(5, 7),
+                        QPoint(9, 4),
+                        QPoint(9, 12),
+                        QPoint(5, 9),
+                        QPoint(2, 9),
+                    ]
+                )
+            )
+            painter.setBrush(Qt.NoBrush)
+            painter.drawArc(8, 5, 5, 6, -45 * 16, 90 * 16)
+
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def pixmap(name: str, size: int = 16) -> QPixmap:
+        return TransportIconFactory.icon(name, size).pixmap(size, size)
+
+    @staticmethod
+    def _triangle(
+        painter: QPainter, x1: int, y1: int, x2: int, y2: int, x3: int, y3: int
+    ) -> None:
+        painter.drawPolygon(QPolygon([QPoint(x1, y1), QPoint(x2, y2), QPoint(x3, y3)]))
 
 
 class VolumeToast(QLabel):
@@ -227,7 +290,8 @@ class AudioPlayer(QWidget):
         # Rewind button
         self.rewind_button = QPushButton()
         self.rewind_button.setObjectName("transport_rewind_button")
-        self.rewind_button.setText("⏪")
+        self.rewind_button.setIcon(TransportIconFactory.icon("rewind"))
+        self.rewind_button.setIconSize(QSize(16, 16))
         self.rewind_button.setToolTip("Seek backward 10 seconds")
         self.rewind_button.clicked.connect(self.seek_backward)
         layout.addWidget(self.rewind_button)
@@ -235,7 +299,8 @@ class AudioPlayer(QWidget):
         # Play/Pause button
         self.play_button = QPushButton()
         self.play_button.setObjectName("transport_play_button")
-        self.play_button.setText("▶")
+        self.play_button.setIcon(TransportIconFactory.icon("play"))
+        self.play_button.setIconSize(QSize(16, 16))
         self.play_button.setToolTip("Play/Pause (Spacebar)")
         self.play_button.clicked.connect(self.toggle_playback)
         layout.addWidget(self.play_button)
@@ -243,7 +308,8 @@ class AudioPlayer(QWidget):
         # Stop button
         self.stop_button = QPushButton()
         self.stop_button.setObjectName("transport_stop_button")
-        self.stop_button.setText("■")
+        self.stop_button.setIcon(TransportIconFactory.icon("stop"))
+        self.stop_button.setIconSize(QSize(16, 16))
         self.stop_button.setToolTip("Stop (Esc)")
         self.stop_button.clicked.connect(self.stop_playback)
         layout.addWidget(self.stop_button)
@@ -251,14 +317,16 @@ class AudioPlayer(QWidget):
         # Forward and loop controls
         self.forward_button = QPushButton()
         self.forward_button.setObjectName("transport_forward_button")
-        self.forward_button.setText("⏩")
+        self.forward_button.setIcon(TransportIconFactory.icon("forward"))
+        self.forward_button.setIconSize(QSize(16, 16))
         self.forward_button.setToolTip("Seek forward 10 seconds")
         self.forward_button.clicked.connect(self.seek_forward)
         layout.addWidget(self.forward_button)
 
         self.loop_button = QPushButton()
         self.loop_button.setObjectName("transport_loop_button")
-        self.loop_button.setText("↻")
+        self.loop_button.setIcon(TransportIconFactory.icon("loop"))
+        self.loop_button.setIconSize(QSize(16, 16))
         self.loop_button.setCheckable(True)
         self.loop_button.setToolTip("Loop playback")
         self.loop_button.toggled.connect(self._set_loop_enabled)
@@ -272,8 +340,9 @@ class AudioPlayer(QWidget):
         layout.addWidget(self.position_slider, stretch=4)
 
         # Volume control
-        volume_label = QLabel("♪")
+        volume_label = QLabel()
         volume_label.setObjectName("transport_volume_label")
+        volume_label.setPixmap(TransportIconFactory.pixmap("speaker", 14))
         volume_label.setFixedWidth(12)
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setObjectName("transport_volume_slider")
@@ -312,7 +381,7 @@ class AudioPlayer(QWidget):
         Note:
             Shortcut implementation is currently disabled in code.
         """
-        # print("🎹 AudioPlayer: Installing global shortcuts...")
+        # print("AudioPlayer: Installing global shortcuts...")
         """
         parent_window = self.window() if self.window() else self.parent()
         if parent_window is None:
@@ -393,7 +462,7 @@ class AudioPlayer(QWidget):
             self.player.setMedia(QMediaContent(url))
             self._current_filepath = filepath
 
-            # print(f"🎵 Audio loaded: {os.path.basename(filepath)}")
+            # print(f"Audio loaded: {os.path.basename(filepath)}")
             return True
 
         except Exception as e:
@@ -438,7 +507,7 @@ class AudioPlayer(QWidget):
         audio. If paused or stopped, starts/resumes playback. This is the primary method
         for spacebar shortcut functionality.
         """
-        # print("🎵 Toggle playbook triggered")
+        # print("Toggle playback triggered")
         if self.player.state() == QMediaPlayer.PlayingState:
             self.pause()
         else:
@@ -691,11 +760,11 @@ class AudioPlayer(QWidget):
             state (QMediaPlayer.State): New playback state
         """
         if state == QMediaPlayer.PlayingState:
-            self.play_button.setText("Ⅱ")
+            self.play_button.setIcon(TransportIconFactory.icon("pause"))
             self.play_button.setToolTip("Pause (Spacebar)")
 
         elif state == QMediaPlayer.PausedState or state == QMediaPlayer.StoppedState:
-            self.play_button.setText("▶")
+            self.play_button.setIcon(TransportIconFactory.icon("play"))
             self.play_button.setToolTip("Play (Spacebar)")
 
         self.stateChanged.emit(state)

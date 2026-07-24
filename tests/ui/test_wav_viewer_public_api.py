@@ -220,11 +220,11 @@ def test_inspector_sections_are_collapsible(qapp, qt_widget_cleanup):
 
     toggle.click()
     assert viewer.fmt_table.isHidden() is True
-    assert toggle.text().startswith("▸")
+    assert toggle.text().startswith(">")
 
     toggle.click()
     assert viewer.fmt_table.isHidden() is False
-    assert toggle.text().startswith("▾")
+    assert toggle.text().startswith("v")
 
 
 def test_metadata_table_cells_can_be_copied(qapp, qt_widget_cleanup):
