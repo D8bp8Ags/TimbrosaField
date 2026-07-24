@@ -731,17 +731,10 @@ class WavViewer(QWidget):
             cue_table=self.cue_table,
         )
 
-        self.inspector_layout.addWidget(self.bext_label)
-        self.inspector_layout.addWidget(self.bext_table)
-
-        self.inspector_layout.addWidget(self.fmt_label)
-        self.inspector_layout.addWidget(self.fmt_table)
-
-        self.inspector_layout.addWidget(self.info_label)
-        self.inspector_layout.addWidget(self.info_table)
-
-        self.inspector_layout.addWidget(self.gps_label)
-        self.inspector_layout.addWidget(self.gps_table)
+        self._add_inspector_section(self.bext_label, self.bext_table)
+        self._add_inspector_section(self.fmt_label, self.fmt_table)
+        self._add_inspector_section(self.info_label, self.info_table)
+        self._add_inspector_section(self.gps_label, self.gps_table)
 
         # Photo preview (shown when WAV has a PHOTO_REF in iXML)
         self.photo_preview_label = QLabel("Photo:")
@@ -790,6 +783,17 @@ class WavViewer(QWidget):
         table.setMinimumHeight(145)
         # table.setMaximumWidth(50)
         return table
+
+    def _add_inspector_section(self, label: QLabel, table: QTableWidget) -> None:
+        """Add a titled metadata table to the right inspector."""
+        section = QFrame()
+        section.setObjectName("inspector_section")
+        section_layout = QVBoxLayout(section)
+        section_layout.setContentsMargins(0, 0, 0, 0)
+        section_layout.setSpacing(4)
+        section_layout.addWidget(label)
+        section_layout.addWidget(table)
+        self.inspector_layout.addWidget(section)
 
     def _setup_tag_input(self) -> None:
         """Set up the tag input system with intelligent autocomplete functionality.

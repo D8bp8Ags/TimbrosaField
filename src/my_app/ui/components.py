@@ -2191,10 +2191,24 @@ class ApplicationStylist:
             border: none;
         }}
 
+        QFrame#inspector_section {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            padding: 0px;
+        }}
+
         QFrame#inspector_panel QLabel {{
             color: {ApplicationStylist.COLORS['text_secondary']};
             font-size: 10pt;
             font-weight: 600;
+        }}
+
+        QFrame#inspector_section > QLabel {{
+            color: {ApplicationStylist.COLORS['primary']};
+            font-size: 9pt;
+            font-weight: 800;
+            padding: 6px 8px 2px 8px;
         }}
 
         QFrame#inspector_panel QTableWidget,
