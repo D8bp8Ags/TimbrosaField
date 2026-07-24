@@ -21,6 +21,8 @@ _GRAPH_MIN = 0.10
 _GRAPH_TOP = 3
 _GRAPH_LABEL_MAX_CHARS = 18
 _GRAPH_LABEL_MIN_SPACING_SECONDS = 30.0
+_REGION_FILL_ALPHA_MAX = 16
+_REGION_EDGE_ALPHA_MAX = 48
 
 
 def _compact_graph_label(label: str) -> str:
@@ -28,6 +30,18 @@ def _compact_graph_label(label: str) -> str:
     if len(label) <= _GRAPH_LABEL_MAX_CHARS:
         return label
     return f"{label[: _GRAPH_LABEL_MAX_CHARS - 1]}…"
+
+
+def _region_style(color: list[int]) -> tuple:
+    """Build restrained fill and edge styles for dense detection overlays."""
+    rgba = list(color[:4]) if len(color) >= 4 else list(color[:3]) + [35]
+    red, green, blue, alpha = rgba
+    fill_alpha = min(alpha, _REGION_FILL_ALPHA_MAX)
+    edge_alpha = min(max(alpha, fill_alpha), _REGION_EDGE_ALPHA_MAX)
+    return (
+        pg.mkBrush(red, green, blue, fill_alpha),
+        pg.mkPen(red, green, blue, edge_alpha, width=1),
+    )
 
 
 class AiOverlayController:
@@ -80,7 +94,7 @@ class AiOverlayController:
         for layer in layers:
             name = layer["name"]
             color = layer.get("color", [80, 80, 200, 35])
-            brush = pg.mkBrush(*color)
+            brush, pen = _region_style(color)
             text_color = layer.get("text_color", "#aaaaff")
 
             by_window: dict[float, list] = {}
@@ -112,6 +126,7 @@ class AiOverlayController:
                     labels,
                     name,
                     brush,
+                    pen,
                     text_color,
                     show_label=show_label,
                 )
@@ -145,6 +160,7 @@ class AiOverlayController:
         labels: list[tuple[str, float]],
         layer_name: str,
         brush,
+        pen,
         text_color: str,
         *,
         show_label: bool = True,
@@ -167,6 +183,7 @@ class AiOverlayController:
                 values=(start_s, end_s),
                 movable=False,
                 brush=brush,
+                pen=pen,
             )
             if tooltip:
                 region.setToolTip(tooltip)
