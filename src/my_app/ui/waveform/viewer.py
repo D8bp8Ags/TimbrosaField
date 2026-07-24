@@ -788,8 +788,8 @@ class WavViewer(QWidget):
         self.inspector_settings_button.setObjectName("inspector_settings_button")
         self.inspector_settings_button.setIcon(UiIconFactory.icon("settings"))
         self.inspector_settings_button.setIconSize(QSize(14, 14))
-        self.inspector_settings_button.setToolTip("Inspector settings")
-        self.inspector_settings_button.clicked.connect(self._focus_inspector)
+        self.inspector_settings_button.setToolTip("Collapse or expand inspector sections")
+        self.inspector_settings_button.clicked.connect(self._toggle_all_inspector_sections)
         inspector_header_row.addWidget(self.inspector_settings_button)
         self.right_layout.addLayout(inspector_header_row)
 
@@ -1158,6 +1158,8 @@ class WavViewer(QWidget):
         )
 
         self.inspector_sections: dict[str, QFrame] = {}
+        self.inspector_section_toggles: dict[str, QPushButton] = {}
+        self.inspector_section_tables: dict[str, QTableWidget] = {}
         self._add_inspector_section(self.bext_label, self.bext_table)
         self._add_inspector_section(self.fmt_label, self.fmt_table)
         self._add_inspector_section(self.gps_label, self.gps_table)
@@ -1261,6 +1263,8 @@ class WavViewer(QWidget):
         section_layout.addWidget(table)
         self.inspector_layout.addWidget(section)
         self.inspector_sections[label.text()] = section
+        self.inspector_section_toggles[label.text()] = section_button
+        self.inspector_section_tables[label.text()] = table
 
     def _toggle_inspector_section(
         self, button: QPushButton, table: QTableWidget, title: str, expanded: bool
@@ -1272,6 +1276,18 @@ class WavViewer(QWidget):
     def _focus_inspector(self) -> None:
         """Focus the inspector scroll area from the header gear action."""
         self.inspector_scroll.setFocus(Qt.ShortcutFocusReason)
+
+    def _toggle_all_inspector_sections(self) -> None:
+        """Collapse all inspector sections, or expand all when already collapsed."""
+        if not self.inspector_section_tables:
+            return
+        should_expand = all(
+            table.isHidden() for table in self.inspector_section_tables.values()
+        )
+        for title, table in self.inspector_section_tables.items():
+            button = self.inspector_section_toggles[title]
+            button.setChecked(should_expand)
+            self._toggle_inspector_section(button, table, title, should_expand)
 
     def _setup_tag_input(self) -> None:
         """Set up the tag input system with intelligent autocomplete functionality.
@@ -2823,8 +2839,6 @@ class WavViewer(QWidget):
         # Convert to time position
         x_pos = offset / self.current_sr
         cue_id_str = str(int(cue_id))
-        label = self.cue_labels.get(cue_id_str, "")
-
         pen = pg.mkPen("#ff334d", width=2)
 
         # Add marker to all plots
@@ -2847,13 +2861,20 @@ class WavViewer(QWidget):
                     "padding:1px 4px;border-radius:2px;font-weight:700;'>"
                     f"{number}</div>"
                 ),
-                anchor=(0.5, 1.0),
+                anchor=(0.5, 0.0),
             )
-            cap.setPos(x_pos, 1.06)
+            cap.plot_ref = plot
+            cap.setPos(x_pos, self._cue_marker_cap_y(plot))
             cap.setZValue(20)
             plot.addItem(cap)
             self.cue_markers.setdefault(cue_id_str, []).append(cap)
 
+    @staticmethod
+    def _cue_marker_cap_y(plot: pg.PlotWidget) -> float:
+        """Return a cap label Y position that stays inside the visible plot."""
+        y_min, y_max = plot.getViewBox().viewRange()[1]
+        y_span = max(0.001, y_max - y_min)
+        return y_max - (y_span * 0.08)
 
     def _setup_interaction_handlers(self) -> None:
         """Set up comprehensive mouse interaction handlers for all plot widgets.
@@ -4157,6 +4178,9 @@ class WavViewer(QWidget):
                 line.setPen(pen)
 
             for cap in self.cue_markers.get(cue_id, []):
+                plot = getattr(cap, "plot_ref", None)
+                if plot is not None:
+                    cap.setPos(cap.pos().x(), self._cue_marker_cap_y(plot))
                 cap.setOpacity(1.0 if is_selected else 0.82)
 
     # ========== AUDIO PLAYBACK INTEGRATION METHODS ==========

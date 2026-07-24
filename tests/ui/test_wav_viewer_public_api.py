@@ -227,6 +227,19 @@ def test_inspector_sections_are_collapsible(qapp, qt_widget_cleanup):
     assert toggle.text().startswith("v")
 
 
+def test_inspector_settings_button_toggles_all_sections(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    viewer.inspector_settings_button.click()
+    assert all(table.isHidden() for table in viewer.inspector_section_tables.values())
+
+    viewer.inspector_settings_button.click()
+    assert all(
+        table.isHidden() is False
+        for table in viewer.inspector_section_tables.values()
+    )
+
+
 def test_metadata_table_cells_can_be_copied(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
     viewer.fmt_table.insertRow(0)
@@ -268,6 +281,26 @@ def test_session_cue_id_prefers_short_free_display_id(qapp, qt_widget_cleanup):
     viewer.current_cue_points = [{"ID": 4278190179, "Sample Offset": 100}]
 
     assert viewer._next_session_cue_id() == 1
+
+
+def test_cue_marker_caps_stay_inside_current_y_range(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    for plot in viewer._waveform_plots():
+        plot.getViewBox().setYRange(-1.2, 1.2, padding=0)
+
+    viewer._add_single_cue_marker({"ID": 1, "Sample Offset": 1000})
+
+    for cap in viewer.cue_markers["1"]:
+        plot = cap.plot_ref
+        y_min, y_max = plot.getViewBox().viewRange()[1]
+        assert y_min < cap.pos().y() < y_max
+
+    viewer.waveform_plot.getViewBox().setYRange(-0.2, 0.2, padding=0)
+    viewer._update_cue_highlighting()
+    cap = viewer.cue_markers["1"][0]
+    y_min, y_max = viewer.waveform_plot.getViewBox().viewRange()[1]
+    assert y_min < cap.pos().y() < y_max
 
 
 def test_transport_zoom_controls_change_waveform_range(qapp, qt_widget_cleanup):
