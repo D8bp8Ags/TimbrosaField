@@ -2369,9 +2369,40 @@ class ApplicationStylist:
             border-color: {ApplicationStylist.COLORS['primary']};
         }}
 
+        QFrame#recording_sidebar QPushButton#recording_settings_button,
+        QFrame#recording_sidebar QPushButton#recording_filter_button,
+        QFrame#recording_sidebar QPushButton#recording_sort_button {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 10pt;
+            font-weight: 800;
+            min-width: 26px;
+            max-width: 30px;
+            min-height: 26px;
+            padding: 0px;
+        }}
+
+        QFrame#recording_sidebar QPushButton#recording_settings_button {{
+            background-color: transparent;
+            border-color: transparent;
+            min-width: 22px;
+            max-width: 24px;
+            min-height: 20px;
+        }}
+
+        QFrame#recording_sidebar QPushButton#recording_settings_button:hover,
+        QFrame#recording_sidebar QPushButton#recording_filter_button:hover,
+        QFrame#recording_sidebar QPushButton#recording_sort_button:hover {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['text_primary']};
+        }}
+
         QFrame#recording_sidebar QLabel#sidebar_section_header {{
             color: {ApplicationStylist.COLORS['text_primary']};
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 800;
             letter-spacing: 0px;
             padding: 2px 0px 0px 0px;
@@ -2524,7 +2555,7 @@ class ApplicationStylist:
 
         QLabel#recording_row_icon {{
             color: {ApplicationStylist.COLORS['text_muted']};
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 700;
         }}
 
@@ -2538,6 +2569,19 @@ class ApplicationStylist:
             color: {ApplicationStylist.COLORS['text_muted']};
             font-size: 8pt;
             font-weight: 700;
+        }}
+
+        QLabel#recording_row_date {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 7pt;
+            font-weight: 600;
+        }}
+
+        QFrame#recording_sidebar QLabel#recording_count_label {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 8pt;
+            font-weight: 700;
+            padding: 0px 4px 2px 0px;
         }}
 
         QFrame#recording_sidebar QRadioButton#view_mode_option {{

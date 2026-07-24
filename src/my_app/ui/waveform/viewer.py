@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -23,12 +24,13 @@ import soundfile as sf
 import my_app.app_config as app_config
 from my_app.audio.player import AudioPlayer
 from PyQt5 import QtCore
-from PyQt5.QtCore import QEvent, QModelIndex, QSize, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen
+from PyQt5.QtCore import QEvent, QModelIndex, QPoint, QSize, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QColor, QFont, QIcon, QMouseEvent, QPainter, QPen, QPixmap, QPolygon
 from PyQt5.QtMultimedia import QMediaPlayer
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QAction,
     QButtonGroup,
     QDialog,
     QFrame,
@@ -131,17 +133,23 @@ class ClippingRegionInfo:
 class RecordingListRow(QWidget):
     """Compact visual row for a recording list item."""
 
-    def __init__(self, filename: str, duration_text: str = "", parent=None) -> None:
+    def __init__(
+        self,
+        filename: str,
+        duration_text: str = "",
+        date_text: str = "",
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("recording_row")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 2, 18, 2)
-        layout.setSpacing(6)
+        layout.setContentsMargins(8, 2, 14, 2)
+        layout.setSpacing(8)
 
-        icon_label = QLabel("⌁")
+        icon_label = QLabel("≋")
         icon_label.setObjectName("recording_row_icon")
-        icon_label.setFixedWidth(14)
+        icon_label.setFixedWidth(16)
         layout.addWidget(icon_label)
 
         name_label = QLabel(filename)
@@ -150,11 +158,23 @@ class RecordingListRow(QWidget):
         name_label.setMinimumWidth(0)
         layout.addWidget(name_label, stretch=1)
 
+        meta_layout = QVBoxLayout()
+        meta_layout.setContentsMargins(0, 0, 0, 0)
+        meta_layout.setSpacing(0)
+
         duration_label = QLabel(duration_text)
         duration_label.setObjectName("recording_row_duration")
         duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        duration_label.setMinimumWidth(44)
-        layout.addWidget(duration_label)
+        duration_label.setMinimumWidth(52)
+        meta_layout.addWidget(duration_label)
+
+        date_label = QLabel(date_text)
+        date_label.setObjectName("recording_row_date")
+        date_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        date_label.setMinimumWidth(92)
+        meta_layout.addWidget(date_label)
+
+        layout.addLayout(meta_layout)
 
 
 class CueOverviewWidget(QWidget):
@@ -695,23 +715,62 @@ class WavViewer(QWidget):
             Selection changes trigger immediate waveform analysis and display
             updates for the selected file.
         """
-        # File list label and widget
-        self.file_list_label = QLabel("WAV Files:")
+        self._recording_sort_descending = False
+
+        # File list header with settings action
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(6)
+
+        self.file_list_label = QLabel("RECORDINGS")
         self.file_list_label.setObjectName("sidebar_section_header")
         self.file_list_label.setToolTip("")
-        self.left_layout.addWidget(self.file_list_label)
+        header_row.addWidget(self.file_list_label, stretch=1)
+
+        self.recording_settings_button = QPushButton("⚙")
+        self.recording_settings_button.setObjectName("recording_settings_button")
+        self.recording_settings_button.setToolTip("Recording list settings")
+        self.recording_settings_button.clicked.connect(self._focus_recording_search)
+        header_row.addWidget(self.recording_settings_button)
+        self.left_layout.addLayout(header_row)
+
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(6)
 
         self.file_search_input = QLineEdit()
         self.file_search_input.setObjectName("recording_search")
         self.file_search_input.setPlaceholderText("Search recordings...")
+        search_icon = QAction(self._make_search_icon(), "Search", self.file_search_input)
+        self.file_search_input.addAction(search_icon, QLineEdit.LeadingPosition)
         self.file_search_input.textChanged.connect(self._filter_file_list)
-        self.left_layout.addWidget(self.file_search_input)
+        search_row.addWidget(self.file_search_input, stretch=1)
+
+        self.recording_filter_button = QPushButton()
+        self.recording_filter_button.setObjectName("recording_filter_button")
+        self.recording_filter_button.setIcon(self._make_funnel_icon())
+        self.recording_filter_button.setToolTip("Focus or clear recording filter")
+        self.recording_filter_button.clicked.connect(self._toggle_recording_filter)
+        search_row.addWidget(self.recording_filter_button)
+
+        self.recording_sort_button = QPushButton()
+        self.recording_sort_button.setObjectName("recording_sort_button")
+        self.recording_sort_button.setIcon(self._make_sort_icon())
+        self.recording_sort_button.setToolTip("Toggle recording sort order")
+        self.recording_sort_button.clicked.connect(self._toggle_recording_sort)
+        search_row.addWidget(self.recording_sort_button)
+        self.left_layout.addLayout(search_row)
 
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.file_list.currentRowChanged.connect(self.plot_selected_wav)
         self.file_list.setUniformItemSizes(True)
         self.left_layout.addWidget(self.file_list)
+
+        self.recording_count_label = QLabel("0 recordings")
+        self.recording_count_label.setObjectName("recording_count_label")
+        self.recording_count_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.left_layout.addWidget(self.recording_count_label)
 
     def _setup_waveform_plots(self) -> None:
         """Set up waveform plot widgets with optimized configuration.
@@ -1171,15 +1230,19 @@ class WavViewer(QWidget):
         # Find all WAV files
         try:
             all_files = os.listdir(wav_dir)
-            wav_files = sorted([f for f in all_files if f.lower().endswith(".wav")])
+            wav_files = sorted(
+                [f for f in all_files if f.lower().endswith(".wav")],
+                reverse=getattr(self, "_recording_sort_descending", False),
+            )
         except OSError as exc:
             logger.error(f"Cannot read directory {wav_dir}: {exc}")
             wav_files = []
 
-        # Update label with folder name (count is already shown in status bar)
+        # Keep the mockup header text stable; expose the real folder as tooltip.
         folder_name = os.path.basename(os.path.normpath(wav_dir))
-        self.file_list_label.setText(f"{folder_name}:")
-        self.file_list_label.setToolTip(wav_dir)
+        self.file_list_label.setText("RECORDINGS")
+        self.file_list_label.setToolTip(f"{folder_name}: {wav_dir}")
+        self._update_recording_count_label(len(wav_files))
 
         # Handle empty directory
         if not wav_files:
@@ -1192,16 +1255,19 @@ class WavViewer(QWidget):
         for wav_file in wav_files:
             full_path = os.path.join(wav_dir, wav_file)
             duration_text = self._get_file_duration_text(full_path)
+            date_text = self._get_file_modified_text(full_path)
 
             # Keep path data stable; visual text is rendered by RecordingListRow.
             item = QListWidgetItem("")
             item.setData(Qt.UserRole, full_path)
             item.setData(Qt.UserRole + 1, wav_file)
             item.setToolTip(full_path)
-            item.setSizeHint(QSize(0, 28))
+            item.setSizeHint(QSize(0, 34))
             self.file_list.addItem(item)
             self.file_list.setItemWidget(
-                item, RecordingListRow(wav_file, duration_text, self.file_list)
+                item, RecordingListRow(
+                    wav_file, duration_text, date_text, self.file_list
+                )
             )
 
         self.file_list.setEnabled(True)
@@ -1234,6 +1300,110 @@ class WavViewer(QWidget):
         if not info.samplerate:
             return ""
         return self._format_duration_for_list(info.frames / info.samplerate)
+
+    @staticmethod
+    def _get_file_modified_text(full_path: str) -> str:
+        """Return compact modified date/time text for a recording list row."""
+        try:
+            modified = datetime.fromtimestamp(os.path.getmtime(full_path))
+        except OSError as exc:
+            logger.debug("Could not read modified time for %s: %s", full_path, exc)
+            return ""
+        return modified.strftime("%d %b %Y %H:%M")
+
+    @staticmethod
+    def _make_search_icon(size: int = 16) -> QIcon:
+        """Create a small magnifying-glass icon for the search input."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(QColor(ApplicationStylist.COLORS["text_secondary"]), 1)
+        painter.setPen(pen)
+        painter.drawEllipse(3, 3, 7, 7)
+        painter.drawLine(9, 9, 13, 13)
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _make_funnel_icon(size: int = 16) -> QIcon:
+        """Create a small funnel icon for the recording filter button."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(QPen(QColor(ApplicationStylist.COLORS["text_secondary"]), 1))
+        painter.setBrush(QColor(ApplicationStylist.COLORS["text_secondary"]))
+        painter.drawPolygon(
+            QPolygon(
+                [
+                    QPoint(3, 4),
+                    QPoint(size - 3, 4),
+                    QPoint(10, 9),
+                    QPoint(10, 13),
+                    QPoint(6, 13),
+                    QPoint(6, 9),
+                ]
+            )
+        )
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
+    def _make_sort_icon(size: int = 16) -> QIcon:
+        """Create a compact sort/sync-style icon for recording order."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(QColor(ApplicationStylist.COLORS["text_secondary"]), 1)
+        painter.setPen(pen)
+        painter.drawLine(5, 3, 5, 12)
+        painter.drawLine(5, 3, 2, 6)
+        painter.drawLine(5, 3, 8, 6)
+        painter.drawLine(11, 4, 11, 13)
+        painter.drawLine(11, 13, 8, 10)
+        painter.drawLine(11, 13, 14, 10)
+        painter.end()
+        return QIcon(pixmap)
+
+    def _update_recording_count_label(self, count: int | None = None) -> None:
+        """Update the recording-list footer count."""
+        if count is None:
+            count = sum(
+                1
+                for row in range(self.file_list.count())
+                if self.file_list.item(row) and self.file_list.item(row).data(Qt.UserRole)
+            )
+        label = "recording" if count == 1 else "recordings"
+        self.recording_count_label.setText(f"{count} {label}")
+
+    def _focus_recording_search(self) -> None:
+        """Focus the recording search field from the sidebar gear action."""
+        self.file_search_input.setFocus(Qt.ShortcutFocusReason)
+
+    def _toggle_recording_filter(self) -> None:
+        """Focus the active filter, or clear it when already filtering."""
+        if self.file_search_input.text():
+            self.file_search_input.clear()
+        else:
+            self._focus_recording_search()
+
+    def _toggle_recording_sort(self) -> None:
+        """Toggle recording sort direction and reload while preserving selection."""
+        selected_path = self._get_selected_file_path()
+        self._recording_sort_descending = not getattr(
+            self, "_recording_sort_descending", False
+        )
+        self.load_wav_files(select_path=selected_path)
+
+    def _get_selected_file_path(self) -> str | None:
+        """Return the currently selected recording path, if any."""
+        item = self.file_list.currentItem()
+        if item is None:
+            return None
+        path = item.data(Qt.UserRole)
+        return path if path else None
 
     def _filter_file_list(self, query: str) -> None:
         """Filter visible recording rows by filename."""

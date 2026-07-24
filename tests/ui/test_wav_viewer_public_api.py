@@ -101,6 +101,11 @@ def test_field_lab_dark_shell_keeps_required_visual_zones(qapp, qt_widget_cleanu
     assert viewer.main_splitter.widget(2) is viewer.right_panel
 
     assert viewer.file_search_input.placeholderText() == "Search recordings..."
+    assert viewer.file_list_label.text() == "RECORDINGS"
+    assert viewer.recording_settings_button.objectName() == "recording_settings_button"
+    assert viewer.recording_filter_button.objectName() == "recording_filter_button"
+    assert viewer.recording_sort_button.objectName() == "recording_sort_button"
+    assert viewer.recording_count_label.objectName() == "recording_count_label"
     assert viewer.audio_player.objectName() == "audio_player_widget"
     assert viewer.cue_label.objectName() == "cue_section_header"
     assert viewer.cue_overview.objectName() == "cue_overview"
@@ -145,3 +150,18 @@ def test_field_lab_dark_shell_preserves_metadata_and_transport_controls(
     assert viewer.audio_player.volume_slider.objectName() == "transport_volume_slider"
     assert viewer.audio_player.time_label.objectName() == "time_display"
     assert viewer._get_professional_default_text() == "Hover for time, sample, dBFS"
+
+
+def test_recording_sidebar_controls_have_real_behavior(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+
+    viewer.file_search_input.setText("089")
+    viewer._toggle_recording_filter()
+    assert viewer.file_search_input.text() == ""
+
+    viewer._recording_sort_descending = False
+    viewer._toggle_recording_sort()
+    assert viewer._recording_sort_descending is True
+
+    viewer._update_recording_count_label(116)
+    assert viewer.recording_count_label.text() == "116 recordings"
