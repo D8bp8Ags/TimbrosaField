@@ -320,13 +320,53 @@ def test_clicking_cue_table_row_seeks_player_to_cue(qapp, qt_widget_cleanup):
     viewer.cue_labels = {"1": "PEAK_01", "2": "PEAK_02"}
     viewer._populate_cue_table(viewer.current_cue_points)
     sought_positions = []
+    play_calls = []
     viewer.audio_player.seek_to_position = sought_positions.append
-    viewer.audio_player.is_stopped = lambda: False
+    viewer.audio_player.is_playing = lambda: False
+    viewer.audio_player.play = lambda: play_calls.append(True)
 
     viewer.highlight_cue_line(1, 0)
 
     assert sought_positions == [27660]
+    assert play_calls == []
     assert viewer.selected_cue_id == "2"
+
+
+def test_cue_table_seek_can_be_disabled(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    viewer.current_cue_points = [{"ID": 1, "Sample Offset": 2500, "Label": "PEAK_01"}]
+    viewer.cue_labels = {"1": "PEAK_01"}
+    viewer._populate_cue_table(viewer.current_cue_points)
+    viewer._set_cue_table_seek_enabled(False)
+    sought_positions = []
+    viewer.audio_player.seek_to_position = sought_positions.append
+
+    viewer.highlight_cue_line(0, 0)
+
+    assert sought_positions == []
+    assert viewer.selected_cue_id == "1"
+
+
+def test_cue_table_seek_uses_preroll_and_preserves_playing_state(
+    qapp, qt_widget_cleanup
+):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    viewer.current_cue_points = [{"ID": 1, "Sample Offset": 2500, "Label": "PEAK_01"}]
+    viewer.cue_labels = {"1": "PEAK_01"}
+    viewer._populate_cue_table(viewer.current_cue_points)
+    viewer._set_cue_table_preroll_seconds(1.0)
+    sought_positions = []
+    play_calls = []
+    viewer.audio_player.seek_to_position = sought_positions.append
+    viewer.audio_player.is_playing = lambda: True
+    viewer.audio_player.play = lambda: play_calls.append(True)
+
+    viewer.highlight_cue_line(0, 0)
+
+    assert sought_positions == [1500]
+    assert play_calls == [True]
 
 
 def test_session_cue_id_prefers_short_free_display_id(qapp, qt_widget_cleanup):

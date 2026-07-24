@@ -34,6 +34,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -41,6 +42,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPushButton,
     QRadioButton,
@@ -49,6 +51,7 @@ from PyQt5.QtWidgets import (
     QSplitter,
     QTableWidget,
     QVBoxLayout,
+    QWidgetAction,
     QWidget,
 )
 
@@ -578,6 +581,8 @@ class WavViewer(QWidget):
         self._snap_to_cues: bool = False
         self._time_display_mode: str = "time"
         self._amplitude_display_mode: str = "dbfs"
+        self._cue_table_seek_enabled: bool = True
+        self._cue_table_preroll_seconds: float = 0.0
 
         # View configuration
         self.view_mode: str = "per_kanaal"
@@ -1172,10 +1177,8 @@ class WavViewer(QWidget):
         self.cue_menu_button.setObjectName("cue_menu_button")
         self.cue_menu_button.setIcon(UiIconFactory.icon("menu"))
         self.cue_menu_button.setIconSize(QSize(14, 14))
-        self.cue_menu_button.setToolTip("Copy selected cue")
-        self.cue_menu_button.clicked.connect(
-            lambda: self._copy_selected_table_cell(self.cue_table)
-        )
+        self.cue_menu_button.setToolTip("Cue options")
+        self.cue_menu_button.clicked.connect(self._show_cue_options_menu)
         self.cue_table = self._create_metadata_table(["ID", "Positie", "Label", "Notes"])
         self.cue_table.cellClicked.connect(self.highlight_cue_line)
         self.cue_table.setFixedHeight(200)
@@ -4266,9 +4269,67 @@ class WavViewer(QWidget):
         self.selected_cue_id = cue_id
         self._update_cue_highlighting()
         self.cue_overview.set_selected_cue(cue_id)
+        self._seek_to_cue_from_table(cue_id)
+
+    def _show_cue_options_menu(self) -> None:
+        """Show cue table behavior options."""
+        menu = QMenu(self.cue_menu_button)
+
+        seek_action = QAction("Seek player when selecting cue rows", menu)
+        seek_action.setCheckable(True)
+        seek_action.setChecked(self._cue_table_seek_enabled)
+        seek_action.toggled.connect(self._set_cue_table_seek_enabled)
+        menu.addAction(seek_action)
+
+        preroll_widget = QWidget(menu)
+        preroll_layout = QHBoxLayout(preroll_widget)
+        preroll_layout.setContentsMargins(8, 4, 8, 4)
+        preroll_layout.setSpacing(8)
+        preroll_label = QLabel("Start before cue")
+        preroll_spin = QDoubleSpinBox()
+        preroll_spin.setRange(0.0, 30.0)
+        preroll_spin.setSingleStep(0.5)
+        preroll_spin.setDecimals(1)
+        preroll_spin.setSuffix(" s")
+        preroll_spin.setValue(self._cue_table_preroll_seconds)
+        preroll_spin.valueChanged.connect(self._set_cue_table_preroll_seconds)
+        preroll_layout.addWidget(preroll_label)
+        preroll_layout.addWidget(preroll_spin)
+
+        preroll_action = QWidgetAction(menu)
+        preroll_action.setDefaultWidget(preroll_widget)
+        menu.addAction(preroll_action)
+
+        menu.addSeparator()
+        copy_action = menu.addAction("Copy selected cue cell")
+        copy_action.triggered.connect(
+            lambda: self._copy_selected_table_cell(self.cue_table)
+        )
+
+        menu.exec_(
+            self.cue_menu_button.mapToGlobal(QPoint(0, self.cue_menu_button.height()))
+        )
+
+    def _set_cue_table_seek_enabled(self, enabled: bool) -> None:
+        """Enable or disable cue-table seek behavior."""
+        self._cue_table_seek_enabled = bool(enabled)
+
+    def _set_cue_table_preroll_seconds(self, seconds: float) -> None:
+        """Set how far before a cue table selection should seek."""
+        self._cue_table_preroll_seconds = max(0.0, float(seconds))
+
+    def _seek_to_cue_from_table(self, cue_id: str) -> None:
+        """Seek the player from a cue-table row selection without unwanted autoplay."""
+        if not self._cue_table_seek_enabled:
+            return
         cue_time = self._cue_time_seconds(cue_id)
-        if cue_time is not None:
-            self.seek_and_play(cue_time)
+        if cue_time is None:
+            return
+        target_time = max(0.0, cue_time - self._cue_table_preroll_seconds)
+        was_playing = self.audio_player.is_playing()
+        self.audio_player.seek_to_position(int(target_time * 1000))
+        if was_playing:
+            self.audio_player.play()
 
     def _cue_time_seconds(self, cue_id: str) -> float | None:
         """Return a cue position in seconds for the given cue ID."""
