@@ -3125,6 +3125,7 @@ class WavViewer(QWidget):
         label.setText(label_text)
         label.setAnchor((0, 0))
         label.setColor(label_color)
+        label.setOpacity(1.0)
         label.setPos(x_range[0], y_range[1])
 
     def _analyze_local_peak(self, sample_idx: int, current_amplitude: float) -> str:
@@ -3413,6 +3414,7 @@ class WavViewer(QWidget):
                 # Neutrale startup kleur
 
                 label.setColor(QColor(150, 150, 150))
+                label.setOpacity(0.65)
 
                 # Safe positioning
                 try:
@@ -3456,39 +3458,7 @@ class WavViewer(QWidget):
             timecode display, precision values, and feature enablement.
             Provides consistent baseline information for all label modes.
         """
-        lines = []
-
-        # Time information
-        if self.mouse_label_config.get("show_timecode", True):
-            lines.append("0.000s (00:00:00.000)")
-        else:
-            lines.append("0.000s")
-
-        # Sample information
-        lines.append("Sample 0")
-
-        # Remaining time (alleen als enabled)
-        if self.mouse_label_config.get("show_remaining_time", True):
-            lines.append("Ready...")
-
-        # Amplitude information
-        if self.mouse_label_config.get("show_percentage", True):
-            lines.append("0.000 (0.0%)")
-        else:
-            lines.append("0.000")
-
-        # dB information
-        db_precision = self.mouse_label_config.get("db_precision", 1)
-        lines.append(f"-120.{0:0{db_precision}d} dB FS")
-
-        # Additional startup info
-        if self.mouse_label_config.get("show_peak_detection", True):
-            lines.append("Hover for analysis")
-
-        if self.mouse_label_config.get("show_channel_correlation", True):
-            lines.append("Ready for audio")
-
-        return "\n".join(lines)
+        return "Hover waveform\nfor time, sample, dBFS"
 
     # ========== CLICK HANDLER METHODS ==========
 
