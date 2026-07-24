@@ -213,6 +213,7 @@ class ModernStatusBar(QStatusBar):
         """
         # Main status label
         self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("statusMessage")
         self.addWidget(self.status_label)
 
         # Separator
@@ -252,12 +253,14 @@ class ModernStatusBar(QStatusBar):
 
         # Separator
         separator2 = QFrame()
+        separator2.setObjectName("statusSeparator")
         separator2.setFrameShape(QFrame.VLine)
         separator2.setFrameShadow(QFrame.Sunken)
         self.addPermanentWidget(separator2)
 
         # # File counter
         self.file_counter = QLabel("0 files")
+        self.file_counter.setObjectName("fileCounter")
         self.addPermanentWidget(self.file_counter)
 
     def setup_timers(self):
@@ -1162,15 +1165,9 @@ class ApplicationStylist:
     @staticmethod
     def apply_complete_styling(app):
         """Apply comprehensive professional application styling."""
-        # Set application font to modern system font
-        font = QFont("Inter", 13)
-        if not font.exactMatch():
-            font = QFont("Segoe UI", 13)  # Windows fallback
-        if not font.exactMatch():
-            font = QFont("SF Pro Display", 13)  # macOS fallback
-        if not font.exactMatch():
-            font = QFont("Ubuntu", 13)  # Linux fallback
-
+        # Use the platform UI font to avoid missing-font alias lookups in offscreen renders.
+        font = QFont()
+        font.setPointSize(13)
         app.setFont(font)
 
         # Apply complete stylesheet
@@ -1561,58 +1558,55 @@ class ApplicationStylist:
 
         /* === MENU BAR === */
         QMenuBar {{
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {ApplicationStylist.COLORS['surface_elevated']},
-                stop:1 {ApplicationStylist.COLORS['surface']});
-            border-bottom: 2px solid {ApplicationStylist.COLORS['border']};
-            color: {ApplicationStylist.COLORS['text_primary']};
-            font-size: 11pt;
-            font-weight: 500;
-            padding: 4px 0px;
+            background-color: {ApplicationStylist.COLORS['background']};
+            border-bottom: 1px solid {ApplicationStylist.COLORS['border']};
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 10pt;
+            font-weight: 600;
+            padding: 2px 8px;
         }}
 
         QMenuBar::item {{
             background: transparent;
-            padding: 8px 16px;
-            border-radius: 6px;
-            margin: 2px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 1px;
         }}
 
         QMenuBar::item:selected {{
-            background-color: {ApplicationStylist.COLORS['primary']};
-            color: {ApplicationStylist.COLORS['selection_text']};
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            color: {ApplicationStylist.COLORS['text_primary']};
         }}
 
         QMenuBar::item:pressed {{
-            background-color: {ApplicationStylist.COLORS['primary_pressed']};
+            background-color: {ApplicationStylist.COLORS['active_overlay']};
         }}
 
         /* === MENUS === */
         QMenu {{
             background-color: {ApplicationStylist.COLORS['input_background']};
-            border: 2px solid {ApplicationStylist.COLORS['border']};
-            border-radius: 8px;
-            padding: 8px;
-            font-size: 11pt;
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 6px;
+            padding: 5px;
+            font-size: 10pt;
         }}
 
         QMenu::item {{
             background: transparent;
-            padding: 8px 32px 8px 16px;
-            border-radius: 6px;
+            padding: 7px 28px 7px 12px;
+            border-radius: 4px;
             margin: 2px 0px;
         }}
 
         QMenu::item:selected {{
-            background-color: {ApplicationStylist.COLORS['primary']};
-            color: {ApplicationStylist.COLORS['selection_text']};
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            color: {ApplicationStylist.COLORS['text_primary']};
         }}
 
         QMenu::separator {{
-            height: 2px;
+            height: 1px;
             background-color: {ApplicationStylist.COLORS['divider']};
-            margin: 8px 0px;
-            border-radius: 1px;
+            margin: 6px 0px;
         }}
 
         QMenu::indicator {{
@@ -1639,6 +1633,23 @@ class ApplicationStylist:
             color: {ApplicationStylist.COLORS['text_muted']};
             font-size: 9pt;
             margin: 0px 4px;
+        }}
+
+        QStatusBar QLabel#statusMessage {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+        }}
+
+        QStatusBar QLabel#fileCounter {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-weight: 700;
+            margin-left: 6px;
+        }}
+
+        QStatusBar QFrame#statusSeparator {{
+            color: {ApplicationStylist.COLORS['border']};
+            background-color: {ApplicationStylist.COLORS['border']};
+            max-width: 1px;
+            margin: 3px 4px;
         }}
 
         /* === PROGRESS BARS === */
@@ -1852,7 +1863,7 @@ class ApplicationStylist:
 
         /* Time display styling */
         QWidget[objectName="audio_player_widget"] QLabel[objectName="time_display"] {{
-            font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
+            font-family: "Menlo", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
             font-size: 10pt;
             font-weight: 600;
             color: {ApplicationStylist.COLORS['text_primary']};
