@@ -276,6 +276,12 @@ class MetadataPresenter:
             label_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             self.cue_table.setItem(row, 2, label_item)
 
+            note = cue.get("Notes", cue.get("Note", ""))
+            if self.cue_table.columnCount() > 3:
+                note_item = QTableWidgetItem(str(note))
+                note_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                self.cue_table.setItem(row, 3, note_item)
+
             row += 1
 
         if row == 0:
@@ -286,5 +292,7 @@ class MetadataPresenter:
             self.cue_table.setItem(0, 0, msg_item)
             self.cue_table.setItem(0, 1, QTableWidgetItem(""))
             self.cue_table.setItem(0, 2, QTableWidgetItem(""))
+            if self.cue_table.columnCount() > 3:
+                self.cue_table.setItem(0, 3, QTableWidgetItem(""))
 
         self.cue_table.setEditTriggers(QAbstractItemView.NoEditTriggers)

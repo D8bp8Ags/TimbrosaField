@@ -143,10 +143,13 @@ def test_field_lab_dark_shell_preserves_metadata_and_transport_controls(
         "Altitude",
     ]
 
-    assert viewer.cue_table.columnCount() == 3
+    assert viewer.cue_table.columnCount() == 4
     assert [
         viewer.cue_table.horizontalHeaderItem(column).text() for column in range(3)
     ] == ["ID", "Positie", "Label"]
+    assert viewer.cue_table.horizontalHeaderItem(3).text() == "Notes"
+    assert viewer.cue_add_button.objectName() == "cue_add_button"
+    assert viewer.cue_menu_button.objectName() == "cue_menu_button"
 
     assert viewer.audio_player.play_button.objectName() == "transport_play_button"
     assert viewer.audio_player.stop_button.objectName() == "transport_stop_button"
@@ -226,3 +229,27 @@ def test_metadata_table_cells_can_be_copied(qapp, qt_widget_cleanup):
     viewer._copy_selected_table_cell(viewer.fmt_table)
 
     assert qapp.clipboard().text() == "96000 Hz"
+
+
+def test_add_session_cue_updates_cue_surfaces(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    viewer.audio_duration = 10.0
+    viewer.audio_player.get_position = lambda: 2500
+
+    viewer._add_session_cue_point()
+
+    assert viewer.current_cue_points == [
+        {
+            "ID": 1,
+            "Sample Offset": 2500,
+            "Label": "MARK_01",
+            "Notes": "Session cue",
+        }
+    ]
+    assert viewer.cue_table.item(0, 0).text() == "1"
+    assert viewer.cue_table.item(0, 2).text() == "MARK_01"
+    assert viewer.cue_table.item(0, 3).text() == "Session cue"
+    assert viewer.selected_cue_id == "1"
+    assert "1" in viewer.cue_lines
+    assert "1" in viewer.cue_markers

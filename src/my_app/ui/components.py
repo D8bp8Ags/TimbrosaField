@@ -2251,6 +2251,30 @@ class ApplicationStylist:
             padding: 0px;
         }}
 
+        QFrame#cue_panel QPushButton#cue_add_button,
+        QFrame#cue_panel QPushButton#cue_menu_button {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 9pt;
+            font-weight: 700;
+            min-height: 22px;
+            padding: 2px 8px;
+        }}
+
+        QFrame#cue_panel QPushButton#cue_menu_button {{
+            min-width: 24px;
+            max-width: 28px;
+            padding: 2px 0px;
+        }}
+
+        QFrame#cue_panel QPushButton#cue_add_button:hover,
+        QFrame#cue_panel QPushButton#cue_menu_button:hover {{
+            background-color: {ApplicationStylist.COLORS['hover_overlay']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
         QLabel#waveform_toolbar_chip {{
             color: {ApplicationStylist.COLORS['text_secondary']};
             background-color: {ApplicationStylist.COLORS['surface_elevated']};

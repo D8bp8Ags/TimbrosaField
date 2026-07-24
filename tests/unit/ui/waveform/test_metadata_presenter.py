@@ -26,7 +26,7 @@ def presenter(qapp):
     info_table = _make_table(["Key", "Value"])
     info_table.setObjectName("info_table")
     gps_table = _make_table(["Key", "Value"])
-    cue_table = _make_table(["ID", "Positie", "Label"])
+    cue_table = _make_table(["ID", "Positie", "Label", "Notes"])
     return MetadataPresenter(fmt_table, bext_table, info_table, gps_table, cue_table)
 
 
@@ -119,11 +119,12 @@ def test_populate_gps_table_rows_adds_photo_and_location_when_present(presenter)
 
 
 def test_populate_cue_table_shows_labeled_cue_points(presenter):
-    cue_points = [{"ID": 1, "Sample Offset": 48000}]
+    cue_points = [{"ID": 1, "Sample Offset": 48000, "Notes": "Checked"}]
     presenter.populate_cue_table(cue_points, cue_labels={"1": "Bird call"}, sample_rate=48000)
     assert presenter.cue_table.rowCount() == 1
     assert presenter.cue_table.item(0, 1).text() == "1.000s"
     assert presenter.cue_table.item(0, 2).text() == "Bird call"
+    assert presenter.cue_table.item(0, 3).text() == "Checked"
 
 
 def test_populate_cue_table_skips_unlabeled_cue_points(presenter):

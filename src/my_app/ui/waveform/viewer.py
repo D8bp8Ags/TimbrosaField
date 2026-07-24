@@ -198,8 +198,22 @@ class CueOverviewWidget(QWidget):
         self.setObjectName("cue_overview")
         self._duration: float = 0.0
         self._markers: list[tuple[str, float, str]] = []
+        self._waveform_peaks: list[float] = []
         self._selected_id: str | None = None
         self.setMinimumHeight(80)
+
+    def set_waveform_data(self, data: np.ndarray | None) -> None:
+        """Update the compact waveform shown behind cue markers."""
+        self._waveform_peaks = []
+        if data is not None and len(data) > 0:
+            signal = data.mean(axis=1) if data.ndim > 1 else data
+            bin_count = min(160, max(24, self.width() // 4))
+            chunks = np.array_split(np.abs(signal), bin_count)
+            peaks = [float(chunk.max()) if len(chunk) else 0.0 for chunk in chunks]
+            peak_max = max(peaks) if peaks else 0.0
+            if peak_max > 0:
+                self._waveform_peaks = [peak / peak_max for peak in peaks]
+        self.update()
 
     def set_cues(
         self,
@@ -265,6 +279,20 @@ class CueOverviewWidget(QWidget):
             rect.bottom() + 14,
             self._format_duration(self._duration),
         )
+
+        if self._waveform_peaks:
+            wave_pen = QPen(QColor("#4d8f74"))
+            wave_pen.setWidth(1)
+            painter.setPen(wave_pen)
+            peak_count = max(1, len(self._waveform_peaks) - 1)
+            for index, peak in enumerate(self._waveform_peaks):
+                if peak <= 0:
+                    continue
+                x = rect.left() + int((index / peak_count) * rect.width())
+                half_height = max(1, int(peak * rect.height() * 0.42))
+                painter.drawLine(
+                    x, baseline_y - half_height, x, baseline_y + half_height
+                )
 
         if not self._markers:
             painter.setPen(QColor("#9ba8a1"))
@@ -472,6 +500,7 @@ class WavViewer(QWidget):
         self.selected_cue_id: str | None = None
         self.cue_labels: dict[str, str] = {}
         self.cue_markers: dict[str, Any] = {}
+        self.current_cue_points: list[dict[str, Any]] = []
 
         # AI detection overlay is managed by self._ai_overlay
         # (AiOverlayController), constructed in _setup_ui() once the
@@ -1041,7 +1070,17 @@ class WavViewer(QWidget):
         # Cue points table
         self.cue_label = QLabel("Cue Points:")
         self.cue_label.setObjectName("cue_section_header")
-        self.cue_table = self._create_metadata_table(["ID", "Positie", "Label"])
+        self.cue_add_button = QPushButton("+ Add Cue")
+        self.cue_add_button.setObjectName("cue_add_button")
+        self.cue_add_button.setToolTip("Add a session cue at the current playhead")
+        self.cue_add_button.clicked.connect(self._add_session_cue_point)
+        self.cue_menu_button = QPushButton("⋯")
+        self.cue_menu_button.setObjectName("cue_menu_button")
+        self.cue_menu_button.setToolTip("Copy selected cue")
+        self.cue_menu_button.clicked.connect(
+            lambda: self._copy_selected_table_cell(self.cue_table)
+        )
+        self.cue_table = self._create_metadata_table(["ID", "Positie", "Label", "Notes"])
         self.cue_table.cellClicked.connect(self.highlight_cue_line)
         self.cue_table.setFixedHeight(200)
 
@@ -1069,7 +1108,13 @@ class WavViewer(QWidget):
         self.inspector_layout.addWidget(self.photo_preview_image)
         self.inspector_layout.addStretch()
 
-        self.cue_layout.addWidget(self.cue_label)
+        self.cue_header_layout = QHBoxLayout()
+        self.cue_header_layout.setContentsMargins(0, 0, 0, 0)
+        self.cue_header_layout.setSpacing(6)
+        self.cue_header_layout.addWidget(self.cue_label, stretch=1)
+        self.cue_header_layout.addWidget(self.cue_add_button)
+        self.cue_header_layout.addWidget(self.cue_menu_button)
+        self.cue_layout.addLayout(self.cue_header_layout)
         self.cue_body_layout = QHBoxLayout()
         self.cue_body_layout.setContentsMargins(0, 0, 0, 0)
         self.cue_body_layout.setSpacing(8)
@@ -1787,6 +1832,8 @@ class WavViewer(QWidget):
         self.cue_lines.clear()
         self.selected_cue_line = None
         self.selected_cue_id = None
+        self.cue_markers.clear()
+        self.current_cue_points = []
 
         # Clear AI overlay
         self._clear_ai_overlay()
@@ -2657,13 +2704,7 @@ class WavViewer(QWidget):
         cue_id_str = str(int(cue_id))
         label = self.cue_labels.get(cue_id_str, "")
 
-        # Choose marker appearance based on label
-        if label.startswith("MARK_"):
-            pen = self.get_pen("cue_mark", width=2)
-        elif label.startswith("PEAK_"):
-            pen = self.get_pen("cue_peak", width=2)
-        else:
-            pen = self.get_pen("cue_default", width=2)
+        pen = pg.mkPen("#ff334d", width=2)
 
         # Add marker to all plots
         for plot in [
@@ -2677,6 +2718,20 @@ class WavViewer(QWidget):
 
             # Track marker for selection highlighting
             self.cue_lines.setdefault(cue_id_str, []).append(line)
+
+            number = cue_id_str[-2:] if len(cue_id_str) > 2 else cue_id_str
+            cap = pg.TextItem(
+                html=(
+                    "<div style='background:#d83a4a;color:#f4f8f5;"
+                    "padding:1px 4px;border-radius:2px;font-weight:700;'>"
+                    f"{number}</div>"
+                ),
+                anchor=(0.5, 1.0),
+            )
+            cap.setPos(x_pos, 1.06)
+            cap.setZValue(20)
+            plot.addItem(cap)
+            self.cue_markers.setdefault(cue_id_str, []).append(cap)
 
 
     def _setup_interaction_handlers(self) -> None:
@@ -3213,11 +3268,13 @@ class WavViewer(QWidget):
 
         Args:     cue_points: list of cue point dictionaries
         """
+        self.current_cue_points = list(cue_points or [])
         self._metadata_presenter.populate_cue_table(
-            cue_points, self.cue_labels, getattr(self, "current_sr", None)
+            self.current_cue_points, self.cue_labels, getattr(self, "current_sr", None)
         )
+        self.cue_overview.set_waveform_data(getattr(self, "current_data", None))
         self.cue_overview.set_cues(
-            cue_points,
+            self.current_cue_points,
             self.cue_labels,
             getattr(self, "current_sr", None),
             getattr(self, "audio_duration", None),
@@ -3925,27 +3982,58 @@ class WavViewer(QWidget):
         self._update_cue_highlighting()
         self.cue_overview.set_selected_cue(cue_id)
 
+    def _add_session_cue_point(self) -> None:
+        """Add a non-persistent cue at the current playhead position."""
+        if self.current_sr is None or not self.audio_duration:
+            logger.info("Cannot add cue without a loaded audio file")
+            return
+
+        position_seconds = max(0.0, self.audio_player.get_position() / 1000.0)
+        position_seconds = min(position_seconds, self.audio_duration)
+        offset = int(position_seconds * self.current_sr)
+        cue_id = self._next_session_cue_id()
+        label = f"MARK_{cue_id:02d}"
+        cue = {
+            "ID": cue_id,
+            "Sample Offset": offset,
+            "Label": label,
+            "Notes": "Session cue",
+        }
+
+        self.cue_labels[str(cue_id)] = label
+        self.current_cue_points.append(cue)
+        self._add_single_cue_marker(cue)
+        self._populate_cue_table(self.current_cue_points)
+        self.selected_cue_id = str(cue_id)
+        self._update_cue_highlighting()
+        self.cue_overview.set_selected_cue(str(cue_id))
+
+    def _next_session_cue_id(self) -> int:
+        """Return the next cue ID for a session-created cue."""
+        existing_ids = []
+        for cue in self.current_cue_points:
+            try:
+                existing_ids.append(int(cue.get("ID", 0)))
+            except (TypeError, ValueError):
+                continue
+        return (max(existing_ids) if existing_ids else 0) + 1
+
     def _update_cue_highlighting(self) -> None:
         """Update visual highlighting of cue markers."""
         for cue_id, lines in self.cue_lines.items():
-            label = self.cue_labels.get(cue_id, "")
             is_selected = cue_id == self.selected_cue_id
 
-            # Choose pen based on selection and label type
-            if is_selected:
-                pen = self.get_pen(
-                    "cue_peak" if label.startswith("PEAK_") else "cue_mark", width=4
-                )
-            elif label.startswith("MARK_"):
-                pen = self.get_pen("cue_mark", width=2)
-            elif label.startswith("PEAK_"):
-                pen = self.get_pen("cue_peak", width=2)
-            else:
-                pen = self.get_pen("cue_default", width=2)
+            pen = pg.mkPen(
+                "#ff6b7d" if is_selected else "#ff334d",
+                width=4 if is_selected else 2,
+            )
 
             # Apply highlighting to all lines for this cue
             for line in lines:
                 line.setPen(pen)
+
+            for cap in self.cue_markers.get(cue_id, []):
+                cap.setOpacity(1.0 if is_selected else 0.82)
 
     # ========== AUDIO PLAYBACK INTEGRATION METHODS ==========
 
