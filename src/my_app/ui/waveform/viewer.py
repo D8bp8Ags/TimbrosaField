@@ -127,6 +127,34 @@ class ClippingRegionInfo:
     duration_ms: float
 
 
+class RecordingListRow(QWidget):
+    """Compact visual row for a recording list item."""
+
+    def __init__(self, filename: str, duration_text: str = "", parent=None) -> None:
+        super().__init__(parent)
+        self.setObjectName("recording_row")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 3, 6, 3)
+        layout.setSpacing(8)
+
+        icon_label = QLabel("⌁")
+        icon_label.setObjectName("recording_row_icon")
+        icon_label.setFixedWidth(14)
+        layout.addWidget(icon_label)
+
+        name_label = QLabel(filename)
+        name_label.setObjectName("recording_row_name")
+        name_label.setToolTip(filename)
+        layout.addWidget(name_label, stretch=1)
+
+        duration_label = QLabel(duration_text)
+        duration_label.setObjectName("recording_row_duration")
+        duration_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        duration_label.setMinimumWidth(52)
+        layout.addWidget(duration_label)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -997,12 +1025,17 @@ class WavViewer(QWidget):
         # Populate file list
         for wav_file in wav_files:
             full_path = os.path.join(wav_dir, wav_file)
+            duration_text = self._get_file_duration_text(full_path)
 
-            # Create list item with filename visible, full path in data
-            item = QListWidgetItem(wav_file)
+            # Keep path data stable; visual text is rendered by RecordingListRow.
+            item = QListWidgetItem("")
             item.setData(Qt.UserRole, full_path)
+            item.setData(Qt.UserRole + 1, wav_file)
             item.setToolTip(full_path)
             self.file_list.addItem(item)
+            self.file_list.setItemWidget(
+                item, RecordingListRow(wav_file, duration_text, self.file_list)
+            )
 
         self.file_list.setEnabled(True)
 
@@ -1013,6 +1046,27 @@ class WavViewer(QWidget):
             self.file_list.setCurrentRow(0)
 
         logger.debug(f"Loaded {len(wav_files)} WAV files")
+
+    @staticmethod
+    def _format_duration_for_list(duration_seconds: float) -> str:
+        """Format a WAV duration for compact recording-list display."""
+        total_seconds = max(0, int(round(duration_seconds)))
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def _get_file_duration_text(self, full_path: str) -> str:
+        """Return compact duration text for a file list row."""
+        try:
+            info = sf.info(full_path)
+        except (RuntimeError, OSError, ValueError) as exc:
+            logger.debug("Could not read duration for %s: %s", full_path, exc)
+            return ""
+        if not info.samplerate:
+            return ""
+        return self._format_duration_for_list(info.frames / info.samplerate)
 
     def _select_file_by_path(self, target_path: str) -> bool:
         """Select a specific file in the file list by matching its full path.

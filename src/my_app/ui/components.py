@@ -2196,6 +2196,28 @@ class ApplicationStylist:
             border-left: 3px solid {ApplicationStylist.COLORS['primary']};
         }}
 
+        QWidget#recording_row {{
+            background-color: transparent;
+        }}
+
+        QLabel#recording_row_icon {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 10pt;
+            font-weight: 700;
+        }}
+
+        QLabel#recording_row_name {{
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 10pt;
+            font-weight: 500;
+        }}
+
+        QLabel#recording_row_duration {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 8pt;
+            font-weight: 500;
+        }}
+
         QSplitter::handle {{
             background-color: {ApplicationStylist.COLORS['border']};
         }}
