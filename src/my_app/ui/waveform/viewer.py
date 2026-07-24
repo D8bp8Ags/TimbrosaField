@@ -392,6 +392,7 @@ WAVEFORM_CUE_LABEL_FONT_SIZE_PT = 8
 WAVEFORM_CUE_LABEL_FONT_WEIGHT = 800
 WAVEFORM_CUE_LABEL_PADDING = "1px 4px"
 WAVEFORM_CUE_LABEL_RADIUS = "2px"
+WAVEFORM_SNAP_TOLERANCE_SECONDS = 1.0
 
 
 def downsample_min_max(
@@ -1106,7 +1107,7 @@ class WavViewer(QWidget):
         self.waveform_plot.getPlotItem().setLabel("top", "Time")
 
     def _set_snap_to_cues(self, enabled: bool) -> None:
-        """Store cue-snap state for toolbar parity and future click behavior."""
+        """Enable or disable snapping waveform clicks to nearby cue points."""
         self._snap_to_cues = enabled
         self.snap_button.setText("Snap: On" if enabled else "Snap: Off")
 
@@ -4179,7 +4180,16 @@ class WavViewer(QWidget):
         view_pos = view_box.mapSceneToView(scene_pos)
         clicked_time = max(0, min(view_pos.x(), self.audio_duration))
 
-        # Seek audio to clicked position
+        snapped_cue_id = None
+        if getattr(self, "_snap_to_cues", False):
+            clicked_time, snapped_cue_id = self._snap_time_to_nearest_cue(clicked_time)
+
+        if snapped_cue_id is not None:
+            self.selected_cue_id = snapped_cue_id
+            self._update_cue_highlighting()
+            self.cue_overview.set_selected_cue(snapped_cue_id)
+
+        # Seek audio to clicked or snapped position
         position_ms = int(clicked_time * 1000)
         self.audio_player.seek_to_position(position_ms)
 
@@ -4188,6 +4198,29 @@ class WavViewer(QWidget):
         # Start playback if currently stopped
         if self.audio_player.is_stopped():
             self.audio_player.play()
+
+    def _snap_time_to_nearest_cue(self, time_seconds: float) -> tuple[float, str | None]:
+        """Snap a time position to the nearest cue point within tolerance."""
+        if not self.current_sr or not self.current_cue_points:
+            return time_seconds, None
+
+        nearest_time = time_seconds
+        nearest_cue_id: str | None = None
+        nearest_distance = WAVEFORM_SNAP_TOLERANCE_SECONDS
+
+        for cue in self.current_cue_points:
+            cue_id = cue.get("ID")
+            offset = cue.get("Sample Offset")
+            if cue_id is None or offset is None:
+                continue
+            cue_time = max(0.0, float(offset) / float(self.current_sr))
+            distance = abs(cue_time - time_seconds)
+            if distance <= nearest_distance:
+                nearest_time = cue_time
+                nearest_cue_id = str(int(cue_id))
+                nearest_distance = distance
+
+        return nearest_time, nearest_cue_id
 
     # ========== CUE POINT METHODS ==========
 

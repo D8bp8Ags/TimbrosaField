@@ -9,6 +9,7 @@ public methods exist and behave as the code they replaced did.
 
 from __future__ import annotations
 
+from PyQt5.QtCore import QPointF
 from PyQt5.QtWidgets import QFrame, QLabel, QPushButton, QTableWidgetItem
 
 from tests.fixtures.wav import builder as wavbuild
@@ -351,6 +352,45 @@ def test_cue_marker_labels_use_centralized_waveform_style(qapp, qt_widget_cleanu
     viewer.selected_cue_id = "1"
     viewer._update_cue_highlighting()
     assert wv.ApplicationStylist.COLORS["waveform_cue_selected"] in cap.textItem.toHtml()
+
+
+def test_snap_time_to_nearest_cue_uses_real_cue_positions(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+    viewer.current_cue_points = [
+        {"ID": 1, "Sample Offset": 2500},
+        {"ID": 2, "Sample Offset": 8000},
+    ]
+
+    snapped_time, cue_id = viewer._snap_time_to_nearest_cue(2.7)
+    assert snapped_time == 2.5
+    assert cue_id == "1"
+
+    unchanged_time, cue_id = viewer._snap_time_to_nearest_cue(5.0)
+    assert unchanged_time == 5.0
+    assert cue_id is None
+
+
+def test_waveform_click_snaps_seek_position_when_enabled(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.audio_duration = 10.0
+    viewer.current_sr = 1000
+    viewer.current_cue_points = [{"ID": 1, "Sample Offset": 2500}]
+    viewer._snap_to_cues = True
+    viewer.waveform_plot.setXRange(0, 10, padding=0)
+    viewer.waveform_plot.setYRange(-1, 1, padding=0)
+    sought_positions = []
+    viewer.audio_player.seek_to_position = sought_positions.append
+    viewer.audio_player.is_stopped = lambda: False
+
+    class FakeMouseEvent:
+        def scenePos(self):
+            return viewer.waveform_plot.getViewBox().mapViewToScene(QPointF(2.7, 0))
+
+    viewer._handle_waveform_click(viewer.waveform_plot, FakeMouseEvent())
+
+    assert sought_positions == [2500]
+    assert viewer.selected_cue_id == "1"
 
 
 def test_waveform_plot_fonts_are_explicit_and_compact(qapp, qt_widget_cleanup):
