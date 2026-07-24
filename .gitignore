@@ -1,4 +1,12 @@
 TASKS.md
+
+# Local editor / AI assistant state
+.claude/
+.codex/
+.cursor/
+.aider*
+.windsurf/
+
 /src/my_app/models/
 /backups/
 /ableton/
@@ -19,6 +27,7 @@ timbrosafield/
 backup/
 *.als
 .DS_Store
+/src/my_app/config/
 config/
 *.bin
 *.jpeg
