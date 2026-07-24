@@ -263,6 +263,13 @@ def test_add_session_cue_updates_cue_surfaces(qapp, qt_widget_cleanup):
     assert "1" in viewer.cue_markers
 
 
+def test_session_cue_id_prefers_short_free_display_id(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_cue_points = [{"ID": 4278190179, "Sample Offset": 100}]
+
+    assert viewer._next_session_cue_id() == 1
+
+
 def test_transport_zoom_controls_change_waveform_range(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
     viewer.audio_duration = 100.0

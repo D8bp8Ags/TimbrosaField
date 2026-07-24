@@ -4060,13 +4060,16 @@ class WavViewer(QWidget):
 
     def _next_session_cue_id(self) -> int:
         """Return the next cue ID for a session-created cue."""
-        existing_ids = []
+        existing_ids = set()
         for cue in self.current_cue_points:
             try:
-                existing_ids.append(int(cue.get("ID", 0)))
+                existing_ids.add(int(cue.get("ID", 0)))
             except (TypeError, ValueError):
                 continue
-        return (max(existing_ids) if existing_ids else 0) + 1
+        for candidate in range(1, 10000):
+            if candidate not in existing_ids:
+                return candidate
+        return max(existing_ids) + 1 if existing_ids else 1
 
     def _update_cue_highlighting(self) -> None:
         """Update visual highlighting of cue markers."""
