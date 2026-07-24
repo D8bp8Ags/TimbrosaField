@@ -399,6 +399,7 @@ def test_cue_marker_caps_stay_inside_current_y_range(qapp, qt_widget_cleanup):
 def test_cue_marker_at_sample_zero_is_rendered(qapp, qt_widget_cleanup):
     viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
     viewer.current_sr = 1000
+    viewer.cue_labels = {"1": "PEAK_01"}
 
     viewer._add_single_cue_marker({"ID": 1, "Sample Offset": 0})
 
@@ -406,6 +407,16 @@ def test_cue_marker_at_sample_zero_is_rendered(qapp, qt_widget_cleanup):
     assert "1" in viewer.cue_markers
     for line in viewer.cue_lines["1"]:
         assert list(line.xData) == [0.0, 0.0]
+
+
+def test_unlabeled_offset_zero_cue_marker_is_skipped(qapp, qt_widget_cleanup):
+    viewer = qt_widget_cleanup(_make_wav_viewer(qapp))
+    viewer.current_sr = 1000
+
+    viewer._add_single_cue_marker({"ID": 1, "Sample Offset": 0})
+
+    assert "1" not in viewer.cue_lines
+    assert "1" not in viewer.cue_markers
 
 
 def test_cue_marker_labels_use_centralized_waveform_style(qapp, qt_widget_cleanup):

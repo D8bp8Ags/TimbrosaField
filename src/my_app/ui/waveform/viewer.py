@@ -2892,15 +2892,13 @@ class WavViewer(QWidget):
 
         Args:     cue: Cue point information dictionary
         """
-        offset = cue.get("Sample Offset", 0)
-        cue_id = cue.get("ID")
-
-        if offset < 0 or cue_id is None or self.current_sr is None:
+        cue_marker = self._displayable_cue_marker(cue)
+        if cue_marker is None:
             return
 
         # Convert to time position
+        cue_id_str, offset = cue_marker
         x_pos = offset / self.current_sr
-        cue_id_str = str(int(cue_id))
         pen = self._cue_marker_pen(is_selected=False)
 
         # Add marker to all plots
@@ -2926,6 +2924,34 @@ class WavViewer(QWidget):
             cap.setZValue(20)
             plot.addItem(cap)
             self.cue_markers.setdefault(cue_id_str, []).append(cap)
+
+    def _displayable_cue_marker(self, cue: dict[str, Any]) -> tuple[str, float] | None:
+        """Return normalized cue marker data, skipping empty offset-zero placeholders."""
+        if self.current_sr is None:
+            return None
+
+        cue_id = cue.get("ID")
+        offset = cue.get("Sample Offset")
+        if cue_id is None or offset is None:
+            return None
+
+        try:
+            cue_id_str = str(int(cue_id))
+            offset_value = float(offset)
+        except (TypeError, ValueError):
+            return None
+
+        if offset_value < 0:
+            return None
+
+        label = (
+            self.cue_labels.get(cue_id_str, "")
+            or str(cue.get("Label", "") or "")
+        ).strip()
+        if offset_value == 0 and not label:
+            return None
+
+        return cue_id_str, offset_value
 
     @staticmethod
     def _cue_marker_cap_y(plot: pg.PlotWidget) -> float:
