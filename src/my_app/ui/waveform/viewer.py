@@ -2895,7 +2895,7 @@ class WavViewer(QWidget):
         offset = cue.get("Sample Offset", 0)
         cue_id = cue.get("ID")
 
-        if offset <= 0 or cue_id is None or self.current_sr is None:
+        if offset < 0 or cue_id is None or self.current_sr is None:
             return
 
         # Convert to time position
