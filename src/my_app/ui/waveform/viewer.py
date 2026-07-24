@@ -745,6 +745,7 @@ class WavViewer(QWidget):
         # self.waveform_plot_bottom.setMinimumHeight(100)
 
         self.waveform_layout.addWidget(self.waveform_plot_bottom, stretch=50)
+        self.apply_waveform_plot_theme()
 
         # self.waveform_plot.getViewBox().sigXRangeChanged.connect(
         #     self.update_plot_for_view_range)
@@ -752,6 +753,30 @@ class WavViewer(QWidget):
         #     self.update_plot_for_view_range)
         # self.waveform_plot_bottom.getViewBox().sigXRangeChanged.connect(
         #     self.update_plot_for_view_range)
+
+    def apply_waveform_plot_theme(self, bg_color: QColor | str | None = None) -> None:
+        """Apply theme-aware visual styling to all waveform plot widgets."""
+        background = bg_color or ApplicationStylist.COLORS["plot_background"]
+        axis_pen = pg.mkPen(ApplicationStylist.COLORS["divider"], width=1)
+        grid_pen = pg.mkPen(ApplicationStylist.COLORS["border"], width=1)
+        text_pen = pg.mkPen(ApplicationStylist.COLORS["text_muted"], width=1)
+
+        for plot in (
+            self.waveform_plot,
+            self.waveform_plot_top,
+            self.waveform_plot_bottom,
+        ):
+            plot.setBackground(background)
+            plot.showGrid(x=True, y=True, alpha=0.22)
+            plot.getViewBox().setBackgroundColor(background)
+
+            plot_item = plot.getPlotItem()
+            plot_item.getViewBox().setBorder(grid_pen)
+            for axis_name in ("left", "bottom"):
+                axis = plot_item.getAxis(axis_name)
+                axis.setPen(axis_pen)
+                axis.setTextPen(text_pen)
+                axis.setStyle(tickTextOffset=6)
 
     def _setup_metadata_tables(self) -> None:
         """Set up comprehensive metadata display tables for WAV file information.

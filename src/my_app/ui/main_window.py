@@ -921,6 +921,8 @@ class MainWindow(QMainWindow):
             self.wav_viewer.waveform_plot_bottom,
         ]:
             plot.setBackground(bg_color)
+        if hasattr(self.wav_viewer, "apply_waveform_plot_theme"):
+            self.wav_viewer.apply_waveform_plot_theme(bg_color)
 
     # ---------------------------------------------------------------------
     # Audio menu handlers
@@ -1277,4 +1279,3 @@ class MainWindow(QMainWindow):
         """
         self.settings_manager.save_all_settings(self)
         event.accept()
-
