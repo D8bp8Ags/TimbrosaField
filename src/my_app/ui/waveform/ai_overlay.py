@@ -19,6 +19,15 @@ from my_app.ai.settings import graph_label_for_detection, load_ai_settings
 # Top-3 labels per unique start_time — sorted by score, min 0.10
 _GRAPH_MIN = 0.10
 _GRAPH_TOP = 3
+_GRAPH_LABEL_MAX_CHARS = 18
+_GRAPH_LABEL_MIN_SPACING_SECONDS = 30.0
+
+
+def _compact_graph_label(label: str) -> str:
+    """Return a compact label that keeps dense detection overlays readable."""
+    if len(label) <= _GRAPH_LABEL_MAX_CHARS:
+        return label
+    return f"{label[: _GRAPH_LABEL_MAX_CHARS - 1]}…"
 
 
 class AiOverlayController:
@@ -83,6 +92,7 @@ class AiOverlayController:
                 s = det["start_time"]
                 by_window.setdefault(s, []).append(det)
 
+            last_labeled_start_s: float | None = None
             for start_s, dets in sorted(by_window.items()):
                 top = sorted(dets, key=lambda d: -d["score"])[:_GRAPH_TOP]
                 end_s = top[0]["end_time"]
@@ -90,7 +100,21 @@ class AiOverlayController:
                     (graph_label_for_detection(d, graph_mode), d["score"])
                     for d in top
                 ]
-                self._add_region(start_s, end_s, labels, name, brush, text_color)
+                show_label = (
+                    last_labeled_start_s is None
+                    or start_s - last_labeled_start_s >= _GRAPH_LABEL_MIN_SPACING_SECONDS
+                )
+                if show_label:
+                    last_labeled_start_s = start_s
+                self._add_region(
+                    start_s,
+                    end_s,
+                    labels,
+                    name,
+                    brush,
+                    text_color,
+                    show_label=show_label,
+                )
 
     def _rebuild_toggles(self, layers: list[dict]) -> None:
         """Recreate the per-layer toggle checkboxes in the header row.
@@ -122,6 +146,8 @@ class AiOverlayController:
         layer_name: str,
         brush,
         text_color: str,
+        *,
+        show_label: bool = True,
     ) -> None:
         """Add a semi-transparent region and stacked text labels for one window.
 
@@ -134,6 +160,7 @@ class AiOverlayController:
             text_color: Hex colour string for the text label.
         """
         visible = self.layer_visible.get(layer_name, True)
+        tooltip = "\n".join(f"{label} {score:.2f}" for label, score in labels)
 
         for plot in self._plots:
             region = pg.LinearRegionItem(
@@ -141,23 +168,31 @@ class AiOverlayController:
                 movable=False,
                 brush=brush,
             )
+            if tooltip:
+                region.setToolTip(tooltip)
             region.setZValue(-10)
             region.setVisible(visible)
             plot.addItem(region)
             self.overlay_items.append((plot, region, layer_name))
 
+        if not show_label:
+            return
+
         font = QFont()
-        font.setPointSize(9)
-        font.setBold(True)
+        font.setPointSize(8)
+        font.setBold(False)
 
         for i, (label, score) in enumerate(labels):
-            y = 0.95 - i * 0.15
+            y = 0.95 - i * 0.12
+            full_text = f"{label} {score:.2f}"
             text = pg.TextItem(
-                text=f"{label} {score:.2f}",
+                text=f"{_compact_graph_label(label)} {score:.2f}",
                 color=text_color,
                 anchor=(0, 1),
             )
             text.setFont(font)
+            text.setToolTip(full_text)
+            text.setOpacity(0.9)
             text.setPos(start_s, y)
             text.setZValue(5)
             text.setVisible(visible)
