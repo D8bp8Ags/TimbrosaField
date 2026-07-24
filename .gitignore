@@ -2,29 +2,6 @@
 # Default: keep repository contents local unless explicitly allowed below.
 /*
 
-# Public root files
-!/.gitignore
-!/AGENTS.md
-!/CLAUDE.md
-!/LICENSE
-!/README.md
-!/pyproject.toml
-!/requirements.txt
-
-# Public application source
-!/src/
-!/src/**
-
-# Public maintenance scripts and tests
-!/scripts/
-!/scripts/**
-!/tests/
-!/tests/**
-
-# Private/local source subtrees
-/src/my_app/config/
-/src/my_app/models/
-
 # Local editor / AI assistant state
 /.claude/
 /.codex/
@@ -34,11 +11,11 @@
 /.windsurf/
 /.aider*
 
-# Local working notes, launchers, user data, and media/output folders
+# Local notes, launchers, user data, and media/output folders
+/notes/
 /TASKS.md
 /Start_TimbrosaField.command
 /data/
-/docs/
 /.github/
 /Ableton/
 /FieldRecordings/
@@ -56,6 +33,8 @@
 *.bak
 *.bin
 *.jpeg
+*.jpg
+*.png
 *.json
 *.wav
 *.WAV
@@ -146,5 +125,27 @@ celerybeat-schedule
 celerybeat.pid
 *.sage.py
 
-# External/public datasets should not be committed
-/data/
+# Public root files
+!/.gitignore
+!/AGENTS.md
+!/CLAUDE.md
+!/LICENSE
+!/README.md
+!/pyproject.toml
+!/requirements.txt
+
+# Public source, scripts, tests, and docs
+!/src/
+!/src/**
+!/scripts/
+!/scripts/**
+!/tests/
+!/tests/**
+!/docs/
+!/docs/**
+
+# Private/local subtrees and files inside public roots
+/src/my_app/config/
+/src/my_app/models/
+/src/my_app/default_template.als
+**/__pycache__/
