@@ -109,6 +109,7 @@ class FileTagAutocomplete(QWidget):
             also sorted alphabetically.
         """
         super().__init__()
+        self.setObjectName("tag_completer")
         logger.info("Initializing FileTagAutocomplete widget")
 
         # Sort categories alphabetically by text (excluding emoji)
@@ -188,8 +189,10 @@ class FileTagAutocomplete(QWidget):
         # Category filter section
         category_layout = QHBoxLayout()
         category_label = QLabel("Category filter:")
+        category_label.setObjectName("tag_section_label")
 
         self.category_combo = QComboBox()
+        self.category_combo.setObjectName("tag_category_filter")
         self.category_combo.addItem("All categories")
         for category in self.tag_categories.keys():
             self.category_combo.addItem(category)
@@ -209,6 +212,7 @@ class FileTagAutocomplete(QWidget):
 
         # Tag input field
         self.tag_input = QLineEdit()
+        self.tag_input.setObjectName("tag_input")
         self.tag_input.setPlaceholderText("Type tags for your recording...")
         self.tag_input.textChanged.connect(self._handle_text_change)
         # self.tag_input.keyPressEvent = self._handle_input_keypress
@@ -217,6 +221,7 @@ class FileTagAutocomplete(QWidget):
 
         # Tag suggestions list
         self.suggestions_widget = QListWidget()
+        self.suggestions_widget.setObjectName("tag_suggestions")
         self.suggestions_widget.itemClicked.connect(self._handle_tag_click)
         # self.suggestions_widget.keyPressEvent = (self._handle_suggestions_keypress)
         self.suggestions_widget.show()
@@ -225,6 +230,7 @@ class FileTagAutocomplete(QWidget):
 
         # Current tags display
         self.tags_display = QLabel("Current tags: ")
+        self.tags_display.setObjectName("current_tags_label")
         self.tags_display.setWordWrap(True)
         layout.addWidget(self.tags_display)
 
@@ -948,7 +954,7 @@ class TemplateQuickButtons(QWidget):
 
         # Label
         label = QLabel("Quick Templates:")
-        #label.setStyleSheet("font-weight: bold; color: #666; font-size: 10pt;")
+        label.setObjectName("tag_section_label")
         layout.addWidget(label)
 
         # Buttons layout (2-column grid so names fit in the narrow left panel)
@@ -983,17 +989,8 @@ class TemplateQuickButtons(QWidget):
             template_data = self.template_manager.get_template(name)
             if template_data:
                 btn = QPushButton(name)
+                btn.setObjectName("template_chip")
                 btn.setMaximumHeight(28)
-                btn.setStyleSheet(
-                    """QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #4a4a4a, stop:1 #3a3a3a); border: 1px solid #666666; border-
-                    radius: 6px; padding: 4px 6px; font-size: 9pt; color: #ffffff; }
-                    QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0,
-                    y2:1, stop:0 #5a5a5a, stop:1 #4a4a4a); border-color: #888888; }
-                    QPushButton:pressed { background: qlineargradient(x1:0, y1:0, x2:0,
-                    y2:1, stop:0 #2a2a2a, stop:1 #1a1a1a); }
-                    """
-                )
                 btn.clicked.connect(
                     lambda checked, data=template_data, n=name: self.apply_template(data, n)
                 )
@@ -1010,6 +1007,7 @@ class TemplateQuickButtons(QWidget):
 
         # More/Manage button — spans both columns on the next row
         more_btn = QPushButton("Manage templates")
+        more_btn.setObjectName("manage_templates_button")
         more_btn.setMaximumHeight(24)
         more_btn.setToolTip("Template Manager (F9)")
         more_btn.setStyleSheet("")

@@ -2267,6 +2267,115 @@ class ApplicationStylist:
             border-color: {ApplicationStylist.COLORS['primary']};
         }}
 
+        QWidget#tag_completer {{
+            background-color: transparent;
+            border: none;
+            border-radius: 0px;
+            padding: 0px;
+        }}
+
+        QWidget#tag_completer QLabel#tag_section_label {{
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 9pt;
+            font-weight: 800;
+            letter-spacing: 0px;
+        }}
+
+        QWidget#tag_completer QComboBox#tag_category_filter,
+        QWidget#tag_completer QLineEdit#tag_input {{
+            background-color: {ApplicationStylist.COLORS['input_background']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 9pt;
+            min-height: 22px;
+            padding: 3px 7px;
+        }}
+
+        QWidget#tag_completer QComboBox#tag_category_filter:focus,
+        QWidget#tag_completer QLineEdit#tag_input:focus {{
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QWidget#tag_completer QComboBox#tag_category_filter::drop-down {{
+            border: none;
+            width: 18px;
+        }}
+
+        QWidget#tag_completer QComboBox#tag_category_filter::down-arrow {{
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid {ApplicationStylist.COLORS['text_muted']};
+            width: 0px;
+            height: 0px;
+            margin-right: 5px;
+        }}
+
+        QWidget#tag_completer QListWidget#tag_suggestions {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 9pt;
+            margin-top: 2px;
+        }}
+
+        QWidget#tag_completer QListWidget#tag_suggestions::item {{
+            border-bottom: 1px solid {ApplicationStylist.COLORS['divider']};
+            margin: 0px;
+            padding: 3px 7px;
+        }}
+
+        QWidget#tag_completer QListWidget#tag_suggestions::item:hover {{
+            background-color: {ApplicationStylist.COLORS['hover_overlay']};
+        }}
+
+        QWidget#tag_completer QListWidget#tag_suggestions::item:selected {{
+            background-color: rgba(106, 168, 79, 0.28);
+            color: {ApplicationStylist.COLORS['selection_text']};
+        }}
+
+        QWidget#tag_completer QLabel#current_tags_label {{
+            color: {ApplicationStylist.COLORS['text_muted']};
+            font-size: 9pt;
+            padding-top: 4px;
+        }}
+
+        QWidget#tag_completer QPushButton#template_chip {{
+            background-color: {ApplicationStylist.COLORS['surface_elevated']};
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_primary']};
+            font-size: 8pt;
+            font-weight: 700;
+            padding: 3px 5px;
+        }}
+
+        QWidget#tag_completer QPushButton#template_chip:hover {{
+            background-color: {ApplicationStylist.COLORS['surface']};
+            border-color: {ApplicationStylist.COLORS['primary']};
+        }}
+
+        QWidget#tag_completer QPushButton#template_chip:pressed {{
+            background-color: {ApplicationStylist.COLORS['primary_pressed']};
+        }}
+
+        QWidget#tag_completer QPushButton#manage_templates_button {{
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid {ApplicationStylist.COLORS['border']};
+            border-radius: 4px;
+            color: {ApplicationStylist.COLORS['text_secondary']};
+            font-size: 9pt;
+            font-weight: 700;
+            padding: 3px 6px;
+        }}
+
+        QWidget#tag_completer QPushButton#manage_templates_button:hover {{
+            border-color: {ApplicationStylist.COLORS['primary']};
+            color: {ApplicationStylist.COLORS['text_primary']};
+        }}
+
         QWidget#recording_row {{
             background-color: transparent;
         }}
